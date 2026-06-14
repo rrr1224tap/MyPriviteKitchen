@@ -1,0 +1,21 @@
+{
+  "pages": [
+    "pages/common/launch/launch",
+    "pages/user/menu/menu",
+    "pages/user/dish-detail/dish-detail",
+    "pages/user/cart/cart",
+    "pages/user/submit-order/submit-order",
+    "pages/user/order-list/order-list",
+    "pages/user/order-detail/order-detail",
+    "pages/merchant/dashboard/dashboard",
+    "pages/merchant/orders/orders",
+    "pages/merchant/order-detail/order-detail"
+  ],
+  "window": {
+    "navigationBarTitleText": "点餐小程序",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f7f7f7"
+  },
+  "style": "v2"
+}

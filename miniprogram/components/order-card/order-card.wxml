@@ -1,0 +1,25 @@
+<view class="order-card" bindtap="onTap">
+  <view class="order-header">
+    <view class="order-no">#{{order.order_no || '订单编号'}}</view>
+    <status-tag status="{{order.status}}" text="{{order.status_text || statusText}}"></status-tag>
+  </view>
+  <view class="order-info">
+    <view class="order-summary">{{order.summary || '订单内容待展示'}}</view>
+    <view wx:if="{{order.remark}}" class="order-remark">备注：{{order.remark}}</view>
+    <view class="order-time">{{order.created_at_text || createdAtText}}</view>
+  </view>
+  <view class="order-footer">
+    <view class="order-count">共 {{order.item_count || 0}} 件</view>
+    <view class="order-amount">{{order.total_amount_text || amountText}}</view>
+  </view>
+  <view wx:if="{{showActions && actions.length}}" class="order-actions" catchtap="noop">
+    <button
+      wx:for="{{actions}}"
+      wx:key="value"
+      class="action-button action-{{item.type || 'primary'}}"
+      size="mini"
+      data-action="{{item.value}}"
+      bindtap="onAction"
+    >{{item.text}}</button>
+  </view>
+</view>

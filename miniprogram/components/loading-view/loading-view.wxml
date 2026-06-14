@@ -1,0 +1,4 @@
+<view wx:if="{{loading}}" class="loading-view">
+  <view class="loading-dot"></view>
+  <view class="loading-text">{{text}}</view>
+</view>

@@ -1,0 +1,116 @@
+.dish-card {
+  display: flex;
+  gap: 20rpx;
+  box-sizing: border-box;
+  padding: 20rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.06);
+}
+
+.dish-card.is-disabled {
+  opacity: 0.55;
+}
+
+.dish-media {
+  position: relative;
+  flex: none;
+}
+
+.dish-image {
+  display: block;
+  width: 184rpx;
+  height: 184rpx;
+  border-radius: 20rpx;
+  background: #f3f3f3;
+}
+
+.dish-status {
+  position: absolute;
+  left: 10rpx;
+  top: 10rpx;
+}
+
+.dish-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.dish-name {
+  color: #171717;
+  font-size: 30rpx;
+  font-weight: bold;
+  line-height: 1.35;
+}
+
+.dish-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 10rpx;
+}
+
+.dish-tag {
+  max-width: 160rpx;
+  box-sizing: border-box;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: #fff0f2;
+  color: #e63b4a;
+  font-size: 20rpx;
+  line-height: 1.3;
+}
+
+.dish-desc {
+  margin-top: 10rpx;
+  color: #777777;
+  font-size: 24rpx;
+  line-height: 1.45;
+}
+
+.dish-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18rpx;
+}
+
+.dish-price {
+  color: #e63b4a;
+  font-size: 36rpx;
+  font-weight: bold;
+}
+
+.add-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0 24rpx;
+  height: 60rpx;
+  border-radius: 999rpx;
+  background: #e63b4a;
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: bold;
+  line-height: 60rpx;
+  box-shadow: 0 8rpx 20rpx rgba(230, 59, 74, 0.22);
+}
+
+.add-button::after {
+  border: none;
+}
+
+.add-button.is-round {
+  width: 60rpx;
+  min-width: 60rpx;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 36rpx;
+}
+
+.add-button[disabled] {
+  background: #aaaaaa;
+  color: #ffffff;
+  box-shadow: none;
+}

@@ -1,0 +1,22 @@
+.loading-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  box-sizing: border-box;
+  padding: 48rpx 32rpx;
+  color: #777777;
+  font-size: 24rpx;
+}
+
+.loading-dot {
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  background: #e63b4a;
+  box-shadow: 0 0 0 8rpx rgba(230, 59, 74, 0.12);
+}
+
+.loading-text {
+  line-height: 1.4;
+}

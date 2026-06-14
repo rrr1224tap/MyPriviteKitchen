@@ -1,0 +1,3 @@
+<view class="status-tag status-{{status}} type-{{type}}">
+  {{displayText || text || status || '状态'}}
+</view>

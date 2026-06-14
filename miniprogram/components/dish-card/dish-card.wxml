@@ -1,0 +1,19 @@
+<view class="dish-card {{disabled ? 'is-disabled' : ''}}" bindtap="onTap">
+  <view class="dish-media">
+    <image class="dish-image" src="{{dish.image}}" mode="aspectFill"></image>
+    <view wx:if="{{status && status !== 'on_sale'}}" class="dish-status">
+      <status-tag status="{{status}}"></status-tag>
+    </view>
+  </view>
+  <view class="dish-content">
+    <view class="dish-name">{{dish.name || '未命名餐品'}}</view>
+    <view wx:if="{{tags.length}}" class="dish-tags">
+      <view wx:for="{{tags}}" wx:key="*this" class="dish-tag">{{item}}</view>
+    </view>
+    <view class="dish-desc">{{dish.description || ''}}</view>
+    <view class="dish-footer">
+      <view class="dish-price">{{dish.price_text || priceText}}</view>
+      <button wx:if="{{showAdd}}" class="add-button {{actionText === '+' ? 'is-round' : 'is-pill'}}" size="mini" catchtap="onAdd" disabled="{{disabled}}">{{actionText}}</button>
+    </view>
+  </view>
+</view>

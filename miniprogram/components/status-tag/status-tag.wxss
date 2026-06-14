@@ -1,0 +1,53 @@
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42rpx;
+  box-sizing: border-box;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  background: #f1f1f1;
+  color: #777777;
+  font-size: 22rpx;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+.status-pending {
+  background: #fff4e5;
+  color: #e7a043;
+}
+
+.status-accepted {
+  background: #e9f4ff;
+  color: #2d7cc8;
+}
+
+.status-cooking {
+  background: #fff0f2;
+  color: #e63b4a;
+}
+
+.status-finished {
+  background: #e9f8ef;
+  color: #5a963b;
+}
+
+.status-cancelled {
+  background: #f1f1f1;
+  color: #777777;
+}
+
+.status-on_sale {
+  background: #e9f8ef;
+  color: #5a963b;
+}
+
+.status-off_sale {
+  background: #f1f1f1;
+  color: #777777;
+}
+
+.status-sold_out {
+  background: #fff0f2;
+  color: #e63b4a;
+}
