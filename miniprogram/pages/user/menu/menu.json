@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "菜单"
+  "navigationStyle": "custom",
+  "backgroundColor": "#100D0B",
+  "backgroundTextStyle": "light"
 }

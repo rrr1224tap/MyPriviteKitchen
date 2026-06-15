@@ -1,4 +1,107 @@
-<view class="page">
-  <view class="page-title">启动页</view>
-  <view class="page-desc">基础页面已创建，后续任务将接入登录逻辑。</view>
+<view class="launch-page">
+  <view class="hero-section">
+    <view class="hero-ambient hero-ambient-one"></view>
+    <view class="hero-ambient hero-ambient-two"></view>
+    <view class="hero-food-window">
+      <image
+        wx:if="{{homeImageAvailable}}"
+        class="hero-food-image"
+        src="{{homeReference}}"
+        mode="widthFix"
+        binderror="handleHomeImageError"
+      ></image>
+    </view>
+    <view class="hero-vignette"></view>
+
+    <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+      <view class="nav-wordmark">三也拌饭<text>甄选</text></view>
+    </view>
+
+    <view class="hero-copy">
+      <view class="brand-sign">
+        <view class="brand-cn">三也</view>
+        <view class="brand-en">SAN YE · KITCHEN</view>
+      </view>
+      <view class="hero-kicker"><text class="kicker-line"></text>今日主推 · 热气上桌</view>
+      <view class="hero-title">招牌肥牛<text>石锅拌饭</text></view>
+      <view class="hero-desc">现炒好味，认真对待每一碗热饭</view>
+      <button class="hero-button" bindtap="goToMenu">
+        <text>立即点餐</text>
+        <text class="button-arrow">→</text>
+      </button>
+    </view>
+  </view>
+
+  <view class="home-content">
+    <view class="member-card glass-light">
+      <view class="member-emblem">
+        <view class="member-emblem-inner">VIP</view>
+      </view>
+      <view class="member-copy">
+        <view class="member-title">三也饭友会</view>
+        <view class="member-desc">新客领 8 元券 · 每单累计成长值</view>
+      </view>
+      <view class="member-action">立即加入</view>
+      <view class="member-glow"></view>
+    </view>
+
+    <view class="section-heading">
+      <view>
+        <view class="section-title">今天怎么吃</view>
+        <view class="section-subtitle">选择你的用餐方式</view>
+      </view>
+      <view class="open-pill"><text></text>营业中</view>
+    </view>
+
+    <view class="entry-row">
+      <view class="entry-card dine-card glass-light" bindtap="goToMenu">
+        <view class="entry-icon dine-icon"><text class="icon-dome">餐</text></view>
+        <view class="entry-title">堂食点餐</view>
+        <view class="entry-desc">到店即点，热气上桌</view>
+        <view class="entry-arrow">→</view>
+      </view>
+      <view class="entry-card pickup-card glass-light" bindtap="goToMenu">
+        <view class="entry-icon pickup-icon"><text>取</text></view>
+        <view class="entry-title">到店自提</view>
+        <view class="entry-desc">提前下单，免排队</view>
+        <view class="entry-arrow">→</view>
+      </view>
+    </view>
+
+    <view class="order-entry glass-light" bindtap="goToOrders">
+      <view class="order-icon">单</view>
+      <view class="order-copy">
+        <view class="entry-title">我的订单</view>
+        <view class="entry-desc">查看制作进度与历史订单</view>
+      </view>
+      <view class="order-arrow">→</view>
+    </view>
+
+    <view class="service-strip glass-light">
+      <view class="service-item"><text class="service-icon">时</text>营业时间 10:30 - 21:30</view>
+      <view class="service-divider"></view>
+      <view class="service-item"><text class="service-icon">店</text>门店现做 · 支持自提</view>
+    </view>
+
+    <view class="merchant-entry" bindtap="goToMerchant">商家工作台</view>
+  </view>
+
+  <view class="premium-tabbar glass-light">
+    <view class="tab-item is-active">
+      <view class="tab-icon">首</view>
+      <view>首页</view>
+    </view>
+    <view class="tab-item" bindtap="goToMenu">
+      <view class="tab-icon">餐</view>
+      <view>点餐</view>
+    </view>
+    <view class="tab-item" bindtap="goToOrders">
+      <view class="tab-icon">单</view>
+      <view>订单</view>
+    </view>
+    <view class="tab-item" bindtap="goToMerchant">
+      <view class="tab-icon">我</view>
+      <view>我的</view>
+    </view>
+  </view>
 </view>

@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "启动页"
+  "navigationStyle": "custom",
+  "backgroundColor": "#17110D",
+  "backgroundTextStyle": "light"
 }
