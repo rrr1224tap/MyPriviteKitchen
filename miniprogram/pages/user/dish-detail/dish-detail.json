@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "餐品详情"
+  "navigationStyle": "custom",
+  "backgroundColor": "#211815",
+  "backgroundTextStyle": "light"
 }

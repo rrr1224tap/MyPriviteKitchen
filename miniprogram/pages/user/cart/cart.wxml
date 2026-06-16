@@ -1,4 +1,137 @@
-<view class="page">
-  <view class="page-title">购物车</view>
-  <view class="page-desc">基础页面已创建，后续任务将接入本地购物车。</view>
+<view class="cart-page">
+  <view class="cart-background">
+    <view class="background-image-window">
+      <image
+        wx:if="{{backgroundImageAvailable}}"
+        class="background-image"
+        src="{{backgroundImage}}"
+        mode="widthFix"
+        binderror="handleBackgroundImageError"
+      ></image>
+    </view>
+    <view class="background-shade"></view>
+  </view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="back-button" bindtap="goBack">‹</view>
+    <view class="nav-title">购物车</view>
+    <view wx:if="{{items.length}}" class="clear-button" bindtap="clearCart">清空</view>
+    <view wx:else class="nav-placeholder"></view>
+  </view>
+
+  <view wx:if="{{items.length}}" class="cart-content">
+    <view class="cart-overview glass-panel">
+      <view>
+        <view class="overview-kicker">YOUR ORDER</view>
+        <view class="overview-title">已选好味</view>
+        <view class="overview-desc">共 {{totalCount}} 件 · 下单后门店现做</view>
+      </view>
+      <view class="overview-count">{{totalCount}}</view>
+    </view>
+
+    <view class="cart-list">
+      <view wx:for="{{items}}" wx:key="dish_id" class="cart-item glass-panel">
+        <view class="cart-image-window">
+          <image
+            wx:if="{{item.image_available}}"
+            class="cart-image"
+            src="{{item.image}}"
+            style="{{item.image_style}}"
+            mode="widthFix"
+            lazy-load="{{true}}"
+            data-id="{{item.dish_id}}"
+            binderror="handleItemImageError"
+          ></image>
+          <view class="image-gloss"></view>
+        </view>
+        <view class="cart-info">
+          <view class="cart-name">{{item.name}}</view>
+          <view class="cart-spec">{{item.spec}}</view>
+          <view class="cart-item-bottom">
+            <view>
+              <view class="cart-price">{{item.price_text}}</view>
+              <view class="cart-subtotal">小计 {{item.subtotal_text}}</view>
+            </view>
+            <view class="stepper">
+              <view class="stepper-button is-minus" data-id="{{item.dish_id}}" data-step="-1" bindtap="changeQuantity">−</view>
+              <view class="stepper-value">{{item.quantity}}</view>
+              <view class="stepper-button" data-id="{{item.dish_id}}" data-step="1" bindtap="changeQuantity">＋</view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="pickup-panel warm-glass">
+      <view class="section-head">
+        <view>
+          <view class="section-kicker">PICKUP METHOD</view>
+          <view class="section-title">取餐方式</view>
+        </view>
+        <view class="pickup-time">预计 15 分钟</view>
+      </view>
+      <view class="pickup-options">
+        <view class="pickup-option {{pickupType === 'pickup' ? 'is-active' : ''}}" data-type="pickup" bindtap="selectPickup">
+          <view class="pickup-icon">取</view>
+          <view>
+            <view class="pickup-title">到店自提</view>
+            <view class="pickup-desc">提前下单，到店即取</view>
+          </view>
+          <view class="option-mark"></view>
+        </view>
+        <view class="pickup-option {{pickupType === 'dine' ? 'is-active' : ''}}" data-type="dine" bindtap="selectPickup">
+          <view class="pickup-icon is-dine">堂</view>
+          <view>
+            <view class="pickup-title">堂食点餐</view>
+            <view class="pickup-desc">到店享用，热气上桌</view>
+          </view>
+          <view class="option-mark"></view>
+        </view>
+      </view>
+    </view>
+
+    <view class="summary-panel glass-panel">
+      <view class="summary-head">
+        <view>
+          <view class="section-kicker is-light">PAYMENT SUMMARY</view>
+          <view class="summary-title">金额明细</view>
+        </view>
+        <view class="member-pill">饭友享价</view>
+      </view>
+      <view class="summary-row">
+        <text>商品小计</text>
+        <text>{{subtotalAmountText}}</text>
+      </view>
+      <view class="summary-row is-discount">
+        <text>饭友优惠</text>
+        <text>-{{discountAmountText}}</text>
+      </view>
+      <view class="summary-divider"></view>
+      <view class="summary-total">
+        <view>
+          <view class="total-label">应付合计</view>
+          <view class="total-note">已为你节省 {{discountAmountText}}</view>
+        </view>
+        <view class="total-price">{{payableAmountText}}</view>
+      </view>
+    </view>
+
+    <view class="cart-spacer"></view>
+  </view>
+
+  <view wx:else class="empty-state glass-panel">
+    <view class="empty-emblem"><text>餐</text></view>
+    <view class="empty-title">购物车还是空的</view>
+    <view class="empty-desc">去挑几份热气腾腾的好味吧</view>
+    <button class="empty-button" bindtap="goToMenu">去点餐 <text>›</text></button>
+  </view>
+
+  <view wx:if="{{items.length}}" class="submit-bar glass-panel">
+    <view class="submit-summary">
+      <view class="submit-label">应付</view>
+      <view class="submit-price">{{payableAmountText}}</view>
+    </view>
+    <view class="submit-saving">已优惠 <text>{{discountAmountText}}</text></view>
+    <button class="submit-button" bindtap="submitMockOrder">去提交订单 <text>›</text></button>
+  </view>
 </view>

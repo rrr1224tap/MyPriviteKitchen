@@ -1,4 +1,88 @@
-<view class="page">
-  <view class="page-title">餐品详情</view>
-  <view class="page-desc">基础页面已创建，后续任务将展示餐品详情。</view>
+<view class="detail-page">
+  <view class="detail-background">
+    <view class="background-glow"></view>
+  </view>
+
+  <view class="hero-section">
+    <view class="hero-image-window">
+      <image
+        wx:if="{{imageAvailable}}"
+        class="hero-image"
+        src="{{dish.image}}"
+        style="{{dish.image_style}}"
+        mode="widthFix"
+        binderror="handleImageError"
+      ></image>
+    </view>
+    <view class="hero-shade"></view>
+
+    <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+      <view class="back-button" bindtap="goBack">‹</view>
+      <view class="nav-title">餐品详情</view>
+      <view class="nav-placeholder"></view>
+    </view>
+
+    <view class="hero-caption">
+      <view class="hero-kicker"><text></text>现炒现做 · 热气上桌</view>
+    </view>
+  </view>
+
+  <view class="detail-content">
+    <view class="dish-panel glass-panel">
+      <view class="dish-head">
+        <view class="dish-title-wrap">
+          <view class="dish-name">{{dish.name}}</view>
+          <view class="dish-subtitle">SAN YE SIGNATURE</view>
+        </view>
+        <view class="dish-price">{{dish.price_text}}</view>
+      </view>
+
+      <view class="tag-row">
+        <view wx:for="{{dish.tags}}" wx:key="*this" class="dish-tag">{{item}}</view>
+      </view>
+
+      <view class="dish-description">{{dish.description}}</view>
+      <view class="fresh-note"><text></text>下单后现炒，高峰期请耐心等候</view>
+    </view>
+
+    <view class="ingredient-panel warm-glass">
+      <view class="section-head">
+        <view>
+          <view class="section-kicker">INGREDIENTS</view>
+          <view class="section-title">主要食材</view>
+        </view>
+        <view class="section-note">每日新鲜备料</view>
+      </view>
+      <view class="ingredient-list">
+        <view wx:for="{{dish.ingredients}}" wx:key="*this" class="ingredient-item">
+          <text class="ingredient-dot"></text>
+          <view>{{item}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="quantity-panel glass-panel">
+      <view>
+        <view class="section-kicker is-light">QUANTITY</view>
+        <view class="quantity-title">选择数量</view>
+        <view class="quantity-desc">按你的胃口来，至少选择一份</view>
+      </view>
+      <view class="stepper">
+        <view class="stepper-button is-minus {{quantity === 1 ? 'is-disabled' : ''}}" bindtap="decreaseQuantity">−</view>
+        <view class="stepper-value">{{quantity}}</view>
+        <view class="stepper-button" bindtap="increaseQuantity">＋</view>
+      </view>
+    </view>
+
+    <view class="detail-spacer"></view>
+  </view>
+
+  <view class="purchase-bar glass-panel">
+    <view class="purchase-summary">
+      <view class="purchase-label">合计</view>
+      <view class="purchase-price">{{totalPriceText}}</view>
+    </view>
+    <view class="purchase-count">{{quantity}} 份</view>
+    <button class="add-cart-button" bindtap="addToMockCart">加入购物车 <text>›</text></button>
+  </view>
 </view>
