@@ -10,7 +10,7 @@
         class="hero-image"
         src="{{dish.image}}"
         style="{{dish.image_style}}"
-        mode="widthFix"
+        mode="{{dish.image_mode}}"
         binderror="handleImageError"
       ></image>
     </view>
@@ -31,18 +31,18 @@
     <view class="dish-panel glass-panel">
       <view class="dish-head">
         <view class="dish-title-wrap">
-          <view class="dish-name">{{dish.name}}</view>
+          <view class="dish-name">{{pageStatus === 'loading' ? '餐品加载中' : dish.name}}</view>
           <view class="dish-subtitle">SAN YE SIGNATURE</view>
         </view>
-        <view class="dish-price">{{dish.price_text}}</view>
+        <view class="dish-price">{{pageStatus === 'loading' ? '¥--' : dish.price_text}}</view>
       </view>
 
-      <view class="tag-row">
+      <view wx:if="{{pageStatus !== 'loading'}}" class="tag-row">
         <view wx:for="{{dish.tags}}" wx:key="*this" class="dish-tag">{{item}}</view>
       </view>
 
-      <view class="dish-description">{{dish.description}}</view>
-      <view class="fresh-note"><text></text>下单后现炒，高峰期请耐心等候</view>
+      <view class="dish-description">{{pageStatus === 'loading' ? '正在读取餐品详情，请稍等。' : dish.description}}</view>
+      <view class="fresh-note"><text></text>{{statusNotice}}</view>
     </view>
 
     <view class="ingredient-panel warm-glass">
@@ -80,9 +80,9 @@
   <view class="purchase-bar glass-panel">
     <view class="purchase-summary">
       <view class="purchase-label">合计</view>
-      <view class="purchase-price">{{totalPriceText}}</view>
+      <view class="purchase-price">{{pageStatus === 'loading' ? '¥--' : totalPriceText}}</view>
     </view>
     <view class="purchase-count">{{quantity}} 份</view>
-    <button class="add-cart-button" bindtap="addToMockCart">加入购物车 <text>›</text></button>
+    <button class="add-cart-button" bindtap="addToMockCart" disabled="{{pageStatus === 'loading'}}">加入购物车<text>›</text></button>
   </view>
 </view>
