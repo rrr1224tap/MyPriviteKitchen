@@ -1,6 +1,7 @@
 const { callFunction } = require('../../../utils/cloud')
 const { DEFAULT_MERCHANT_ID } = require('../../../utils/constants')
 const { formatMoney } = require('../../../utils/format')
+const { addCartItem, getCartSummary } = require('../../../utils/cart')
 
 const MENU_REFERENCE = '/images/mock/menu-glass-display.jpg'
 const HOME_REFERENCE = '/images/mock/home-glass-display.jpg'
@@ -229,6 +230,10 @@ Page({
     this.loadMenu()
   },
 
+  onShow() {
+    this.refreshCartSummary()
+  },
+
   onPullDownRefresh() {
     this.loadMenu().finally(() => {
       wx.stopPullDownRefresh()
@@ -261,6 +266,16 @@ Page({
         usingFallback: true
       })
     }
+  },
+
+  refreshCartSummary() {
+    const summary = getCartSummary()
+
+    this.setData({
+      cartCount: summary.total_quantity,
+      cartAmountCent: summary.total_amount_cent,
+      cartAmountText: formatMoney(summary.total_amount_cent)
+    })
   },
 
   handleHomeImageError() {
@@ -331,14 +346,17 @@ Page({
   addDish(event) {
     const dishId = event.currentTarget.dataset.id
     const dish = this.data.allDishes.find((item) => item._id === dishId)
-    const nextCount = this.data.cartCount + 1
-    const nextAmount = this.data.cartAmountCent + (dish ? dish.price_cent : 0)
 
-    this.setData({
-      cartCount: nextCount,
-      cartAmountCent: nextAmount,
-      cartAmountText: formatMoney(nextAmount)
-    })
+    if (!dish) {
+      wx.showToast({
+        title: '餐品信息异常，请稍后重试',
+        icon: 'none'
+      })
+      return
+    }
+
+    addCartItem(dish, 1)
+    this.refreshCartSummary()
 
     wx.showToast({
       title: '已加入购物车',

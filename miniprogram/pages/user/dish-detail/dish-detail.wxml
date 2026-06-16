@@ -83,6 +83,6 @@
       <view class="purchase-price">{{pageStatus === 'loading' ? '¥--' : totalPriceText}}</view>
     </view>
     <view class="purchase-count">{{quantity}} 份</view>
-    <button class="add-cart-button" bindtap="addToMockCart" disabled="{{pageStatus === 'loading'}}">加入购物车<text>›</text></button>
+    <button class="add-cart-button" bindtap="addToCart" disabled="{{pageStatus === 'loading'}}">加入购物车<text>›</text></button>
   </view>
 </view>

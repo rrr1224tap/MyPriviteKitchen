@@ -1,48 +1,52 @@
 const { formatMoney } = require('../../../utils/format')
+const cartUtils = require('../../../utils/cart')
 
 const DISCOUNT_CENT = 600
-
-const INITIAL_ITEMS = [
-  {
-    dish_id: 'dish_002',
-    name: '招牌肥牛石锅拌饭',
-    spec: '标准份 · 门店现做',
-    image: '/images/mock/menu-glass-display.jpg',
-    image_style: 'width: 750rpx; left: -192rpx; top: -846rpx;',
-    price_cent: 2990,
-    quantity: 1,
-    image_available: true
-  },
-  {
-    dish_id: 'dish_001',
-    name: '经典肉酱砂锅米线',
-    spec: '标准份 · 门店现做',
-    image: '/images/mock/menu-glass-display.jpg',
-    image_style: 'width: 750rpx; left: -192rpx; top: -676rpx;',
-    price_cent: 2590,
-    quantity: 1,
-    image_available: true
-  }
+const FALLBACK_IMAGE = '/images/mock/menu-glass-display.jpg'
+const FALLBACK_BACKGROUND = '/images/mock/home-glass-display.jpg'
+const FALLBACK_IMAGE_STYLES = [
+  'width: 750rpx; left: -192rpx; top: -846rpx;',
+  'width: 750rpx; left: -192rpx; top: -676rpx;',
+  'width: 1300rpx; left: -359rpx; top: -1768rpx;',
+  'width: 750rpx; left: -410rpx; top: -412rpx;'
 ]
 
+function getFallbackImageStyle(index) {
+  return FALLBACK_IMAGE_STYLES[index % FALLBACK_IMAGE_STYLES.length]
+}
+
 function decorateItems(items) {
-  return items.map((item) => Object.assign({}, item, {
-    price_text: formatMoney(item.price_cent),
-    subtotal_text: formatMoney(item.price_cent * item.quantity)
-  }))
+  return items.map((item, index) => {
+    const hasRealImage = Boolean(item.image_url)
+    const priceCent = Number(item.price_cent) || 0
+    const quantity = Number(item.quantity) || 1
+
+    return {
+      ...item,
+      spec: item.spec || '标准份 · 门店现做',
+      image: hasRealImage ? item.image_url : FALLBACK_IMAGE,
+      image_style: hasRealImage
+        ? 'width: 100%; height: 100%; left: 0; top: 0;'
+        : getFallbackImageStyle(index),
+      image_mode: hasRealImage ? 'aspectFill' : 'widthFix',
+      image_available: true,
+      price_text: formatMoney(priceCent),
+      subtotal_text: formatMoney(priceCent * quantity)
+    }
+  })
 }
 
 Page({
   data: {
     statusBarHeight: 20,
     navigationHeight: 44,
-    backgroundImage: '/images/mock/home-glass-display.jpg',
+    backgroundImage: FALLBACK_BACKGROUND,
     backgroundImageAvailable: true,
-    items: decorateItems(INITIAL_ITEMS),
-    totalCount: 2,
-    subtotalAmountText: formatMoney(5580),
-    discountAmountText: formatMoney(DISCOUNT_CENT),
-    payableAmountText: formatMoney(4980),
+    items: [],
+    totalCount: 0,
+    subtotalAmountText: formatMoney(0),
+    discountAmountText: formatMoney(0),
+    payableAmountText: formatMoney(0),
     pickupType: 'pickup'
   },
 
@@ -56,6 +60,12 @@ Page({
       statusBarHeight,
       navigationHeight
     })
+
+    this.refreshCart()
+  },
+
+  onShow() {
+    this.refreshCart()
   },
 
   goBack() {
@@ -69,21 +79,18 @@ Page({
     this.goToMenu()
   },
 
-  updateSummary(items) {
-    const summary = items.reduce((result, item) => ({
-      totalCount: result.totalCount + item.quantity,
-      subtotalAmountCent: result.subtotalAmountCent + item.price_cent * item.quantity
-    }), {
-      totalCount: 0,
-      subtotalAmountCent: 0
-    })
-    const discountAmountCent = items.length ? Math.min(DISCOUNT_CENT, summary.subtotalAmountCent) : 0
-    const payableAmountCent = summary.subtotalAmountCent - discountAmountCent
+  refreshCart() {
+    const items = cartUtils.getCartItems()
+    const summary = cartUtils.getCartSummary()
+    const discountAmountCent = summary.total_amount_cent
+      ? Math.min(DISCOUNT_CENT, summary.total_amount_cent)
+      : 0
+    const payableAmountCent = summary.total_amount_cent - discountAmountCent
 
     this.setData({
       items: decorateItems(items),
-      totalCount: summary.totalCount,
-      subtotalAmountText: formatMoney(summary.subtotalAmountCent),
+      totalCount: summary.total_quantity,
+      subtotalAmountText: formatMoney(summary.total_amount_cent),
       discountAmountText: formatMoney(discountAmountCent),
       payableAmountText: formatMoney(payableAmountCent)
     })
@@ -92,13 +99,14 @@ Page({
   changeQuantity(event) {
     const dishId = event.currentTarget.dataset.id
     const step = Number(event.currentTarget.dataset.step)
-    const nextItems = this.data.items
-      .map((item) => item.dish_id === dishId
-        ? Object.assign({}, item, { quantity: item.quantity + step })
-        : item)
-      .filter((item) => item.quantity > 0)
+    const currentItem = this.data.items.find((item) => item.dish_id === dishId)
 
-    this.updateSummary(nextItems)
+    if (!currentItem || !Number.isFinite(step)) {
+      return
+    }
+
+    cartUtils.updateCartItemQuantity(dishId, currentItem.quantity + step)
+    this.refreshCart()
   },
 
   clearCart() {
@@ -108,7 +116,8 @@ Page({
       confirmColor: '#E63B4A',
       success: (result) => {
         if (result.confirm) {
-          this.updateSummary([])
+          cartUtils.clearCart()
+          this.refreshCart()
         }
       }
     })
@@ -122,9 +131,26 @@ Page({
 
   handleItemImageError(event) {
     const dishId = event.currentTarget.dataset.id
-    const items = this.data.items.map((item) => item.dish_id === dishId
-      ? Object.assign({}, item, { image_available: false })
-      : item)
+    const items = this.data.items.map((item, index) => {
+      if (item.dish_id !== dishId) {
+        return item
+      }
+
+      if (item.image === FALLBACK_IMAGE) {
+        return {
+          ...item,
+          image_available: false
+        }
+      }
+
+      return {
+        ...item,
+        image: FALLBACK_IMAGE,
+        image_style: getFallbackImageStyle(index),
+        image_mode: 'widthFix',
+        image_available: true
+      }
+    })
 
     this.setData({ items })
   },
@@ -142,8 +168,16 @@ Page({
   },
 
   submitMockOrder() {
+    if (!this.data.items.length) {
+      wx.showToast({
+        title: '购物车为空',
+        icon: 'none'
+      })
+      return
+    }
+
     wx.showToast({
-      title: '提交订单将在后续接入',
+      title: '提交订单功能下一步接入',
       icon: 'none'
     })
   }

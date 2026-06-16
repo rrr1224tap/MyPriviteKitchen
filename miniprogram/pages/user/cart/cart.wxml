@@ -26,7 +26,10 @@
         <view class="overview-title">已选好味</view>
         <view class="overview-desc">共 {{totalCount}} 件 · 下单后门店现做</view>
       </view>
-      <view class="overview-count">{{totalCount}}</view>
+      <view class="overview-actions">
+        <view class="overview-count">{{totalCount}}</view>
+        <view class="overview-clear" bindtap="clearCart">清空</view>
+      </view>
     </view>
 
     <view class="cart-list">
@@ -37,7 +40,7 @@
             class="cart-image"
             src="{{item.image}}"
             style="{{item.image_style}}"
-            mode="widthFix"
+            mode="{{item.image_mode}}"
             lazy-load="{{true}}"
             data-id="{{item.dish_id}}"
             binderror="handleItemImageError"

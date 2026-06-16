@@ -1,6 +1,7 @@
 const { callFunction } = require('../../../utils/cloud')
 const { DEFAULT_MERCHANT_ID } = require('../../../utils/constants')
 const { formatMoney } = require('../../../utils/format')
+const { addCartItem } = require('../../../utils/cart')
 
 const FALLBACK_IMAGE = '/images/mock/home-glass-display.jpg'
 const FALLBACK_IMAGE_STYLE = 'width: 1120rpx; left: -318rpx; top: -126rpx;'
@@ -86,6 +87,8 @@ function decorateDish(rawDish, detailData = {}) {
   return {
     _id: getDishId(dish),
     dish_id: getDishId(dish),
+    merchant_id: dish.merchant_id || DEFAULT_MERCHANT_ID,
+    category_id: dish.category_id || (detailData.category && detailData.category.category_id) || '',
     name: dish.name || '未命名餐品',
     price_cent: priceCent,
     price_text: formatMoney(priceCent),
@@ -246,9 +249,11 @@ Page({
     this.updateQuantity(this.data.quantity + 1)
   },
 
-  addToMockCart() {
+  addToCart() {
+    addCartItem(this.data.dish, this.data.quantity)
+
     wx.showToast({
-      title: `已加入 ${this.data.quantity} 份`,
+      title: '已加入购物车',
       icon: 'none'
     })
   }
