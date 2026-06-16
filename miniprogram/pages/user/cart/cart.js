@@ -1,5 +1,7 @@
 const { formatMoney } = require('../../../utils/format')
 const cartUtils = require('../../../utils/cart')
+const { callFunction } = require('../../../utils/cloud')
+const { DEFAULT_MERCHANT_ID } = require('../../../utils/constants')
 
 const DISCOUNT_CENT = 600
 const FALLBACK_IMAGE = '/images/mock/menu-glass-display.jpg'
@@ -47,7 +49,8 @@ Page({
     subtotalAmountText: formatMoney(0),
     discountAmountText: formatMoney(0),
     payableAmountText: formatMoney(0),
-    pickupType: 'pickup'
+    pickupType: 'pickup',
+    submitting: false
   },
 
   onLoad() {
@@ -161,14 +164,48 @@ Page({
     })
   },
 
+  getCreateOrderPickupType() {
+    if (this.data.pickupType === 'dine') {
+      return 'dine_in'
+    }
+
+    return 'self_pickup'
+  },
+
+  buildCreateOrderPayload() {
+    const cartItems = cartUtils.getCartItems()
+    const items = cartItems
+      .map((item) => ({
+        dish_id: item.dish_id,
+        quantity: Number(item.quantity) || 0
+      }))
+      .filter((item) => item.dish_id && Number.isInteger(item.quantity) && item.quantity > 0)
+    const merchantId = cartItems[0] && cartItems[0].merchant_id
+      ? cartItems[0].merchant_id
+      : DEFAULT_MERCHANT_ID
+
+    return {
+      merchant_id: merchantId,
+      items,
+      remark: '',
+      pickup_type: this.getCreateOrderPickupType()
+    }
+  },
+
   goToMenu() {
     wx.reLaunch({
       url: '/pages/user/menu/menu'
     })
   },
 
-  submitMockOrder() {
-    if (!this.data.items.length) {
+  async submitOrder() {
+    if (this.data.submitting) {
+      return
+    }
+
+    const payload = this.buildCreateOrderPayload()
+
+    if (!payload.items.length) {
       wx.showToast({
         title: '购物车为空',
         icon: 'none'
@@ -176,9 +213,28 @@ Page({
       return
     }
 
-    wx.showToast({
-      title: '提交订单功能下一步接入',
-      icon: 'none'
+    this.setData({
+      submitting: true
     })
+
+    try {
+      const order = await callFunction('createOrder', payload)
+
+      cartUtils.clearCart()
+      this.refreshCart()
+
+      wx.showModal({
+        title: '下单成功',
+        content: `订单号：${order.order_no || order.order_id || ''}`,
+        showCancel: false,
+        confirmColor: '#E63B4A'
+      })
+    } catch (error) {
+      console.error('submit order failed', error)
+    } finally {
+      this.setData({
+        submitting: false
+      })
+    }
   }
 })

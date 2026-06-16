@@ -24,7 +24,7 @@
       <view>
         <view class="overview-kicker">YOUR ORDER</view>
         <view class="overview-title">已选好味</view>
-        <view class="overview-desc">共 {{totalCount}} 件 · 下单后门店现做</view>
+        <view class="overview-desc">共 {{totalCount}} 份 · 下单后门店现做</view>
       </view>
       <view class="overview-actions">
         <view class="overview-count">{{totalCount}}</view>
@@ -126,7 +126,7 @@
     <view class="empty-emblem"><text>餐</text></view>
     <view class="empty-title">购物车还是空的</view>
     <view class="empty-desc">去挑几份热气腾腾的好味吧</view>
-    <button class="empty-button" bindtap="goToMenu">去点餐 <text>›</text></button>
+    <button class="empty-button" bindtap="goToMenu">去点餐<text>→</text></button>
   </view>
 
   <view wx:if="{{items.length}}" class="submit-bar glass-panel">
@@ -135,6 +135,13 @@
       <view class="submit-price">{{payableAmountText}}</view>
     </view>
     <view class="submit-saving">已优惠 <text>{{discountAmountText}}</text></view>
-    <button class="submit-button" bindtap="submitMockOrder">去提交订单 <text>›</text></button>
+    <button
+      class="submit-button"
+      bindtap="submitOrder"
+      loading="{{submitting}}"
+      disabled="{{submitting}}"
+    >
+      {{submitting ? '提交中...' : '去提交订单'}}<text>→</text>
+    </button>
   </view>
 </view>
