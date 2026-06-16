@@ -1,0 +1,12 @@
+{
+  "name": "get-dish-detail",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test getDishDetail.test.js"
+  },
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  },
+  "devDependencies": {}
+}
