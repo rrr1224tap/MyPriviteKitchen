@@ -21,10 +21,10 @@
   <view class="menu-header">
     <view class="shop-panel dark-glass">
       <view class="shop-copy">
-        <view class="shop-name">三也拌饭</view>
-        <view class="shop-branch">星都里店</view>
-        <view class="shop-status"><text></text>营业中 · 预计 15 分钟出餐</view>
-        <view class="shop-notice">今日现炒现做，高峰期请耐心等候</view>
+        <view class="shop-name">{{merchant.name}}</view>
+        <view class="shop-branch">{{merchant.branch}}</view>
+        <view class="shop-status"><text></text>{{merchant.statusText}}</view>
+        <view class="shop-notice">{{merchant.notice}}</view>
       </view>
       <view class="shop-photo">
         <image
@@ -92,7 +92,13 @@
         <view class="dish-section-count">{{dishes.length}} 款 ›</view>
       </view>
 
-      <view wx:if="{{dishes.length}}" class="dish-items">
+      <view wx:if="{{pageStatus === 'loading'}}" class="empty-dishes">
+        <view class="empty-emblem">餐</view>
+        <view class="empty-title">菜单加载中</view>
+        <view class="empty-desc">正在读取门店餐品</view>
+      </view>
+
+      <view wx:elif="{{dishes.length}}" class="dish-items">
         <view
           wx:for="{{dishes}}"
           wx:key="_id"
@@ -102,13 +108,13 @@
         >
           <view class="dish-image-window">
             <image
-              wx:if="{{menuImageAvailable}}"
               class="dish-image-source"
-              src="{{menuReference}}"
+              src="{{item.display_image}}"
               style="{{item.image_style}}"
-              mode="widthFix"
+              mode="{{item.image_mode}}"
               lazy-load="{{true}}"
-              binderror="handleMenuImageError"
+              data-id="{{item._id}}"
+              binderror="handleDishImageError"
             ></image>
             <view class="dish-image-gloss"></view>
           </view>
@@ -128,8 +134,8 @@
 
       <view wx:else class="empty-dishes">
         <view class="empty-emblem">餐</view>
-        <view class="empty-title">这类好味正在准备</view>
-        <view class="empty-desc">先看看其他分类吧</view>
+        <view class="empty-title">{{emptyTitle}}</view>
+        <view class="empty-desc">{{emptyDesc}}</view>
       </view>
       <view class="list-spacer"></view>
     </scroll-view>
