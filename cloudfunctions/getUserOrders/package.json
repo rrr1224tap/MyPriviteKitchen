@@ -1,0 +1,13 @@
+{
+  "name": "get-user-orders",
+  "version": "1.0.0",
+  "description": "Get current user orders cloud function for ordering miniprogram",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test getUserOrders.test.js"
+  },
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  },
+  "devDependencies": {}
+}

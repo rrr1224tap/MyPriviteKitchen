@@ -1,0 +1,13 @@
+{
+  "name": "get-order-detail",
+  "version": "1.0.0",
+  "description": "Get current user order detail cloud function for ordering miniprogram",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test getOrderDetail.test.js"
+  },
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  },
+  "devDependencies": {}
+}
