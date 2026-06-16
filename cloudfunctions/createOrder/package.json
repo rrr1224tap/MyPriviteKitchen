@@ -1,0 +1,13 @@
+{
+  "name": "create-order",
+  "version": "1.0.0",
+  "description": "Create order cloud function for ordering miniprogram",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test createOrder.test.js"
+  },
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  },
+  "devDependencies": {}
+}
