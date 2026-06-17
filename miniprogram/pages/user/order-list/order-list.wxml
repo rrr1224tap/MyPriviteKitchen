@@ -1,4 +1,76 @@
-<view class="page">
-  <view class="page-title">我的订单</view>
-  <view class="page-desc">基础页面已创建，后续任务将展示用户订单列表。</view>
+<view class="order-list-page">
+  <image
+    wx:if="{{backgroundImageAvailable}}"
+    class="background-image-window"
+    src="{{backgroundImage}}"
+    mode="aspectFill"
+    binderror="handleBackgroundImageError"
+  />
+  <view class="background-shade"></view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="nav-back" bindtap="goBack">‹</view>
+    <view class="nav-title">我的订单</view>
+  </view>
+
+  <scroll-view class="order-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="order-content" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+      <view class="order-hero glass-panel">
+        <view>
+          <view class="hero-kicker">ORDER TRACK</view>
+          <view class="hero-title">订单记录</view>
+          <view class="hero-desc">
+            <block wx:if="{{orders.length}}">共 {{orders.length}} 笔订单，按下单时间展示</block>
+            <block wx:else>查看你的点餐进度和历史订单</block>
+          </view>
+        </view>
+        <button class="hero-action" bindtap="goToMenu">继续点餐</button>
+      </view>
+
+      <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
+        <view class="state-mark">...</view>
+        <view class="state-title">正在读取订单</view>
+        <view class="state-desc">正在同步你的最新订单记录</view>
+      </view>
+
+      <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
+        <view class="state-mark">!</view>
+        <view class="state-title">订单加载失败</view>
+        <view class="state-desc">{{errorMessage}}</view>
+        <button class="state-button" bindtap="retryLoad">重新加载</button>
+      </view>
+
+      <view wx:elif="{{pageStatus === 'empty'}}" class="state-card glass-panel">
+        <view class="state-mark">餐</view>
+        <view class="state-title">还没有订单</view>
+        <view class="state-desc">先去挑一份热乎的拌饭，提交后会显示在这里</view>
+        <button class="state-button" bindtap="goToMenu">去点餐</button>
+      </view>
+
+      <view wx:else class="order-list">
+        <view
+          class="order-card glass-panel"
+          wx:for="{{orders}}"
+          wx:key="order_id"
+          data-id="{{item.order_id}}"
+          bindtap="openOrder"
+        >
+          <view class="order-card-head">
+            <view>
+              <view class="order-no">订单号 {{item.order_no}}</view>
+              <view class="order-time">{{item.created_time}}</view>
+            </view>
+            <view class="status-tag status-{{item.status_class}}">{{item.status_text}}</view>
+          </view>
+
+          <view class="order-summary">{{item.item_summary}}</view>
+
+          <view class="order-card-foot">
+            <view class="order-count">{{item.item_count_text}}</view>
+            <view class="order-total">{{item.total_amount_text}}</view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
 </view>
