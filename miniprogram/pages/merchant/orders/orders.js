@@ -179,6 +179,18 @@ Page({
     this.loadOrders()
   },
 
+  handleOrderTap(event) {
+    const orderId = event.currentTarget.dataset.id || ''
+
+    if (!orderId) {
+      return
+    }
+
+    wx.navigateTo({
+      url: `/pages/merchant/order-detail/order-detail?order_id=${orderId}`
+    })
+  },
+
   async handleOrderAction(event) {
     const { id, nextStatus } = event.currentTarget.dataset
 

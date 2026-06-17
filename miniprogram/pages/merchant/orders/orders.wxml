@@ -65,6 +65,8 @@
           class="order-card glass-panel"
           wx:for="{{orders}}"
           wx:key="order_id"
+          data-id="{{item.order_id}}"
+          bindtap="handleOrderTap"
         >
           <view class="order-card-head">
             <view>

@@ -1,4 +1,119 @@
-<view class="page">
-  <view class="page-title">商家订单详情</view>
-  <view class="page-desc">基础页面已创建，后续任务将展示商家订单详情。</view>
+<view class="merchant-order-detail-page">
+  <image
+    wx:if="{{backgroundImageAvailable}}"
+    class="background-image-window"
+    src="{{backgroundImage}}"
+    mode="aspectFill"
+    binderror="handleBackgroundImageError"
+  />
+  <view class="background-shade"></view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="nav-back" bindtap="goBack">‹</view>
+    <view class="nav-title">商家订单详情</view>
+  </view>
+
+  <scroll-view class="detail-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="detail-content {{order && order.action_text ? 'has-action' : ''}}" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+      <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
+        <view class="state-mark">...</view>
+        <view class="state-title">正在读取订单详情</view>
+        <view class="state-desc">正在同步订单信息和商品明细</view>
+      </view>
+
+      <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
+        <view class="state-mark">!</view>
+        <view class="state-title">订单详情加载失败</view>
+        <view class="state-desc">{{errorMessage}}</view>
+        <button class="state-button" bindtap="retryLoad">重新加载</button>
+      </view>
+
+      <view wx:elif="{{pageStatus === 'empty'}}" class="state-card glass-panel">
+        <view class="state-mark">单</view>
+        <view class="state-title">没有找到订单</view>
+        <view class="state-desc">请返回商家订单列表，选择有效订单查看</view>
+        <button class="state-button" bindtap="goBack">返回订单列表</button>
+      </view>
+
+      <block wx:else>
+        <view class="detail-hero glass-panel">
+          <view>
+            <view class="hero-kicker">MERCHANT ORDER</view>
+            <view class="hero-title">{{order.status_text}}</view>
+            <view class="hero-desc">订单号 {{order.order_no}}</view>
+            <view class="hero-time">下单时间 {{order.created_time}}</view>
+          </view>
+          <view class="status-tag status-{{order.status_class}}">{{order.status_text}}</view>
+        </view>
+
+        <view class="remark-panel glass-panel">
+          <view class="section-kicker">CUSTOMER NOTE</view>
+          <view class="section-title">顾客备注</view>
+          <view class="remark-content">{{order.remark_text}}</view>
+        </view>
+
+        <view class="items-panel warm-glass">
+          <view class="section-head">
+            <view>
+              <view class="section-kicker is-dark">ITEMS</view>
+              <view class="section-title is-dark">商品明细</view>
+            </view>
+            <view class="item-count">{{order.item_count_text}}</view>
+          </view>
+
+          <view class="order-item" wx:for="{{items}}" wx:key="order_item_id">
+            <view class="dish-emblem">{{index + 1}}</view>
+            <view class="dish-info">
+              <view class="dish-name">{{item.dish_name}}</view>
+              <view class="dish-price">单价 {{item.unit_price_text}}</view>
+            </view>
+            <view class="dish-side">
+              <view class="dish-quantity">x{{item.quantity}}</view>
+              <view class="dish-subtotal">{{item.subtotal_text}}</view>
+            </view>
+          </view>
+
+          <view wx:if="{{!items.length}}" class="empty-items">
+            暂无商品明细
+          </view>
+        </view>
+
+        <view class="info-panel glass-panel">
+          <view class="section-kicker">PICKUP</view>
+          <view class="section-title">取餐信息</view>
+          <view class="info-row">
+            <view class="info-label">取餐方式</view>
+            <view class="info-value">{{order.pickup_type_text}}</view>
+          </view>
+          <view class="info-row">
+            <view class="info-label">商品数量</view>
+            <view class="info-value">{{order.item_count_text}}</view>
+          </view>
+          <view class="info-row">
+            <view class="info-label">更新时间</view>
+            <view class="info-value">{{order.updated_time || '暂无更新'}}</view>
+          </view>
+        </view>
+
+        <view class="total-panel glass-panel">
+          <view>
+            <view class="total-label">订单总金额</view>
+            <view class="total-note">金额来自下单时的订单快照</view>
+          </view>
+          <view class="total-price">{{order.total_amount_text}}</view>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+
+  <view wx:if="{{pageStatus === 'success' && order.action_text}}" class="fixed-action-bar">
+    <button
+      class="action-button"
+      bindtap="handleOrderAction"
+      disabled="{{submitting}}"
+    >
+      <block wx:if="{{submitting}}">处理中...</block>
+      <block wx:else>{{order.action_text}}</block>
+    </button>
+  </view>
 </view>
