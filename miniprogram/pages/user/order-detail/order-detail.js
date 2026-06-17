@@ -189,6 +189,12 @@ Page({
     this.loadOrderDetail(orderId)
   },
 
+  onShow() {
+    if (this.data.orderId && this.data.pageStatus !== 'loading') {
+      this.loadOrderDetail(this.data.orderId)
+    }
+  },
+
   onPullDownRefresh() {
     if (!this.data.orderId) {
       wx.stopPullDownRefresh()

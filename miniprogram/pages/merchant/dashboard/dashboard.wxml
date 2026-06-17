@@ -1,4 +1,45 @@
-<view class="page">
-  <view class="page-title">商家首页</view>
-  <view class="page-desc">基础页面已创建，后续任务将接入商家概览。</view>
+<view class="merchant-dashboard-page">
+  <image
+    wx:if="{{backgroundImageAvailable}}"
+    class="background-image-window"
+    src="{{backgroundImage}}"
+    mode="aspectFill"
+    binderror="handleBackgroundImageError"
+  />
+  <view class="background-shade"></view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="nav-back" bindtap="goBack">‹</view>
+    <view class="nav-title">商家工作台</view>
+  </view>
+
+  <view class="dashboard-content" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+    <view class="merchant-hero glass-panel">
+      <view>
+        <view class="hero-kicker">MERCHANT DESK</view>
+        <view class="hero-title">订单处理中心</view>
+        <view class="hero-desc">查看新订单，完成接单、制作和出餐处理</view>
+      </view>
+      <view class="hero-badge">MVP</view>
+    </view>
+
+    <view class="entry-card warm-glass" bindtap="goToOrders">
+      <view class="entry-icon">单</view>
+      <view class="entry-copy">
+        <view class="entry-title">进入商家订单</view>
+        <view class="entry-desc">查看订单列表，处理待接单、制作中和已完成订单</view>
+      </view>
+      <view class="entry-arrow">→</view>
+    </view>
+
+    <view class="tips-panel glass-panel">
+      <view class="section-kicker">CHECKLIST</view>
+      <view class="section-title">联调提醒</view>
+      <view class="tip-row">1. 当前账号需要配置为 merchant_staff active 员工</view>
+      <view class="tip-row">2. 真实权限由商家订单云函数校验</view>
+      <view class="tip-row">3. 暂不接入支付、分类和餐品管理</view>
+    </view>
+
+    <button class="secondary-button" bindtap="goToUserHome">返回用户首页</button>
+  </view>
 </view>

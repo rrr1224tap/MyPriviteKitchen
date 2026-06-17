@@ -198,6 +198,12 @@ Page({
     })
   },
 
+  goToOrders() {
+    wx.navigateTo({
+      url: '/pages/user/order-list/order-list'
+    })
+  },
+
   async submitOrder() {
     if (this.data.submitting) {
       return
@@ -226,8 +232,16 @@ Page({
       wx.showModal({
         title: '下单成功',
         content: `订单号：${order.order_no || order.order_id || ''}`,
-        showCancel: false,
-        confirmColor: '#E63B4A'
+        cancelText: '继续点餐',
+        confirmText: '查看订单',
+        confirmColor: '#E63B4A',
+        success: (result) => {
+          if (result.confirm) {
+            this.goToOrders()
+          } else if (result.cancel) {
+            this.goToMenu()
+          }
+        }
       })
     } catch (error) {
       console.error('submit order failed', error)
