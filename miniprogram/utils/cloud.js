@@ -19,6 +19,9 @@ async function callFunction(name, data = {}) {
       })
 
       const error = new Error(message)
+      error.code = result.code || ''
+      error.data = result.data || null
+      error.result = result
       error.toastShown = true
       throw error
     }

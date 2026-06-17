@@ -1,4 +1,108 @@
-<view class="page">
-  <view class="page-title">商家订单</view>
-  <view class="page-desc">基础页面已创建，后续任务将展示商家订单列表。</view>
+<view class="merchant-orders-page">
+  <image
+    wx:if="{{backgroundImageAvailable}}"
+    class="background-image-window"
+    src="{{backgroundImage}}"
+    mode="aspectFill"
+    binderror="handleBackgroundImageError"
+  />
+  <view class="background-shade"></view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="nav-back" bindtap="goBack">‹</view>
+    <view class="nav-title">商家订单</view>
+  </view>
+
+  <scroll-view class="orders-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="orders-content" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+      <view class="merchant-hero glass-panel">
+        <view>
+          <view class="hero-kicker">MERCHANT WORKBENCH</view>
+          <view class="hero-title">订单处理</view>
+          <view class="hero-desc">
+            <block wx:if="{{orders.length}}">当前筛选下共 {{orders.length}} 笔订单</block>
+            <block wx:else>查看门店订单，按状态快速处理</block>
+          </view>
+        </view>
+        <view class="hero-badge">实时</view>
+      </view>
+
+      <scroll-view class="filter-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="filter-list">
+          <view
+            wx:for="{{statusFilters}}"
+            wx:key="key"
+            class="filter-tab {{activeStatus === item.status ? 'active' : ''}}"
+            data-status="{{item.status}}"
+            bindtap="handleFilterTap"
+          >
+            {{item.label}}
+          </view>
+        </view>
+      </scroll-view>
+
+      <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
+        <view class="state-mark">...</view>
+        <view class="state-title">正在读取商家订单</view>
+        <view class="state-desc">正在同步门店最新订单，请稍等</view>
+      </view>
+
+      <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
+        <view class="state-mark">!</view>
+        <view class="state-title">订单加载失败</view>
+        <view class="state-desc">{{errorMessage}}</view>
+        <button class="state-button" bindtap="retryLoad">重新加载</button>
+      </view>
+
+      <view wx:elif="{{pageStatus === 'empty'}}" class="state-card glass-panel">
+        <view class="state-mark">单</view>
+        <view class="state-title">暂无订单</view>
+        <view class="state-desc">当前筛选下还没有订单，收到新订单后会显示在这里</view>
+      </view>
+
+      <view wx:else class="order-list">
+        <view
+          class="order-card glass-panel"
+          wx:for="{{orders}}"
+          wx:key="order_id"
+        >
+          <view class="order-card-head">
+            <view>
+              <view class="order-no">订单号 {{item.order_no}}</view>
+              <view class="order-time">{{item.created_time}}</view>
+            </view>
+            <view class="status-tag status-{{item.status_class}}">{{item.status_text}}</view>
+          </view>
+
+          <view class="order-summary">{{item.item_summary}}</view>
+
+          <view wx:if="{{item.remark_text}}" class="order-remark">
+            <text class="remark-label">备注</text>
+            <text>{{item.remark_text}}</text>
+          </view>
+
+          <view class="order-card-foot">
+            <view>
+              <view class="order-count">{{item.item_count_text}}</view>
+              <view class="order-total-label">订单金额</view>
+            </view>
+            <view class="order-total">{{item.total_amount_text}}</view>
+          </view>
+
+          <view wx:if="{{item.action_text}}" class="action-row">
+            <button
+              class="action-button"
+              catchtap="handleOrderAction"
+              data-id="{{item.order_id}}"
+              data-next-status="{{item.next_status}}"
+              disabled="{{submittingOrderId === item.order_id}}"
+            >
+              <block wx:if="{{submittingOrderId === item.order_id}}">处理中...</block>
+              <block wx:else>{{item.action_text}}</block>
+            </button>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
 </view>
