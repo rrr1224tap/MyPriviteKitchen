@@ -1,0 +1,13 @@
+{
+  "name": "get-merchant-orders",
+  "version": "1.0.0",
+  "description": "Get merchant orders cloud function for ordering miniprogram",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test getMerchantOrders.test.js"
+  },
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  },
+  "devDependencies": {}
+}
