@@ -1,0 +1,13 @@
+{
+  "name": "update-order-status",
+  "version": "1.0.0",
+  "description": "Update merchant order status cloud function for ordering miniprogram",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test updateOrderStatus.test.js"
+  },
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  },
+  "devDependencies": {}
+}
