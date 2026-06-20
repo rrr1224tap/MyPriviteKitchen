@@ -8,7 +8,8 @@ const NOW = new Date('2026-06-17T10:30:00.000Z')
 function createDependencies(overrides = {}) {
   const calls = {
     order: null,
-    orderItems: null
+    orderItems: null,
+    stockUpdates: []
   }
 
   const dependencies = {
@@ -34,7 +35,9 @@ function createDependencies(overrides = {}) {
         image_url: 'beef-rice.png',
         price_cent: 2990,
         status: 'on_sale',
-        stock: 99
+        stock_enabled: true,
+        stock_count: 99,
+        sold_out: false
       },
       {
         _id: 'dish_002',
@@ -45,7 +48,9 @@ function createDependencies(overrides = {}) {
         image: 'noodle.png',
         price_cent: 2590,
         status: 'on_sale',
-        stock: 99
+        stock_enabled: false,
+        stock_count: 0,
+        sold_out: false
       }
     ],
     createOrder: async (order) => {
@@ -55,6 +60,10 @@ function createDependencies(overrides = {}) {
     createOrderItems: async (items) => {
       calls.orderItems = items
       return items
+    },
+    updateDishStock: async ({ dish_id, stock_count }) => {
+      calls.stockUpdates.push({ dish_id, stock_count })
+      return { dish_id, stock_count }
     },
     ...overrides
   }
@@ -99,6 +108,9 @@ test('creates an order and order item snapshots using database dish prices', asy
   assert.equal(calls.orderItems[0].quantity, 2)
   assert.equal(calls.orderItems[0].subtotal_cent, 5980)
   assert.equal(calls.orderItems[1].subtotal_cent, 2590)
+  assert.deepEqual(calls.stockUpdates, [
+    { dish_id: 'dish_001', stock_count: 97 }
+  ])
 })
 
 test('returns INVALID_PARAMS when items is empty', async () => {
@@ -171,6 +183,217 @@ test('returns DISH_OFF_SALE when a dish is not on sale', async () => {
 
   assert.equal(result.success, false)
   assert.equal(result.code, 'DISH_OFF_SALE')
+})
+
+test('returns DISH_SOLD_OUT when dish is manually sold out', async () => {
+  const { dependencies } = createDependencies({
+    findDishesByIds: async () => [
+      {
+        _id: 'dish_001',
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        name: '售罄餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        stock_enabled: false,
+        stock_count: 0,
+        sold_out: true
+      }
+    ]
+  })
+  const createOrder = createCreateOrderHandler(dependencies)
+
+  const result = await createOrder({
+    merchant_id: 'merchant_001',
+    items: [
+      { dish_id: 'dish_001', quantity: 1 }
+    ]
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'DISH_SOLD_OUT')
+})
+
+test('returns STOCK_NOT_ENOUGH when enabled stock is lower than quantity', async () => {
+  const { dependencies } = createDependencies({
+    findDishesByIds: async () => [
+      {
+        _id: 'dish_001',
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        name: '库存不足餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        stock_enabled: true,
+        stock_count: 1,
+        sold_out: false
+      }
+    ]
+  })
+  const createOrder = createCreateOrderHandler(dependencies)
+
+  const result = await createOrder({
+    merchant_id: 'merchant_001',
+    items: [
+      { dish_id: 'dish_001', quantity: 2 }
+    ]
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'STOCK_NOT_ENOUGH')
+})
+
+test('creates order and deducts stock to zero when stock equals quantity', async () => {
+  const { dependencies, calls } = createDependencies({
+    findDishesByIds: async () => [
+      {
+        _id: 'dish_001',
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        name: '刚好库存餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        stock_enabled: true,
+        stock_count: 2,
+        sold_out: false
+      }
+    ]
+  })
+  const createOrder = createCreateOrderHandler(dependencies)
+
+  const result = await createOrder({
+    merchant_id: 'merchant_001',
+    items: [
+      { dish_id: 'dish_001', quantity: 2 }
+    ]
+  })
+
+  assert.equal(result.success, true)
+  assert.deepEqual(calls.stockUpdates, [
+    { dish_id: 'dish_001', stock_count: 0 }
+  ])
+})
+
+test('creates order and deducts stock when stock is greater than quantity', async () => {
+  const { dependencies, calls } = createDependencies({
+    findDishesByIds: async () => [
+      {
+        _id: 'dish_001',
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        name: '充足库存餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        stock_enabled: true,
+        stock_count: 5,
+        sold_out: false
+      }
+    ]
+  })
+  const createOrder = createCreateOrderHandler(dependencies)
+
+  const result = await createOrder({
+    merchant_id: 'merchant_001',
+    items: [
+      { dish_id: 'dish_001', quantity: 2 }
+    ]
+  })
+
+  assert.equal(result.success, true)
+  assert.deepEqual(calls.stockUpdates, [
+    { dish_id: 'dish_001', stock_count: 3 }
+  ])
+})
+
+test('creates order without stock deduction when stock is disabled', async () => {
+  const { dependencies, calls } = createDependencies({
+    findDishesByIds: async () => [
+      {
+        _id: 'dish_001',
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        name: '不限库存餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        stock_enabled: false,
+        stock_count: 1,
+        sold_out: false
+      }
+    ]
+  })
+  const createOrder = createCreateOrderHandler(dependencies)
+
+  const result = await createOrder({
+    merchant_id: 'merchant_001',
+    items: [
+      { dish_id: 'dish_001', quantity: 2 }
+    ]
+  })
+
+  assert.equal(result.success, true)
+  assert.deepEqual(calls.stockUpdates, [])
+})
+
+test('creates order for legacy dish without stock fields as unlimited stock', async () => {
+  const { dependencies, calls } = createDependencies({
+    findDishesByIds: async () => [
+      {
+        _id: 'dish_001',
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        name: '历史旧餐品',
+        price_cent: 2990,
+        status: 'on_sale'
+      }
+    ]
+  })
+  const createOrder = createCreateOrderHandler(dependencies)
+
+  const result = await createOrder({
+    merchant_id: 'merchant_001',
+    items: [
+      { dish_id: 'dish_001', quantity: 99 }
+    ]
+  })
+
+  assert.equal(result.success, true)
+  assert.deepEqual(calls.stockUpdates, [])
+})
+
+test('merges duplicate dish_id before stock validation and deduction', async () => {
+  const { dependencies, calls } = createDependencies({
+    findDishesByIds: async () => [
+      {
+        _id: 'dish_001',
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        name: '重复餐品',
+        price_cent: 1000,
+        status: 'on_sale',
+        stock_enabled: true,
+        stock_count: 3,
+        sold_out: false
+      }
+    ]
+  })
+  const createOrder = createCreateOrderHandler(dependencies)
+
+  const result = await createOrder({
+    merchant_id: 'merchant_001',
+    items: [
+      { dish_id: 'dish_001', quantity: 1 },
+      { dish_id: 'dish_001', quantity: 2 }
+    ]
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.item_count, 3)
+  assert.equal(result.data.total_amount_cent, 3000)
+  assert.equal(calls.orderItems.length, 1)
+  assert.equal(calls.orderItems[0].quantity, 3)
+  assert.deepEqual(calls.stockUpdates, [
+    { dish_id: 'dish_001', stock_count: 0 }
+  ])
 })
 
 test('returns UNAUTHORIZED when cloud openid is unavailable', async () => {

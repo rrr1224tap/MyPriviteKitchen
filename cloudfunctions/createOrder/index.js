@@ -57,6 +57,28 @@ async function createOrderItems(orderItems) {
   return orderItems
 }
 
+async function updateDishStock({ merchant_id, dish_id, quantity }) {
+  const result = await db.collection('dishes')
+    .where({
+      merchant_id,
+      dish_id,
+      stock_enabled: true,
+      stock_count: _.gte(quantity)
+    })
+    .update({
+      data: {
+        stock_count: _.inc(-quantity),
+        updated_at: new Date()
+      }
+    })
+
+  if (!result || result.stats.updated < 1) {
+    throw new Error('stock update failed')
+  }
+
+  return result
+}
+
 const createOrderHandler = createCreateOrderHandler({
   getOpenid: () => {
     const wxContext = cloud.getWXContext()
@@ -69,6 +91,7 @@ const createOrderHandler = createCreateOrderHandler({
   findDishesByIds,
   createOrder,
   createOrderItems,
+  updateDishStock,
   logError: console.error
 })
 

@@ -63,6 +63,16 @@ function isSafeAmount(value) {
   return Number.isInteger(value) && value >= 0
 }
 
+function getStockInfo(dish = {}) {
+  return {
+    stock_enabled: typeof dish.stock_enabled === 'boolean' ? dish.stock_enabled : false,
+    stock_count: Number.isInteger(dish.stock_count) && dish.stock_count >= 0
+      ? dish.stock_count
+      : 0,
+    sold_out: typeof dish.sold_out === 'boolean' ? dish.sold_out : false
+  }
+}
+
 function createOrderNo(now = new Date()) {
   const date = now instanceof Date ? now : new Date(now)
   const pad = (value, length = 2) => String(value).padStart(length, '0')
@@ -152,6 +162,7 @@ function createCreateOrderHandler(dependencies) {
       const orderId = dependencies.generateId('order')
       const orderNo = dependencies.generateOrderNo(now)
       const orderItems = []
+      const stockUpdates = []
       let totalAmountCent = 0
       let itemCount = 0
 
@@ -170,7 +181,13 @@ function createCreateOrderHandler(dependencies) {
           return failure('DISH_OFF_SALE', '餐品当前不可下单')
         }
 
-        if (Number.isFinite(dish.stock) && dish.stock < item.quantity) {
+        const stockInfo = getStockInfo(dish)
+
+        if (stockInfo.sold_out) {
+          return failure('DISH_SOLD_OUT', '餐品已售罄')
+        }
+
+        if (stockInfo.stock_enabled && stockInfo.stock_count < item.quantity) {
           return failure('STOCK_NOT_ENOUGH', '餐品库存不足')
         }
 
@@ -199,6 +216,15 @@ function createCreateOrderHandler(dependencies) {
           subtotal_cent: subtotalCent,
           created_at: now
         })
+
+        if (stockInfo.stock_enabled) {
+          stockUpdates.push({
+            merchant_id: merchantId,
+            dish_id: item.dish_id,
+            quantity: item.quantity,
+            stock_count: stockInfo.stock_count - item.quantity
+          })
+        }
       }
 
       if (!isSafeAmount(totalAmountCent) || totalAmountCent <= 0 || itemCount <= 0) {
@@ -225,6 +251,11 @@ function createCreateOrderHandler(dependencies) {
       try {
         await dependencies.createOrder(order)
         await dependencies.createOrderItems(orderItems)
+        if (typeof dependencies.updateDishStock === 'function') {
+          await Promise.all(stockUpdates.map((stockUpdate) =>
+            dependencies.updateDishStock(stockUpdate)
+          ))
+        }
       } catch (error) {
         if (typeof dependencies.logError === 'function') {
           dependencies.logError('createOrder database write failed', error)
