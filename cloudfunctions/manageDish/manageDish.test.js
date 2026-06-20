@@ -170,6 +170,9 @@ test('active merchant staff can list dishes for their merchant only', async () =
     'dish_001',
     'dish_002'
   ])
+  assert.equal(result.data.list[0].stock_enabled, false)
+  assert.equal(result.data.list[0].stock_count, 0)
+  assert.equal(result.data.list[0].sold_out, false)
 })
 
 test('user without active merchant staff permission cannot manage dishes', async () => {
@@ -207,7 +210,94 @@ test('create adds an on_sale dish with database price in cents', async () => {
   assert.equal(result.data.dish.dish_id, 'dish_new_1')
   assert.equal(result.data.dish.price_cent, 1890)
   assert.equal(result.data.dish.status, 'on_sale')
+  assert.equal(result.data.dish.stock_enabled, false)
+  assert.equal(result.data.dish.stock_count, 0)
+  assert.equal(result.data.dish.sold_out, false)
   assert.equal(state.dishes.some((dish) => dish.dish_id === 'dish_new_1'), true)
+})
+
+test('create accepts stock fields when values are valid', async () => {
+  const { state, deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '限量拌饭',
+      price_cent: 2990,
+      stock_enabled: true,
+      stock_count: 8,
+      sold_out: true
+    }
+  })
+
+  const createdDish = state.dishes.find((dish) => dish.dish_id === 'dish_new_1')
+  assert.equal(result.success, true)
+  assert.equal(result.data.dish.stock_enabled, true)
+  assert.equal(result.data.dish.stock_count, 8)
+  assert.equal(result.data.dish.sold_out, true)
+  assert.equal(createdDish.stock_enabled, true)
+  assert.equal(createdDish.stock_count, 8)
+  assert.equal(createdDish.sold_out, true)
+})
+
+test('create fails when stock_enabled is not boolean', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '库存开关错误餐品',
+      price_cent: 1990,
+      stock_enabled: 'true'
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when stock_count is not a non-negative integer', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '库存数量错误餐品',
+      price_cent: 1990,
+      stock_count: -1
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when sold_out is not boolean', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '售罄开关错误餐品',
+      price_cent: 1990,
+      sold_out: 'false'
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
 })
 
 test('create fails when category belongs to another merchant', async () => {
@@ -286,6 +376,97 @@ test('update changes a dish that belongs to the requested merchant', async () =>
   assert.equal(result.data.dish.name, '本店招牌肥牛拌饭')
   assert.equal(result.data.dish.price_cent, 3190)
   assert.deepEqual(result.data.dish.tags, ['招牌推荐'])
+})
+
+test('update stock_enabled succeeds', async () => {
+  const { state, deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    data: {
+      stock_enabled: true
+    }
+  })
+
+  const dish = state.dishes.find((item) => item.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.equal(result.data.dish.stock_enabled, true)
+  assert.equal(dish.stock_enabled, true)
+})
+
+test('update stock_count succeeds', async () => {
+  const { state, deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    data: {
+      stock_count: 12
+    }
+  })
+
+  const dish = state.dishes.find((item) => item.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.equal(result.data.dish.stock_count, 12)
+  assert.equal(dish.stock_count, 12)
+})
+
+test('update sold_out succeeds', async () => {
+  const { state, deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    data: {
+      sold_out: true
+    }
+  })
+
+  const dish = state.dishes.find((item) => item.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.equal(result.data.dish.sold_out, true)
+  assert.equal(dish.sold_out, true)
+})
+
+test('update fails when stock_count is invalid', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    data: {
+      stock_count: 2.5
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('update status sold_out fails validation', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    data: {
+      status: 'sold_out'
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
 })
 
 test('update fails when moving dish to inactive category', async () => {

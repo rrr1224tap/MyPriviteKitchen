@@ -1,5 +1,5 @@
 const VALID_ACTIONS = ['list', 'create', 'update', 'onSale', 'offSale', 'sort']
-const VALID_DISH_STATUSES = ['on_sale', 'off_sale', 'sold_out']
+const VALID_DISH_STATUSES = ['on_sale', 'off_sale']
 
 function success(message, data = {}) {
   return {
@@ -53,6 +53,21 @@ function normalizePriceCent(value) {
   return numberValue
 }
 
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value, key)
+}
+
+function normalizeStockCount(value) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    return null
+  }
+  return value
+}
+
+function normalizeBooleanDefault(value, defaultValue) {
+  return typeof value === 'boolean' ? value : defaultValue
+}
+
 function isActiveMerchantStaff(staff, merchantId, openid) {
   return Boolean(
     staff &&
@@ -90,6 +105,11 @@ function formatDish(dish = {}) {
       : 0,
     tags: normalizeTags(dish.tags),
     status: dish.status || 'off_sale',
+    stock_enabled: normalizeBooleanDefault(dish.stock_enabled, false),
+    stock_count: normalizeStockCount(dish.stock_count) === null
+      ? 0
+      : normalizeStockCount(dish.stock_count),
+    sold_out: normalizeBooleanDefault(dish.sold_out, false),
     sort_order: Number(dish.sort_order) || 0,
     created_at: dish.created_at || null,
     updated_at: dish.updated_at || null
@@ -179,6 +199,9 @@ function buildDishCreateData(deps, merchantId, data, now, dishId, sortOrder) {
         : normalizePriceCent(data.original_price_cent),
     tags: normalizeTags(data.tags),
     status,
+    stock_enabled: hasOwn(data, 'stock_enabled') ? data.stock_enabled : false,
+    stock_count: hasOwn(data, 'stock_count') ? normalizeStockCount(data.stock_count) : 0,
+    sold_out: hasOwn(data, 'sold_out') ? data.sold_out : false,
     sort_order: sortOrder,
     created_at: now,
     updated_at: now
@@ -225,6 +248,18 @@ function applyDishUpdateData(updateData, data) {
     updateData.status = normalizeString(data.status)
   }
 
+  if (hasOwn(data, 'stock_enabled')) {
+    updateData.stock_enabled = data.stock_enabled
+  }
+
+  if (hasOwn(data, 'stock_count')) {
+    updateData.stock_count = normalizeStockCount(data.stock_count)
+  }
+
+  if (hasOwn(data, 'sold_out')) {
+    updateData.sold_out = data.sold_out
+  }
+
   if (data.sort_order !== undefined) {
     updateData.sort_order = normalizeSortOrder(data.sort_order)
   }
@@ -235,7 +270,7 @@ function validateDishData(data, options = {}) {
     return failure('VALIDATION_ERROR', '餐品分类不能为空')
   }
 
-  if (Object.prototype.hasOwnProperty.call(data, 'name') && !normalizeString(data.name)) {
+  if (hasOwn(data, 'name') && !normalizeString(data.name)) {
     return failure('VALIDATION_ERROR', '餐品名称不能为空')
   }
 
@@ -243,7 +278,7 @@ function validateDishData(data, options = {}) {
     return failure('VALIDATION_ERROR', '餐品名称不能为空')
   }
 
-  if (Object.prototype.hasOwnProperty.call(data, 'price_cent')) {
+  if (hasOwn(data, 'price_cent')) {
     const priceCent = normalizePriceCent(data.price_cent)
     if (priceCent === null) {
       return failure('VALIDATION_ERROR', '餐品价格必须是非负整数分')
@@ -252,7 +287,7 @@ function validateDishData(data, options = {}) {
     return failure('VALIDATION_ERROR', '餐品价格不能为空')
   }
 
-  if (Object.prototype.hasOwnProperty.call(data, 'original_price_cent')) {
+  if (hasOwn(data, 'original_price_cent')) {
     const originalPriceCent =
       data.original_price_cent === null || data.original_price_cent === ''
         ? 0
@@ -262,14 +297,26 @@ function validateDishData(data, options = {}) {
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(data, 'status')) {
+  if (hasOwn(data, 'status')) {
     const status = normalizeString(data.status)
     if (status && !VALID_DISH_STATUSES.includes(status)) {
       return failure('VALIDATION_ERROR', '餐品状态不合法')
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(data, 'sort_order')) {
+  if (hasOwn(data, 'stock_enabled') && typeof data.stock_enabled !== 'boolean') {
+    return failure('VALIDATION_ERROR', '库存开关必须是布尔值')
+  }
+
+  if (hasOwn(data, 'stock_count') && normalizeStockCount(data.stock_count) === null) {
+    return failure('VALIDATION_ERROR', '库存数量必须是非负整数')
+  }
+
+  if (hasOwn(data, 'sold_out') && typeof data.sold_out !== 'boolean') {
+    return failure('VALIDATION_ERROR', '售罄开关必须是布尔值')
+  }
+
+  if (hasOwn(data, 'sort_order')) {
     const sortOrder = normalizeSortOrder(data.sort_order)
     if (sortOrder === null) {
       return failure('VALIDATION_ERROR', '餐品排序必须是非负整数')
