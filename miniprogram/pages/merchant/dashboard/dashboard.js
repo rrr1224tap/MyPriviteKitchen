@@ -1,3 +1,19 @@
+function getNavigationMetrics() {
+  const windowInfo = wx.getWindowInfo
+    ? wx.getWindowInfo()
+    : (wx.getSystemInfoSync ? wx.getSystemInfoSync() : {})
+  const menuButton = wx.getMenuButtonBoundingClientRect ? wx.getMenuButtonBoundingClientRect() : null
+  const statusBarHeight = windowInfo.statusBarHeight || 20
+  const navigationHeight = menuButton
+    ? menuButton.bottom + menuButton.top - statusBarHeight
+    : 44
+
+  return {
+    statusBarHeight,
+    navigationHeight
+  }
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -6,18 +22,12 @@ Page({
     backgroundImageAvailable: true
   },
 
-  onLoad() {
-    const systemInfo = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {}
-    const menuButton = wx.getMenuButtonBoundingClientRect ? wx.getMenuButtonBoundingClientRect() : null
-    const statusBarHeight = systemInfo.statusBarHeight || 20
-    const navigationHeight = menuButton
-      ? menuButton.bottom + menuButton.top - statusBarHeight
-      : 44
+  onReady() {
+    this.setupNavigation()
+  },
 
-    this.setData({
-      statusBarHeight,
-      navigationHeight
-    })
+  setupNavigation() {
+    this.setData(getNavigationMetrics())
   },
 
   handleBackgroundImageError() {

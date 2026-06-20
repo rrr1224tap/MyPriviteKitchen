@@ -156,6 +156,22 @@ function normalizeOrderDetail(data = {}) {
   }
 }
 
+function getNavigationMetrics() {
+  const windowInfo = wx.getWindowInfo
+    ? wx.getWindowInfo()
+    : (wx.getSystemInfoSync ? wx.getSystemInfoSync() : {})
+  const menuButton = wx.getMenuButtonBoundingClientRect ? wx.getMenuButtonBoundingClientRect() : null
+  const statusBarHeight = windowInfo.statusBarHeight || 20
+  const navigationHeight = menuButton
+    ? menuButton.bottom + menuButton.top - statusBarHeight
+    : 44
+
+  return {
+    statusBarHeight,
+    navigationHeight
+  }
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -171,8 +187,6 @@ Page({
   },
 
   onLoad(options = {}) {
-    this.setupNavigation()
-
     const orderId = options.order_id || ''
 
     if (!orderId) {
@@ -187,6 +201,10 @@ Page({
       orderId
     })
     this.loadOrderDetail(orderId)
+  },
+
+  onReady() {
+    this.setupNavigation()
   },
 
   onShow() {
@@ -207,17 +225,7 @@ Page({
   },
 
   setupNavigation() {
-    const systemInfo = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {}
-    const menuButton = wx.getMenuButtonBoundingClientRect ? wx.getMenuButtonBoundingClientRect() : null
-    const statusBarHeight = systemInfo.statusBarHeight || 20
-    const navigationHeight = menuButton
-      ? menuButton.bottom + menuButton.top - statusBarHeight
-      : 44
-
-    this.setData({
-      statusBarHeight,
-      navigationHeight
-    })
+    this.setData(getNavigationMetrics())
   },
 
   async loadOrderDetail(orderId) {

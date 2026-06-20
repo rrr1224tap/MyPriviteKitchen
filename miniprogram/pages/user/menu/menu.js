@@ -391,5 +391,11 @@ Page({
     wx.navigateTo({
       url: '/pages/user/order-list/order-list'
     })
+  },
+
+  goToMerchant() {
+    wx.navigateTo({
+      url: '/pages/merchant/dashboard/dashboard'
+    })
   }
 })
