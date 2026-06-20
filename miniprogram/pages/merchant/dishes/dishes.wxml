@@ -86,6 +86,7 @@
               <view class="dish-meta">
                 <view class="meta-pill">{{item.category_name}}</view>
                 <view class="meta-pill">排序 {{item.sort_order}}</view>
+                <view class="meta-pill stock-pill {{item.stock_class}}">{{item.stock_text}}</view>
               </view>
               <view class="dish-tags" wx:if="{{item.tags.length}}">
                 <view wx:for="{{item.tags}}" wx:key="*this" class="dish-tag">{{item}}</view>
@@ -228,6 +229,46 @@
           <view class="form-field">
             <view class="field-label">排序</view>
             <input class="field-input" type="number" value="{{formData.sort_order}}" data-field="sort_order" bindinput="handleFormInput" placeholder="1" />
+          </view>
+        </view>
+
+        <view class="stock-panel">
+          <view class="stock-panel-head">
+            <view>
+              <view class="field-label">库存 / 售罄</view>
+              <view class="stock-panel-desc">用于控制用户端是否可加购，下架状态仍由上架/下架按钮控制</view>
+            </view>
+          </view>
+
+          <view class="switch-row">
+            <view>
+              <view class="switch-title">启用库存管理</view>
+              <view class="switch-desc">关闭后显示不限库存，不参与库存扣减</view>
+            </view>
+            <switch
+              checked="{{formData.stock_enabled}}"
+              color="#E63B4A"
+              data-field="stock_enabled"
+              bindchange="handleFormSwitchChange"
+            />
+          </view>
+
+          <view class="form-field stock-count-field">
+            <view class="field-label">库存数量</view>
+            <input class="field-input" type="number" value="{{formData.stock_count}}" data-field="stock_count" bindinput="handleFormInput" placeholder="0" />
+          </view>
+
+          <view class="switch-row">
+            <view>
+              <view class="switch-title">手动售罄</view>
+              <view class="switch-desc">开启后用户端显示已售罄，不能加购</view>
+            </view>
+            <switch
+              checked="{{formData.sold_out}}"
+              color="#E63B4A"
+              data-field="sold_out"
+              bindchange="handleFormSwitchChange"
+            />
           </view>
         </view>
       </scroll-view>

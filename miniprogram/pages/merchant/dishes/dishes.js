@@ -5,15 +5,13 @@ const BACKGROUND_IMAGE = '/images/mock/home-glass-display.jpg'
 
 const DISH_STATUS_TEXT = {
   on_sale: '上架中',
-  off_sale: '已下架',
-  sold_out: '已售罄'
+  off_sale: '已下架'
 }
 
 const STATUS_FILTERS = [
   { label: '全部', value: '' },
   { label: '上架', value: 'on_sale' },
-  { label: '下架', value: 'off_sale' },
-  { label: '售罄', value: 'sold_out' }
+  { label: '下架', value: 'off_sale' }
 ]
 
 function getNavigationMetrics() {
@@ -53,6 +51,58 @@ function yuanToCent(value, options = {}) {
 
   const [yuan, cent = ''] = text.split('.')
   return Number(yuan) * 100 + Number(cent.padEnd(2, '0'))
+}
+
+function normalizeStockCount(value) {
+  const numberValue = Number(value)
+  if (!Number.isInteger(numberValue) || numberValue < 0) {
+    return null
+  }
+  return numberValue
+}
+
+function getStockDisplay(dish = {}) {
+  const stockEnabled = typeof dish.stock_enabled === 'boolean' ? dish.stock_enabled : false
+  const stockCount = normalizeStockCount(dish.stock_count) === null ? 0 : normalizeStockCount(dish.stock_count)
+  const soldOut = typeof dish.sold_out === 'boolean' ? dish.sold_out : false
+
+  if (soldOut) {
+    return {
+      stock_enabled: stockEnabled,
+      stock_count: stockCount,
+      sold_out: soldOut,
+      stock_text: '手动售罄',
+      stock_class: 'stock-sold-out'
+    }
+  }
+
+  if (stockEnabled && stockCount <= 0) {
+    return {
+      stock_enabled: stockEnabled,
+      stock_count: stockCount,
+      sold_out: soldOut,
+      stock_text: '已售罄',
+      stock_class: 'stock-empty'
+    }
+  }
+
+  if (stockEnabled) {
+    return {
+      stock_enabled: stockEnabled,
+      stock_count: stockCount,
+      sold_out: soldOut,
+      stock_text: `剩余 ${stockCount} 份`,
+      stock_class: 'stock-limited'
+    }
+  }
+
+  return {
+    stock_enabled: stockEnabled,
+    stock_count: stockCount,
+    sold_out: soldOut,
+    stock_text: '不限库存',
+    stock_class: 'stock-unlimited'
+  }
 }
 
 function getImageExtension(filePath = '') {
@@ -154,6 +204,7 @@ function buildCategoryMap(categories) {
 function normalizeDish(dish = {}, categoryMap = {}) {
   const status = dish.status || 'off_sale'
   const category = categoryMap[dish.category_id] || {}
+  const stockDisplay = getStockDisplay(dish)
 
   return {
     ...dish,
@@ -177,6 +228,7 @@ function normalizeDish(dish = {}, categoryMap = {}) {
     status,
     status_text: DISH_STATUS_TEXT[status] || '未知状态',
     status_class: `status-${status}`,
+    ...stockDisplay,
     sort_order: Number(dish.sort_order) || 0
   }
 }
@@ -192,6 +244,9 @@ function createEmptyForm(categoryId = '', categoryName = '', sortOrder = 1) {
     price_yuan: '',
     original_price_yuan: '',
     tags_text: '',
+    stock_enabled: false,
+    stock_count: '0',
+    sold_out: false,
     sort_order: String(sortOrder)
   }
 }
@@ -421,6 +476,9 @@ Page({
         price_yuan: dish.price_yuan,
         original_price_yuan: dish.original_price_yuan,
         tags_text: dish.tags_text,
+        stock_enabled: dish.stock_enabled,
+        stock_count: String(dish.stock_count),
+        sold_out: dish.sold_out,
         sort_order: String(dish.sort_order)
       }
     })
@@ -514,6 +572,14 @@ Page({
     })
   },
 
+  handleFormSwitchChange(event) {
+    const field = event.currentTarget.dataset.field
+    const value = event.detail.value
+    this.setData({
+      [`formData.${field}`]: value
+    })
+  },
+
   handleFormCategoryChange(event) {
     const index = Number(event.detail.value)
     const category = this.data.formCategoryOptions[index]
@@ -597,6 +663,7 @@ Page({
     const originalPriceCent = yuanToCent(formData.original_price_yuan, {
       allowEmpty: true
     })
+    const stockCount = normalizeStockCount(formData.stock_count)
     const sortOrder = Number(formData.sort_order)
 
     if (!name) {
@@ -615,6 +682,10 @@ Page({
       return { error: '请输入正确原价' }
     }
 
+    if (stockCount === null) {
+      return { error: '库存数量必须是非负整数' }
+    }
+
     if (!Number.isInteger(sortOrder) || sortOrder < 0) {
       return { error: '排序必须是非负整数' }
     }
@@ -629,6 +700,9 @@ Page({
         price_cent: priceCent,
         original_price_cent: originalPriceCent,
         tags: parseTags(formData.tags_text),
+        stock_enabled: Boolean(formData.stock_enabled),
+        stock_count: stockCount,
+        sold_out: Boolean(formData.sold_out),
         sort_order: sortOrder
       }
     }
