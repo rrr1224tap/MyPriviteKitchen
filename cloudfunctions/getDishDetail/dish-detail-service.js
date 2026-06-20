@@ -30,6 +30,12 @@ function getSortOrder(item) {
   return Number.isFinite(item.sort_order) ? item.sort_order : 0
 }
 
+function getStockCount(dish) {
+  return Number.isInteger(dish.stock_count) && dish.stock_count >= 0
+    ? dish.stock_count
+    : 0
+}
+
 function formatDish(dish) {
   return {
     _id: dish._id || '',
@@ -46,7 +52,9 @@ function formatDish(dish) {
       : 0,
     tags: asList(dish.tags),
     status: dish.status || '',
-    stock: Number.isFinite(dish.stock) ? dish.stock : 0,
+    stock_enabled: typeof dish.stock_enabled === 'boolean' ? dish.stock_enabled : false,
+    stock_count: getStockCount(dish),
+    sold_out: typeof dish.sold_out === 'boolean' ? dish.sold_out : false,
     sales_count: Number.isFinite(dish.sales_count) ? dish.sales_count : 0,
     estimated_time_min: Number.isFinite(dish.estimated_time_min)
       ? dish.estimated_time_min

@@ -47,7 +47,46 @@ test('getMenu returns active categories and on_sale dishes grouped by category',
         name: '招牌肥牛石锅拌饭',
         price_cent: 2990,
         status: 'on_sale',
+        stock_enabled: true,
+        stock_count: 12,
+        sold_out: false,
         sort_order: 2
+      },
+      {
+        _id: 'dish_sold_out',
+        dish_id: 'dish_sold_out',
+        merchant_id: 'merchant_001',
+        category_id: 'category_001',
+        name: '手动售罄餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        stock_enabled: false,
+        stock_count: 0,
+        sold_out: true,
+        sort_order: 3
+      },
+      {
+        _id: 'dish_zero_stock',
+        dish_id: 'dish_zero_stock',
+        merchant_id: 'merchant_001',
+        category_id: 'category_001',
+        name: '库存售罄餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        stock_enabled: true,
+        stock_count: 0,
+        sold_out: false,
+        sort_order: 4
+      },
+      {
+        _id: 'dish_legacy',
+        dish_id: 'dish_legacy',
+        merchant_id: 'merchant_001',
+        category_id: 'category_001',
+        name: '历史旧餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        sort_order: 5
       },
       {
         _id: 'dish_off_sale',
@@ -81,8 +120,18 @@ test('getMenu returns active categories and on_sale dishes grouped by category',
   assert.equal(result.data.categories[0].category_id, 'category_001')
   assert.deepEqual(
     result.data.categories[0].dishes.map((dish) => dish.dish_id),
-    ['dish_002']
+    ['dish_002', 'dish_sold_out', 'dish_zero_stock', 'dish_legacy']
   )
+  const [normalDish, soldOutDish, zeroStockDish, legacyDish] = result.data.categories[0].dishes
+  assert.equal(normalDish.stock_enabled, true)
+  assert.equal(normalDish.stock_count, 12)
+  assert.equal(normalDish.sold_out, false)
+  assert.equal(soldOutDish.sold_out, true)
+  assert.equal(zeroStockDish.stock_enabled, true)
+  assert.equal(zeroStockDish.stock_count, 0)
+  assert.equal(legacyDish.stock_enabled, false)
+  assert.equal(legacyDish.stock_count, 0)
+  assert.equal(legacyDish.sold_out, false)
   assert.equal(result.data.categories[1].dishes.length, 0)
 })
 
