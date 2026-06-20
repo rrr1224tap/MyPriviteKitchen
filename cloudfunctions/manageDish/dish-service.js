@@ -62,6 +62,18 @@ function isActiveMerchantStaff(staff, merchantId, openid) {
   )
 }
 
+function isCategoryUsable(category = {}) {
+  if (category.enabled === false) {
+    return false
+  }
+
+  if (category.status && category.status !== 'active') {
+    return false
+  }
+
+  return true
+}
+
 function formatDish(dish = {}) {
   return {
     _id: dish._id || '',
@@ -127,13 +139,19 @@ async function assertCategoryBelongsToMerchant(deps, categoryId, merchantId) {
   const category = await deps.findCategoryById(categoryId)
   if (!category) {
     return {
-      error: failure('NOT_FOUND', '分类不存在')
+      error: failure('VALIDATION_ERROR', '分类不可用，不能绑定餐品')
     }
   }
 
   if (category.merchant_id !== merchantId) {
     return {
-      error: failure('FORBIDDEN', '不能使用其他商家的分类')
+      error: failure('VALIDATION_ERROR', '分类不可用，不能绑定餐品')
+    }
+  }
+
+  if (!isCategoryUsable(category)) {
+    return {
+      error: failure('VALIDATION_ERROR', '分类不可用，不能绑定餐品')
     }
   }
 

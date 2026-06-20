@@ -32,6 +32,23 @@ function createDependencies(options = {}) {
         name: '其他商家分类',
         sort_order: 1,
         status: 'active'
+      },
+      {
+        _id: 'doc_category_inactive',
+        category_id: 'category_inactive',
+        merchant_id: 'merchant_001',
+        name: '停用分类',
+        sort_order: 2,
+        status: 'inactive'
+      },
+      {
+        _id: 'doc_category_disabled',
+        category_id: 'category_disabled',
+        merchant_id: 'merchant_001',
+        name: '禁用分类',
+        sort_order: 3,
+        status: 'active',
+        enabled: false
       }
     ],
     dishes: options.dishes || [
@@ -208,7 +225,46 @@ test('create fails when category belongs to another merchant', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'FORBIDDEN')
+  assert.equal(result.code, 'VALIDATION_ERROR')
+  assert.equal(result.message, '分类不可用，不能绑定餐品')
+})
+
+test('create fails when category is inactive', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_inactive',
+      name: '停用分类餐品',
+      price_cent: 1990
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+  assert.equal(result.message, '分类不可用，不能绑定餐品')
+})
+
+test('create fails when category enabled is false', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_disabled',
+      name: '禁用分类餐品',
+      price_cent: 1990
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+  assert.equal(result.message, '分类不可用，不能绑定餐品')
 })
 
 test('update changes a dish that belongs to the requested merchant', async () => {
@@ -230,6 +286,41 @@ test('update changes a dish that belongs to the requested merchant', async () =>
   assert.equal(result.data.dish.name, '本店招牌肥牛拌饭')
   assert.equal(result.data.dish.price_cent, 3190)
   assert.deepEqual(result.data.dish.tags, ['招牌推荐'])
+})
+
+test('update fails when moving dish to inactive category', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    data: {
+      category_id: 'category_inactive'
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+  assert.equal(result.message, '分类不可用，不能绑定餐品')
+})
+
+test('update succeeds when moving dish to active category', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    data: {
+      category_id: 'category_001'
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.dish.category_id, 'category_001')
 })
 
 test('onSale marks a dish on sale', async () => {
