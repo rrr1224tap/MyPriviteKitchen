@@ -176,8 +176,35 @@
         </view>
 
         <view class="form-field">
+          <view class="field-label">餐品主图</view>
+          <view class="image-upload-card">
+            <image
+              wx:if="{{formData.image_url}}"
+              class="image-upload-preview"
+              src="{{formData.image_url}}"
+              mode="aspectFill"
+              bindtap="previewFormImage"
+            />
+            <view wx:else class="image-upload-placeholder" bindtap="chooseDishImage">
+              <view class="image-upload-mark">图</view>
+              <view class="image-upload-title">上传餐品图片</view>
+              <view class="image-upload-desc">支持从相册选择或拍照</view>
+            </view>
+
+            <view class="image-upload-footer">
+              <button
+                class="image-upload-button"
+                bindtap="chooseDishImage"
+                disabled="{{uploadingImage}}"
+              >{{uploadingImage ? '上传中...' : (formData.image_url ? '更换图片' : '上传图片')}}</button>
+              <view class="image-upload-tip">上传成功后会自动填入图片地址</view>
+            </view>
+          </view>
+        </view>
+
+        <view class="form-field">
           <view class="field-label">图片地址</view>
-          <input class="field-input" value="{{formData.image_url}}" data-field="image_url" bindinput="handleFormInput" placeholder="可先留空，后续替换真实图片" />
+          <input class="field-input" value="{{formData.image_url}}" data-field="image_url" bindinput="handleFormInput" placeholder="可手动粘贴 cloud:// fileID 调试" />
         </view>
 
         <view class="form-grid">

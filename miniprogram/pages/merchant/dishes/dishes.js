@@ -55,6 +55,62 @@ function yuanToCent(value, options = {}) {
   return Number(yuan) * 100 + Number(cent.padEnd(2, '0'))
 }
 
+function getImageExtension(filePath = '') {
+  const match = String(filePath).match(/\.([a-zA-Z0-9]+)(?:\?|$)/)
+  const extension = match ? match[1].toLowerCase() : 'jpg'
+  return ['jpg', 'jpeg', 'png', 'webp'].includes(extension) ? extension : 'jpg'
+}
+
+function getDishImageCloudPath(filePath) {
+  const random = Math.random().toString(36).slice(2, 8)
+  return `dish-images/${DEFAULT_MERCHANT_ID}/${Date.now()}_${random}.${getImageExtension(filePath)}`
+}
+
+function chooseDishImageFile() {
+  return new Promise((resolve, reject) => {
+    if (wx.chooseMedia) {
+      wx.chooseMedia({
+        count: 1,
+        mediaType: ['image'],
+        sourceType: ['album', 'camera'],
+        sizeType: ['compressed'],
+        success: (res) => {
+          const file = res.tempFiles && res.tempFiles[0]
+          resolve(file ? file.tempFilePath : '')
+        },
+        fail: reject
+      })
+      return
+    }
+
+    wx.chooseImage({
+      count: 1,
+      sourceType: ['album', 'camera'],
+      sizeType: ['compressed'],
+      success: (res) => {
+        resolve(res.tempFilePaths && res.tempFilePaths[0] ? res.tempFilePaths[0] : '')
+      },
+      fail: reject
+    })
+  })
+}
+
+function uploadDishImageFile(filePath) {
+  return new Promise((resolve, reject) => {
+    wx.cloud.uploadFile({
+      cloudPath: getDishImageCloudPath(filePath),
+      filePath,
+      success: resolve,
+      fail: reject
+    })
+  })
+}
+
+function isCancelError(error) {
+  const message = error && (error.errMsg || error.message || '')
+  return message.indexOf('cancel') >= 0
+}
+
 function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -162,7 +218,8 @@ Page({
     formDishId: '',
     formData: createEmptyForm(),
     formCategoryOptions: [],
-    formCategoryIndex: 0
+    formCategoryIndex: 0,
+    uploadingImage: false
   },
 
   onReady() {
@@ -370,12 +427,82 @@ Page({
   },
 
   closeForm() {
-    if (this.data.submitting) {
+    if (this.data.submitting || this.data.uploadingImage) {
       return
     }
 
     this.setData({
       formVisible: false
+    })
+  },
+
+  async chooseDishImage() {
+    if (this.data.uploadingImage) {
+      return
+    }
+
+    let tempFilePath = ''
+    try {
+      tempFilePath = await chooseDishImageFile()
+    } catch (error) {
+      if (!isCancelError(error)) {
+        wx.showToast({
+          title: '选择图片失败',
+          icon: 'none'
+        })
+      }
+      return
+    }
+
+    if (!tempFilePath) {
+      return
+    }
+
+    this.setData({
+      uploadingImage: true
+    })
+    wx.showLoading({
+      title: '上传中...',
+      mask: true
+    })
+
+    try {
+      const result = await uploadDishImageFile(tempFilePath)
+      if (!result || !result.fileID) {
+        throw new Error('No fileID returned')
+      }
+
+      this.setData({
+        'formData.image_url': result.fileID
+      })
+      wx.hideLoading()
+      wx.showToast({
+        title: '图片已上传',
+        icon: 'success'
+      })
+    } catch (error) {
+      wx.hideLoading()
+      console.error('upload dish image failed', error)
+      wx.showToast({
+        title: '图片上传失败',
+        icon: 'none'
+      })
+    } finally {
+      this.setData({
+        uploadingImage: false
+      })
+    }
+  },
+
+  previewFormImage() {
+    const imageUrl = this.data.formData.image_url
+    if (!imageUrl) {
+      return
+    }
+
+    wx.previewImage({
+      current: imageUrl,
+      urls: [imageUrl]
     })
   },
 
@@ -403,6 +530,14 @@ Page({
 
   async submitForm() {
     if (this.data.submitting) {
+      return
+    }
+
+    if (this.data.uploadingImage) {
+      wx.showToast({
+        title: '图片上传中',
+        icon: 'none'
+      })
       return
     }
 
