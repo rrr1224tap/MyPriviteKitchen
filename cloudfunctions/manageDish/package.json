@@ -1,0 +1,9 @@
+{
+  "name": "manageDish",
+  "version": "1.0.0",
+  "description": "Manage merchant dishes for ordering mini program",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}
