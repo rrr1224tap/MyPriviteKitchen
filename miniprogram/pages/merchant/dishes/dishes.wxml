@@ -1,0 +1,214 @@
+<view class="merchant-dishes-page">
+  <image
+    wx:if="{{backgroundImageAvailable}}"
+    class="background-image-window"
+    src="{{backgroundImage}}"
+    mode="aspectFill"
+    binderror="handleBackgroundImageError"
+  />
+  <view class="background-shade"></view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="nav-back" bindtap="goBack">‹</view>
+    <view class="nav-title">餐品管理</view>
+  </view>
+
+  <scroll-view class="dishes-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="dishes-content" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+      <view class="merchant-hero glass-panel">
+        <view class="hero-copy">
+          <view class="hero-kicker">MENU DISH</view>
+          <view class="hero-title">餐品管理</view>
+          <view class="hero-desc">维护餐品信息、价格、上下架和展示顺序</view>
+        </view>
+        <button class="hero-action" bindtap="handleCreateTap" disabled="{{submitting}}">新增</button>
+      </view>
+
+      <scroll-view class="filter-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="filter-list">
+          <view
+            wx:for="{{categoryFilters}}"
+            wx:key="category_id"
+            class="filter-tab {{activeCategoryId === item.category_id ? 'active' : ''}}"
+            data-id="{{item.category_id}}"
+            bindtap="handleCategoryFilterTap"
+          >{{item.name}}</view>
+        </view>
+      </scroll-view>
+
+      <scroll-view class="filter-scroll status-filter-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="filter-list">
+          <view
+            wx:for="{{statusFilters}}"
+            wx:key="value"
+            class="filter-tab status-filter {{activeStatus === item.value ? 'active' : ''}}"
+            data-status="{{item.value}}"
+            bindtap="handleStatusFilterTap"
+          >{{item.label}}</view>
+        </view>
+      </scroll-view>
+
+      <view wx:if="{{pageStatus === 'loading'}}" class="state-card warm-glass">
+        <view class="state-mark">等</view>
+        <view class="state-title">正在加载餐品</view>
+        <view class="state-desc">正在同步当前门店的餐品数据</view>
+      </view>
+
+      <view wx:elif="{{pageStatus === 'error'}}" class="state-card warm-glass">
+        <view class="state-mark">!</view>
+        <view class="state-title">餐品加载失败</view>
+        <view class="state-desc">{{errorMessage}}</view>
+        <button class="state-button" bindtap="retryLoad">重新加载</button>
+      </view>
+
+      <view wx:elif="{{pageStatus === 'empty'}}" class="state-card warm-glass">
+        <view class="state-mark">菜</view>
+        <view class="state-title">还没有餐品</view>
+        <view class="state-desc">先新增一个餐品，上架后会出现在用户点餐菜单中</view>
+        <button class="state-button" bindtap="handleCreateTap" disabled="{{submitting}}">新增餐品</button>
+      </view>
+
+      <view wx:else class="dish-list">
+        <view
+          wx:for="{{dishes}}"
+          wx:key="dish_id"
+          class="dish-card warm-glass {{item.status === 'on_sale' ? '' : 'dish-card-muted'}}"
+        >
+          <view class="dish-main">
+            <image wx:if="{{item.image_url}}" class="dish-image" src="{{item.image_url}}" mode="aspectFill" />
+            <view wx:else class="dish-image dish-image-fallback">餐</view>
+            <view class="dish-copy">
+              <view class="dish-head">
+                <view class="dish-name">{{item.name}}</view>
+                <view class="dish-status {{item.status_class}}">{{item.status_text}}</view>
+              </view>
+              <view class="dish-desc">{{item.description || '暂无简介'}}</view>
+              <view class="dish-meta">
+                <view class="meta-pill">{{item.category_name}}</view>
+                <view class="meta-pill">排序 {{item.sort_order}}</view>
+              </view>
+              <view class="dish-tags" wx:if="{{item.tags.length}}">
+                <view wx:for="{{item.tags}}" wx:key="*this" class="dish-tag">{{item}}</view>
+              </view>
+            </view>
+          </view>
+
+          <view class="dish-foot">
+            <view>
+              <view class="price-text">¥{{item.price_yuan}}</view>
+              <view wx:if="{{item.original_price_yuan}}" class="original-price">原价 ¥{{item.original_price_yuan}}</view>
+            </view>
+            <view class="action-row">
+              <button
+                class="action-button ghost"
+                data-index="{{index}}"
+                data-direction="-1"
+                bindtap="handleMoveTap"
+                disabled="{{submitting || index === 0}}"
+              >上移</button>
+              <button
+                class="action-button ghost"
+                data-index="{{index}}"
+                data-direction="1"
+                bindtap="handleMoveTap"
+                disabled="{{submitting || index === dishes.length - 1}}"
+              >下移</button>
+              <button
+                class="action-button"
+                data-id="{{item.dish_id}}"
+                bindtap="handleEditTap"
+                disabled="{{submitting}}"
+              >编辑</button>
+              <button
+                wx:if="{{item.status === 'on_sale'}}"
+                class="action-button danger"
+                data-id="{{item.dish_id}}"
+                data-action="offSale"
+                bindtap="handleStatusTap"
+                disabled="{{submitting}}"
+              >下架</button>
+              <button
+                wx:else
+                class="action-button"
+                data-id="{{item.dish_id}}"
+                data-action="onSale"
+                bindtap="handleStatusTap"
+                disabled="{{submitting}}"
+              >上架</button>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view wx:if="{{formVisible}}" class="form-mask">
+    <view class="dish-form warm-glass">
+      <view class="form-head">
+        <view>
+          <view class="form-kicker">DISH FORM</view>
+          <view class="form-title">{{formTitle}}</view>
+        </view>
+        <view class="form-close" bindtap="closeForm">×</view>
+      </view>
+
+      <scroll-view class="form-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+        <view class="form-field">
+          <view class="field-label">餐品名称</view>
+          <input class="field-input" value="{{formData.name}}" data-field="name" bindinput="handleFormInput" placeholder="例如：招牌肥牛石锅拌饭" />
+        </view>
+
+        <view class="form-field">
+          <view class="field-label">所属分类</view>
+          <picker range="{{formCategoryOptions}}" range-key="name" value="{{formCategoryIndex}}" bindchange="handleFormCategoryChange">
+            <view class="field-picker">{{formData.category_name || '请选择分类'}}</view>
+          </picker>
+        </view>
+
+        <view class="form-field">
+          <view class="field-label">简介</view>
+          <input class="field-input" value="{{formData.description}}" data-field="description" bindinput="handleFormInput" placeholder="用于菜单卡片展示" />
+        </view>
+
+        <view class="form-field">
+          <view class="field-label">详情</view>
+          <textarea class="field-textarea" value="{{formData.detail_description}}" data-field="detail_description" bindinput="handleFormInput" placeholder="用于餐品详情页展示" maxlength="120"></textarea>
+        </view>
+
+        <view class="form-field">
+          <view class="field-label">图片地址</view>
+          <input class="field-input" value="{{formData.image_url}}" data-field="image_url" bindinput="handleFormInput" placeholder="可先留空，后续替换真实图片" />
+        </view>
+
+        <view class="form-grid">
+          <view class="form-field">
+            <view class="field-label">售价（元）</view>
+            <input class="field-input" type="digit" value="{{formData.price_yuan}}" data-field="price_yuan" bindinput="handleFormInput" placeholder="29.90" />
+          </view>
+
+          <view class="form-field">
+            <view class="field-label">原价（元）</view>
+            <input class="field-input" type="digit" value="{{formData.original_price_yuan}}" data-field="original_price_yuan" bindinput="handleFormInput" placeholder="可不填" />
+          </view>
+        </view>
+
+        <view class="form-grid">
+          <view class="form-field">
+            <view class="field-label">标签</view>
+            <input class="field-input" value="{{formData.tags_text}}" data-field="tags_text" bindinput="handleFormInput" placeholder="招牌，热销" />
+          </view>
+
+          <view class="form-field">
+            <view class="field-label">排序</view>
+            <input class="field-input" type="number" value="{{formData.sort_order}}" data-field="sort_order" bindinput="handleFormInput" placeholder="1" />
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="form-actions">
+        <button class="form-button secondary" bindtap="closeForm" disabled="{{submitting}}">取消</button>
+        <button class="form-button primary" bindtap="submitForm" disabled="{{submitting}}">{{submitting ? '保存中...' : '保存'}}</button>
+      </view>
+    </view>
+  </view>
+</view>

@@ -60,6 +60,12 @@ Page({
     })
   },
 
+  goToDishes() {
+    wx.navigateTo({
+      url: '/pages/merchant/dishes/dishes'
+    })
+  },
+
   goToUserHome() {
     wx.reLaunch({
       url: '/pages/common/launch/launch'

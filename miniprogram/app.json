@@ -10,7 +10,8 @@
     "pages/merchant/dashboard/dashboard",
     "pages/merchant/orders/orders",
     "pages/merchant/order-detail/order-detail",
-    "pages/merchant/categories/categories"
+    "pages/merchant/categories/categories",
+    "pages/merchant/dishes/dishes"
   ],
   "window": {
     "navigationBarTitleText": "点餐小程序",
