@@ -54,6 +54,12 @@ Page({
     })
   },
 
+  goToCategories() {
+    wx.navigateTo({
+      url: '/pages/merchant/categories/categories'
+    })
+  },
+
   goToUserHome() {
     wx.reLaunch({
       url: '/pages/common/launch/launch'

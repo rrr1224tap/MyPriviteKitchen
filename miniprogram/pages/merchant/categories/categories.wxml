@@ -1,0 +1,99 @@
+<view class="merchant-categories-page">
+  <image
+    wx:if="{{backgroundImageAvailable}}"
+    class="background-image-window"
+    src="{{backgroundImage}}"
+    mode="aspectFill"
+    binderror="handleBackgroundImageError"
+  />
+  <view class="background-shade"></view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="nav-back" bindtap="goBack">‹</view>
+    <view class="nav-title">分类管理</view>
+  </view>
+
+  <scroll-view class="categories-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="categories-content" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+      <view class="merchant-hero glass-panel">
+        <view class="hero-copy">
+          <view class="hero-kicker">MENU CATEGORY</view>
+          <view class="hero-title">分类管理</view>
+          <view class="hero-desc">维护点餐页左侧分类顺序，帮助顾客更快找到餐品</view>
+        </view>
+        <button class="hero-action" bindtap="handleCreateTap" disabled="{{submitting}}">新增</button>
+      </view>
+
+      <view wx:if="{{pageStatus === 'loading'}}" class="state-card warm-glass">
+        <view class="state-mark">等</view>
+        <view class="state-title">正在加载分类</view>
+        <view class="state-desc">正在同步当前门店的分类数据</view>
+      </view>
+
+      <view wx:elif="{{pageStatus === 'error'}}" class="state-card warm-glass">
+        <view class="state-mark">!</view>
+        <view class="state-title">分类加载失败</view>
+        <view class="state-desc">{{errorMessage}}</view>
+        <button class="state-button" bindtap="retryLoad">重新加载</button>
+      </view>
+
+      <view wx:elif="{{pageStatus === 'empty'}}" class="state-card warm-glass">
+        <view class="state-mark">类</view>
+        <view class="state-title">还没有分类</view>
+        <view class="state-desc">先新增一个分类，例如“招牌推荐”或“石锅现炒”</view>
+        <button class="state-button" bindtap="handleCreateTap" disabled="{{submitting}}">新增分类</button>
+      </view>
+
+      <view wx:else class="category-list">
+        <view
+          wx:for="{{categories}}"
+          wx:key="category_id"
+          class="category-card warm-glass {{item.is_active ? '' : 'category-card-muted'}}"
+        >
+          <view class="category-head">
+            <view class="category-name-wrap">
+              <view class="category-name">{{item.name}}</view>
+              <view class="category-id">{{item.category_id}}</view>
+            </view>
+            <view class="category-status {{item.status_class}}">{{item.status_text}}</view>
+          </view>
+
+          <view class="category-meta">
+            <view class="meta-pill">排序 {{item.sort_order}}</view>
+            <view class="meta-pill">{{item.is_active ? '点餐页可展示' : '点餐页不展示'}}</view>
+          </view>
+
+          <view class="action-row">
+            <button
+              class="action-button ghost"
+              data-index="{{index}}"
+              data-direction="-1"
+              bindtap="handleMoveTap"
+              disabled="{{submitting || index === 0}}"
+            >上移</button>
+            <button
+              class="action-button ghost"
+              data-index="{{index}}"
+              data-direction="1"
+              bindtap="handleMoveTap"
+              disabled="{{submitting || index === categories.length - 1}}"
+            >下移</button>
+            <button
+              class="action-button"
+              data-id="{{item.category_id}}"
+              bindtap="handleEditTap"
+              disabled="{{submitting}}"
+            >编辑</button>
+            <button
+              wx:if="{{item.is_active}}"
+              class="action-button danger"
+              data-id="{{item.category_id}}"
+              bindtap="handleDisableTap"
+              disabled="{{submitting}}"
+            >停用</button>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

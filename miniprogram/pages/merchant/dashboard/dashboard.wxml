@@ -32,12 +32,21 @@
       <view class="entry-arrow">→</view>
     </view>
 
+    <view class="entry-card warm-glass" bindtap="goToCategories">
+      <view class="entry-icon">类</view>
+      <view class="entry-copy">
+        <view class="entry-title">分类管理</view>
+        <view class="entry-desc">新增、编辑、停用分类，并调整点餐页展示顺序</view>
+      </view>
+      <view class="entry-arrow">→</view>
+    </view>
+
     <view class="tips-panel glass-panel">
       <view class="section-kicker">CHECKLIST</view>
       <view class="section-title">联调提醒</view>
       <view class="tip-row">1. 当前账号需要配置为 merchant_staff active 员工</view>
       <view class="tip-row">2. 真实权限由商家订单云函数校验</view>
-      <view class="tip-row">3. 暂不接入支付、分类和餐品管理</view>
+      <view class="tip-row">3. 分类管理已接入，餐品管理和支付后续再接入</view>
     </view>
 
     <button class="secondary-button" bindtap="goToUserHome">返回用户首页</button>
