@@ -36,6 +36,10 @@ function getStockCount(dish) {
     : 0
 }
 
+function hasOptions(dish) {
+  return asList(dish.spec_groups).length > 0 || asList(dish.addon_groups).length > 0
+}
+
 function sortBySortOrder(left, right) {
   return getSortOrder(left) - getSortOrder(right)
 }
@@ -70,6 +74,10 @@ function isCategoryActive(category) {
 
 function getCategoryId(category) {
   return category.category_id || category._id || ''
+}
+
+function getCategoryMatchIds(category) {
+  return [category.category_id, category._id].filter(Boolean)
 }
 
 function formatMerchant(merchant) {
@@ -107,6 +115,7 @@ function formatDish(dish) {
     stock_enabled: typeof dish.stock_enabled === 'boolean' ? dish.stock_enabled : false,
     stock_count: getStockCount(dish),
     sold_out: typeof dish.sold_out === 'boolean' ? dish.sold_out : false,
+    has_options: hasOptions(dish),
     sales_count: Number.isFinite(dish.sales_count) ? dish.sales_count : 0,
     estimated_time_min: Number.isFinite(dish.estimated_time_min)
       ? dish.estimated_time_min
@@ -116,9 +125,12 @@ function formatDish(dish) {
 }
 
 function formatCategory(category, dishes) {
+  const categoryId = getCategoryId(category)
+
   return {
-    _id: category._id || '',
-    category_id: getCategoryId(category),
+    _id: categoryId,
+    db_id: category._id || '',
+    category_id: categoryId,
     merchant_id: category.merchant_id || '',
     name: category.name || '',
     sort_order: getSortOrder(category),
@@ -152,13 +164,21 @@ function createGetMenuHandler(dependencies) {
         .filter(isCategoryActive)
         .sort(sortBySortOrder)
 
-      const activeCategoryIds = new Set(activeCategories.map(getCategoryId))
+      const categoryIdAliasMap = activeCategories.reduce((result, category) => {
+        const categoryId = getCategoryId(category)
+        getCategoryMatchIds(category).forEach((id) => {
+          result[id] = categoryId
+        })
+        return result
+      }, {})
+
+      const activeCategoryIds = new Set(Object.keys(categoryIdAliasMap))
       const dishesByCategoryId = asList(dishList)
         .filter((dish) => dish.status === 'on_sale')
         .filter((dish) => activeCategoryIds.has(dish.category_id))
         .sort(sortBySortOrder)
         .reduce((result, dish) => {
-          const categoryId = dish.category_id || ''
+          const categoryId = categoryIdAliasMap[dish.category_id] || dish.category_id || ''
           if (!result[categoryId]) {
             result[categoryId] = []
           }

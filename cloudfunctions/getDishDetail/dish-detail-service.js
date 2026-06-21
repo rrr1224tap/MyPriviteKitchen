@@ -36,7 +36,49 @@ function getStockCount(dish) {
     : 0
 }
 
+function sortBySortOrder(left, right) {
+  return getSortOrder(left) - getSortOrder(right)
+}
+
+function formatOption(option) {
+  return {
+    option_id: option.option_id || '',
+    name: option.name || '',
+    price_delta_cent: Number.isInteger(option.price_delta_cent)
+      ? option.price_delta_cent
+      : 0,
+    enabled: option.enabled === true,
+    sort_order: getSortOrder(option)
+  }
+}
+
+function formatOptionGroup(group) {
+  return {
+    group_id: group.group_id || '',
+    name: group.name || '',
+    required: group.required === true,
+    min_select: Number.isInteger(group.min_select) && group.min_select >= 0
+      ? group.min_select
+      : 0,
+    max_select: Number.isInteger(group.max_select) && group.max_select >= 0
+      ? group.max_select
+      : 0,
+    sort_order: getSortOrder(group),
+    options: asList(group.options)
+      .filter((option) => option && option.enabled === true)
+      .map(formatOption)
+      .sort(sortBySortOrder)
+  }
+}
+
+function formatOptionGroups(groups) {
+  return asList(groups).map(formatOptionGroup).sort(sortBySortOrder)
+}
+
 function formatDish(dish) {
+  const specGroups = formatOptionGroups(dish.spec_groups)
+  const addonGroups = formatOptionGroups(dish.addon_groups)
+
   return {
     _id: dish._id || '',
     dish_id: dish.dish_id || dish._id || '',
@@ -55,6 +97,9 @@ function formatDish(dish) {
     stock_enabled: typeof dish.stock_enabled === 'boolean' ? dish.stock_enabled : false,
     stock_count: getStockCount(dish),
     sold_out: typeof dish.sold_out === 'boolean' ? dish.sold_out : false,
+    spec_groups: specGroups,
+    addon_groups: addonGroups,
+    has_options: specGroups.length > 0 || addonGroups.length > 0,
     sales_count: Number.isFinite(dish.sales_count) ? dish.sales_count : 0,
     estimated_time_min: Number.isFinite(dish.estimated_time_min)
       ? dish.estimated_time_min

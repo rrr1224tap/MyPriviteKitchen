@@ -3,6 +3,105 @@ const assert = require('node:assert/strict')
 
 const { createGetDishDetailHandler } = require('./dish-detail-service')
 
+function createSpecGroups() {
+  return [
+    {
+      group_id: 'spicy',
+      name: '辣度',
+      required: false,
+      min_select: 0,
+      max_select: 1,
+      sort_order: 2,
+      options: [
+        {
+          option_id: 'hot',
+          name: '特辣',
+          price_delta_cent: 100,
+          enabled: false,
+          sort_order: 2
+        },
+        {
+          option_id: 'medium',
+          name: '中辣',
+          price_delta_cent: 0,
+          enabled: true,
+          sort_order: 1
+        }
+      ]
+    },
+    {
+      group_id: 'size',
+      name: '规格',
+      required: true,
+      min_select: 1,
+      max_select: 1,
+      sort_order: 1,
+      options: [
+        {
+          option_id: 'large',
+          name: '大份',
+          price_delta_cent: 300,
+          enabled: true,
+          sort_order: 2
+        },
+        {
+          option_id: 'normal',
+          name: '标准份',
+          price_delta_cent: 0,
+          enabled: true,
+          sort_order: 1
+        }
+      ]
+    }
+  ]
+}
+
+function createAddonGroups() {
+  return [
+    {
+      group_id: 'extra',
+      name: '加料',
+      required: false,
+      min_select: 0,
+      max_select: 3,
+      sort_order: 1,
+      options: [
+        {
+          option_id: 'cheese',
+          name: '加芝士',
+          price_delta_cent: 300,
+          enabled: false,
+          sort_order: 2
+        },
+        {
+          option_id: 'egg',
+          name: '加蛋',
+          price_delta_cent: 200,
+          enabled: true,
+          sort_order: 1
+        }
+      ]
+    }
+  ]
+}
+
+function createDetailHandlerWithDish(dish) {
+  return createGetDishDetailHandler({
+    findDishById: async () => dish,
+    findCategoryById: async () => null,
+    findDishIngredientLinks: async () => [],
+    findIngredientsByIds: async () => [],
+    findProductionSteps: async () => []
+  })
+}
+
+async function getFormattedDish(dish) {
+  const getDishDetail = createDetailHandlerWithDish(dish)
+  const result = await getDishDetail({ dish_id: dish.dish_id || dish._id })
+  assert.equal(result.success, true)
+  return result.data.dish
+}
+
 test('getDishDetail returns dish detail with category, ingredients, and production steps', async () => {
   const getDishDetail = createGetDishDetailHandler({
     findDishById: async () => ({
@@ -20,7 +119,9 @@ test('getDishDetail returns dish detail with category, ingredients, and producti
       status: 'on_sale',
       stock_enabled: true,
       stock_count: 8,
-      sold_out: false
+      sold_out: false,
+      spec_groups: createSpecGroups(),
+      addon_groups: createAddonGroups()
     }),
     findCategoryById: async () => ({
       _id: 'category_001',
@@ -60,12 +161,167 @@ test('getDishDetail returns dish detail with category, ingredients, and producti
   assert.equal(result.data.dish.stock_enabled, true)
   assert.equal(result.data.dish.stock_count, 8)
   assert.equal(result.data.dish.sold_out, false)
+  assert.equal(result.data.dish.has_options, true)
+  assert.deepEqual(
+    result.data.dish.spec_groups.map((group) => group.group_id),
+    ['size', 'spicy']
+  )
+  assert.deepEqual(
+    result.data.dish.spec_groups[0].options.map((option) => option.option_id),
+    ['normal', 'large']
+  )
+  assert.deepEqual(
+    result.data.dish.spec_groups[1].options.map((option) => option.option_id),
+    ['medium']
+  )
+  assert.deepEqual(
+    result.data.dish.addon_groups[0].options.map((option) => option.option_id),
+    ['egg']
+  )
   assert.equal(result.data.category.name, '招牌推荐')
   assert.equal(result.data.ingredients[0].name, '肥牛')
   assert.deepEqual(
     result.data.production_steps.map((step) => step.step_index),
     [1, 2]
   )
+})
+
+test('getDishDetail returns empty option groups and has_options false for legacy dishes', async () => {
+  const dish = await getFormattedDish({
+    dish_id: 'dish_legacy',
+    merchant_id: 'merchant_001',
+    category_id: 'category_001',
+    name: 'Legacy Dish',
+    price_cent: 2990,
+    status: 'on_sale'
+  })
+
+  assert.deepEqual(dish.spec_groups, [])
+  assert.deepEqual(dish.addon_groups, [])
+  assert.equal(dish.has_options, false)
+})
+
+test('getDishDetail filters disabled options and sorts option groups and options', async () => {
+  const dish = await getFormattedDish({
+    dish_id: 'dish_options',
+    merchant_id: 'merchant_001',
+    category_id: 'category_001',
+    name: 'Option Dish',
+    price_cent: 2990,
+    status: 'on_sale',
+    spec_groups: createSpecGroups(),
+    addon_groups: [
+      {
+        group_id: 'sauce',
+        name: 'Sauce',
+        required: false,
+        min_select: 0,
+        max_select: 1,
+        sort_order: 2,
+        options: [
+          {
+            option_id: 'bbq',
+            name: 'BBQ',
+            price_delta_cent: 100,
+            enabled: true,
+            sort_order: 2
+          },
+          {
+            option_id: 'tomato',
+            name: 'Tomato',
+            price_delta_cent: 0,
+            enabled: true,
+            sort_order: 1
+          }
+        ]
+      },
+      {
+        group_id: 'extra',
+        name: 'Extra',
+        required: false,
+        min_select: 0,
+        max_select: 3,
+        sort_order: 1,
+        options: [
+          {
+            option_id: 'cheese',
+            name: 'Cheese',
+            price_delta_cent: 300,
+            enabled: false,
+            sort_order: 2
+          },
+          {
+            option_id: 'egg',
+            name: 'Egg',
+            price_delta_cent: 200,
+            enabled: true,
+            sort_order: 1
+          }
+        ]
+      }
+    ]
+  })
+
+  assert.equal(dish.has_options, true)
+  assert.deepEqual(
+    dish.spec_groups.map((group) => group.group_id),
+    ['size', 'spicy']
+  )
+  assert.deepEqual(
+    dish.spec_groups[0].options.map((option) => option.option_id),
+    ['normal', 'large']
+  )
+  assert.deepEqual(
+    dish.spec_groups[1].options.map((option) => option.option_id),
+    ['medium']
+  )
+  assert.deepEqual(
+    dish.addon_groups.map((group) => group.group_id),
+    ['extra', 'sauce']
+  )
+  assert.deepEqual(
+    dish.addon_groups[0].options.map((option) => option.option_id),
+    ['egg']
+  )
+  assert.deepEqual(
+    dish.addon_groups[1].options.map((option) => option.option_id),
+    ['tomato', 'bbq']
+  )
+})
+
+test('getDishDetail keeps stock and sold out fields when returning option groups', async () => {
+  const dish = await getFormattedDish({
+    dish_id: 'dish_stock_options',
+    merchant_id: 'merchant_001',
+    category_id: 'category_001',
+    name: 'Stock Option Dish',
+    price_cent: 2990,
+    status: 'on_sale',
+    stock_enabled: true,
+    stock_count: 0,
+    sold_out: true,
+    spec_groups: createSpecGroups()
+  })
+
+  assert.equal(dish.stock_enabled, true)
+  assert.equal(dish.stock_count, 0)
+  assert.equal(dish.sold_out, true)
+  assert.equal(dish.has_options, true)
+})
+
+test('getDishDetail can return off_sale dish detail without changing original logic', async () => {
+  const dish = await getFormattedDish({
+    dish_id: 'dish_off_sale',
+    merchant_id: 'merchant_001',
+    category_id: 'category_001',
+    name: 'Off Sale Dish',
+    price_cent: 2990,
+    status: 'off_sale',
+    spec_groups: createSpecGroups()
+  })
+
+  assert.equal(dish.status, 'off_sale')
+  assert.equal(dish.has_options, true)
 })
 
 test('getDishDetail keeps optional collections as empty arrays when optional queries fail', async () => {
@@ -97,6 +353,9 @@ test('getDishDetail keeps optional collections as empty arrays when optional que
   assert.equal(result.data.dish.stock_enabled, false)
   assert.equal(result.data.dish.stock_count, 0)
   assert.equal(result.data.dish.sold_out, false)
+  assert.deepEqual(result.data.dish.spec_groups, [])
+  assert.deepEqual(result.data.dish.addon_groups, [])
+  assert.equal(result.data.dish.has_options, false)
   assert.deepEqual(result.data.ingredients, [])
   assert.deepEqual(result.data.production_steps, [])
 })
