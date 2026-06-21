@@ -33,6 +33,44 @@ function getDishId(dish = {}) {
   return dish.dish_id || dish._id || ''
 }
 
+function normalizeStockCount(value) {
+  const numberValue = Number(value)
+
+  if (!Number.isInteger(numberValue) || numberValue < 0) {
+    return 0
+  }
+
+  return numberValue
+}
+
+function getSoldOutState(dish = {}) {
+  const stockEnabled = dish.stock_enabled === true
+  const stockCount = normalizeStockCount(dish.stock_count)
+  const soldOut = dish.sold_out === true
+
+  return {
+    stock_enabled: stockEnabled,
+    stock_count: stockCount,
+    sold_out: soldOut,
+    is_sold_out: soldOut || (stockEnabled && stockCount <= 0)
+  }
+}
+
+function buildCartDish(dish = {}) {
+  return {
+    dish_id: dish.dish_id,
+    merchant_id: dish.merchant_id || DEFAULT_MERCHANT_ID,
+    category_id: dish.category_id || '',
+    name: dish.name,
+    description: dish.description || '',
+    image_url: dish.image_url || dish.image || '',
+    price_cent: dish.price_cent,
+    original_price_cent: dish.original_price_cent || 0,
+    tags: normalizeTags(dish.tags),
+    status: dish.status || 'on_sale'
+  }
+}
+
 function formatIngredient(item) {
   if (typeof item === 'string') {
     return item
@@ -76,6 +114,7 @@ function decorateDish(rawDish, detailData = {}) {
   const hasRealImage = Boolean(imageUrl)
   const tags = normalizeTags(dish.tags)
   const estimatedTime = Number(dish.estimated_time_min)
+  const soldOutState = getSoldOutState(dish)
 
   if (Number.isFinite(estimatedTime) && estimatedTime > 0) {
     const timeTag = `约${estimatedTime}分钟`
@@ -101,13 +140,17 @@ function decorateDish(rawDish, detailData = {}) {
     description: dish.detail_description || dish.description || '暂无餐品介绍',
     ingredients: normalizeIngredients(detailData.ingredients, tags),
     status: dish.status || 'on_sale',
-    category: detailData.category || null
+    category: detailData.category || null,
+    ...soldOutState
   }
 }
 
 function getFallbackDish() {
+  const soldOutState = getSoldOutState(FALLBACK_DISH)
+
   return {
     ...FALLBACK_DISH,
+    ...soldOutState,
     price_text: formatMoney(FALLBACK_DISH.price_cent)
   }
 }
@@ -246,11 +289,27 @@ Page({
   },
 
   increaseQuantity() {
+    if (this.data.dish.is_sold_out) {
+      wx.showToast({
+        title: '该餐品已售罄',
+        icon: 'none'
+      })
+      return
+    }
+
     this.updateQuantity(this.data.quantity + 1)
   },
 
   addToCart() {
-    addCartItem(this.data.dish, this.data.quantity)
+    if (this.data.dish.is_sold_out) {
+      wx.showToast({
+        title: '该餐品已售罄',
+        icon: 'none'
+      })
+      return
+    }
+
+    addCartItem(buildCartDish(this.data.dish), this.data.quantity)
 
     wx.showToast({
       title: '已加入购物车',

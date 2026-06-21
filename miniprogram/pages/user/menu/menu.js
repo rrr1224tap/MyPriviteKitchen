@@ -100,12 +100,51 @@ function getFallbackImageStyle(index) {
   return FALLBACK_IMAGE_STYLES[index % FALLBACK_IMAGE_STYLES.length]
 }
 
+function normalizeStockCount(value) {
+  const numberValue = Number(value)
+
+  if (!Number.isInteger(numberValue) || numberValue < 0) {
+    return 0
+  }
+
+  return numberValue
+}
+
+function getSoldOutState(dish = {}) {
+  const stockEnabled = dish.stock_enabled === true
+  const stockCount = normalizeStockCount(dish.stock_count)
+  const soldOut = dish.sold_out === true
+
+  return {
+    stock_enabled: stockEnabled,
+    stock_count: stockCount,
+    sold_out: soldOut,
+    is_sold_out: soldOut || (stockEnabled && stockCount <= 0)
+  }
+}
+
+function buildCartDish(dish = {}) {
+  return {
+    dish_id: dish.dish_id,
+    merchant_id: dish.merchant_id || DEFAULT_MERCHANT_ID,
+    category_id: dish.category_id || '',
+    name: dish.name,
+    description: dish.description || '',
+    image_url: dish.image_url || dish.display_image || dish.image || '',
+    price_cent: dish.price_cent,
+    original_price_cent: dish.original_price_cent || 0,
+    tags: normalizeTags(dish.tags),
+    status: dish.status || 'on_sale'
+  }
+}
+
 function normalizeDish(dish, categoryId, index) {
   const dishId = getDishId(dish)
   const imageUrl = dish.image_url || dish.image || ''
   const hasRealImage = Boolean(imageUrl)
   const priceCent = Number(dish.price_cent)
   const safePriceCent = Number.isFinite(priceCent) ? priceCent : 0
+  const soldOutState = getSoldOutState(dish)
 
   return {
     ...dish,
@@ -122,7 +161,8 @@ function normalizeDish(dish, categoryId, index) {
     image_style: hasRealImage
       ? 'width: 100%; height: 100%; left: 0; top: 0;'
       : dish.image_style || getFallbackImageStyle(index),
-    image_mode: hasRealImage ? 'aspectFill' : 'widthFix'
+    image_mode: hasRealImage ? 'aspectFill' : 'widthFix',
+    ...soldOutState
   }
 }
 
@@ -355,7 +395,15 @@ Page({
       return
     }
 
-    addCartItem(dish, 1)
+    if (dish.is_sold_out) {
+      wx.showToast({
+        title: '该餐品已售罄',
+        icon: 'none'
+      })
+      return
+    }
+
+    addCartItem(buildCartDish(dish), 1)
     this.refreshCartSummary()
 
     wx.showToast({

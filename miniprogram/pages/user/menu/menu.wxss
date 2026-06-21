@@ -473,6 +473,10 @@
   box-shadow: 0 12rpx 30rpx rgba(70, 48, 35, 0.1), inset 0 1rpx 0 rgba(255, 255, 255, 0.92);
 }
 
+.dish-card.is-sold-out {
+  background: linear-gradient(135deg, rgba(255, 253, 250, 0.92), rgba(241, 234, 227, 0.88));
+}
+
 .dish-image-window {
   position: relative;
   width: 164rpx;
@@ -481,6 +485,10 @@
   overflow: hidden;
   border-radius: 20rpx;
   background: radial-gradient(circle at 58% 40%, #dca75f, #9b5d32 54%, #4a2b1c 100%);
+}
+
+.dish-card.is-sold-out .dish-image-source {
+  opacity: 0.58;
 }
 
 .dish-image-source {
@@ -497,6 +505,20 @@
   border: 1rpx solid rgba(255, 255, 255, 0.58);
   border-radius: 20rpx;
   box-shadow: inset 0 -18rpx 34rpx rgba(61, 37, 23, 0.05);
+}
+
+.sold-out-badge {
+  position: absolute;
+  right: 12rpx;
+  bottom: 12rpx;
+  padding: 7rpx 13rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.42);
+  border-radius: 999rpx;
+  background: rgba(40, 29, 23, 0.76);
+  color: #ffe3bd;
+  font-size: 18rpx;
+  font-weight: bold;
+  box-shadow: 0 8rpx 18rpx rgba(29, 19, 14, 0.24);
 }
 
 .dish-info {
@@ -526,6 +548,13 @@
   background: rgba(232, 77, 73, 0.1);
   color: #ad4144;
   font-size: 17rpx;
+}
+
+.dish-tag.sold-out-tag {
+  border-color: rgba(216, 121, 24, 0.22);
+  background: #fff1dd;
+  color: #d87918;
+  font-weight: bold;
 }
 
 .dish-description {
@@ -563,6 +592,13 @@
   font-size: 34rpx;
   font-weight: bold;
   box-shadow: 0 9rpx 20rpx rgba(180, 9, 18, 0.42), inset 0 2rpx 2rpx rgba(255, 255, 255, 0.35);
+}
+
+.add-button.is-disabled {
+  background: linear-gradient(145deg, #d8cec4, #a99a8e);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 22rpx;
+  box-shadow: none;
 }
 
 .empty-dishes {

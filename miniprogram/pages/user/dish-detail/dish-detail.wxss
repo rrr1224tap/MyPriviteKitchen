@@ -208,6 +208,13 @@
   font-size: 18rpx;
 }
 
+.dish-tag.sold-out-tag {
+  border-color: rgba(216, 121, 24, 0.28);
+  background: rgba(255, 241, 221, 0.18);
+  color: #ffd3a0;
+  font-weight: bold;
+}
+
 .dish-description {
   display: -webkit-box;
   margin-top: 14rpx;
@@ -337,6 +344,8 @@
 
 .stepper-button.is-disabled {
   color: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
 }
 
 .stepper-value {
@@ -417,4 +426,10 @@
   margin-left: 14rpx;
   font-size: 34rpx;
   font-weight: normal;
+}
+
+.add-cart-button.is-disabled {
+  background: linear-gradient(145deg, #d8cec4, #a99a8e);
+  color: rgba(255, 255, 255, 0.86);
+  box-shadow: none;
 }

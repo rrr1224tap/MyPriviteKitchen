@@ -38,6 +38,7 @@
       </view>
 
       <view wx:if="{{pageStatus !== 'loading'}}" class="tag-row">
+        <view wx:if="{{dish.is_sold_out}}" class="dish-tag sold-out-tag">已售罄</view>
         <view wx:for="{{dish.tags}}" wx:key="*this" class="dish-tag">{{item}}</view>
       </view>
 
@@ -70,7 +71,7 @@
       <view class="stepper">
         <view class="stepper-button is-minus {{quantity === 1 ? 'is-disabled' : ''}}" bindtap="decreaseQuantity">−</view>
         <view class="stepper-value">{{quantity}}</view>
-        <view class="stepper-button" bindtap="increaseQuantity">＋</view>
+        <view class="stepper-button {{dish.is_sold_out ? 'is-disabled' : ''}}" bindtap="increaseQuantity">＋</view>
       </view>
     </view>
 
@@ -83,6 +84,6 @@
       <view class="purchase-price">{{pageStatus === 'loading' ? '¥--' : totalPriceText}}</view>
     </view>
     <view class="purchase-count">{{quantity}} 份</view>
-    <button class="add-cart-button" bindtap="addToCart" disabled="{{pageStatus === 'loading'}}">加入购物车<text>›</text></button>
+    <button class="add-cart-button {{dish.is_sold_out ? 'is-disabled' : ''}}" bindtap="addToCart" disabled="{{pageStatus === 'loading'}}">{{dish.is_sold_out ? '已售罄' : '加入购物车'}}<text wx:if="{{!dish.is_sold_out}}">›</text></button>
   </view>
 </view>

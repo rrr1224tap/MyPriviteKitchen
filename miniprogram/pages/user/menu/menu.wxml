@@ -102,7 +102,7 @@
         <view
           wx:for="{{dishes}}"
           wx:key="_id"
-          class="dish-card"
+          class="dish-card {{item.is_sold_out ? 'is-sold-out' : ''}}"
           data-id="{{item._id}}"
           bindtap="openDish"
         >
@@ -117,16 +117,18 @@
               binderror="handleDishImageError"
             ></image>
             <view class="dish-image-gloss"></view>
+            <view wx:if="{{item.is_sold_out}}" class="sold-out-badge">已售罄</view>
           </view>
           <view class="dish-info">
             <view class="dish-name">{{item.name}}</view>
             <view class="dish-tags">
+              <view wx:if="{{item.is_sold_out}}" class="dish-tag sold-out-tag">已售罄</view>
               <view wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this" class="dish-tag">{{tag}}</view>
             </view>
             <view class="dish-description">{{item.description}}</view>
             <view class="dish-footer">
               <view class="dish-price">{{item.price_text}}</view>
-              <view class="add-button" data-id="{{item._id}}" catchtap="addDish">＋</view>
+              <view class="add-button {{item.is_sold_out ? 'is-disabled' : ''}}" data-id="{{item._id}}" catchtap="addDish">{{item.is_sold_out ? '售' : '＋'}}</view>
             </view>
           </view>
         </view>
