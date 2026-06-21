@@ -30,15 +30,32 @@ async function findDishesByIds(dishIds, merchantId) {
     return []
   }
 
-  const result = await db.collection('dishes')
-    .where({
-      merchant_id: merchantId,
-      dish_id: _.in(uniqueDishIds)
-    })
-    .limit(1000)
-    .get()
+  const [businessIdResult, databaseIdResult] = await Promise.all([
+    db.collection('dishes')
+      .where({
+        merchant_id: merchantId,
+        dish_id: _.in(uniqueDishIds)
+      })
+      .limit(1000)
+      .get(),
+    db.collection('dishes')
+      .where({
+        merchant_id: merchantId,
+        _id: _.in(uniqueDishIds)
+      })
+      .limit(1000)
+      .get()
+  ])
 
-  return result.data || []
+  const dishMap = {}
+  ;[...(businessIdResult.data || []), ...(databaseIdResult.data || [])].forEach((dish) => {
+    const key = dish._id || dish.dish_id
+    if (key) {
+      dishMap[key] = dish
+    }
+  })
+
+  return Object.values(dishMap)
 }
 
 async function createOrder(order) {
