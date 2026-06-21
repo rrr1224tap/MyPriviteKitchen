@@ -27,6 +27,40 @@ function normalizeData(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
 }
 
+const DISH_DATA_FIELDS = [
+  'category_id',
+  'name',
+  'description',
+  'detail_description',
+  'image_url',
+  'image',
+  'price_cent',
+  'original_price_cent',
+  'tags',
+  'status',
+  'stock_enabled',
+  'stock_count',
+  'sold_out',
+  'spec_groups',
+  'addon_groups',
+  'sort_order'
+]
+
+function normalizeEventData(event = {}) {
+  const rootData = {}
+  DISH_DATA_FIELDS.forEach((field) => {
+    if (hasOwn(event, field)) {
+      rootData[field] = event[field]
+    }
+  })
+
+  return {
+    ...rootData,
+    ...normalizeData(event.dish),
+    ...normalizeData(event.data)
+  }
+}
+
 function normalizeTags(value) {
   if (!Array.isArray(value)) {
     return []
@@ -66,6 +100,124 @@ function normalizeStockCount(value) {
 
 function normalizeBooleanDefault(value, defaultValue) {
   return typeof value === 'boolean' ? value : defaultValue
+}
+
+function normalizeOptionGroupList(value) {
+  return Array.isArray(value) ? value : []
+}
+
+function hasOptions(dish = {}) {
+  return normalizeOptionGroupList(dish.spec_groups).length > 0 ||
+    normalizeOptionGroupList(dish.addon_groups).length > 0
+}
+
+function isNonNegativeInteger(value) {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
+function isNonNegativeNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
+
+function validateOptionGroupList(groups, type, usedGroupIds) {
+  if (!Array.isArray(groups)) {
+    return failure('VALIDATION_ERROR', type === 'spec'
+      ? '规格配置必须是数组'
+      : '加料配置必须是数组')
+  }
+
+  for (const group of groups) {
+    if (!group || typeof group !== 'object' || Array.isArray(group)) {
+      return failure('VALIDATION_ERROR', '规格加料配置不合法')
+    }
+
+    const groupId = normalizeString(group.group_id)
+    if (!groupId) {
+      return failure('VALIDATION_ERROR', '规格加料组 ID 不能为空')
+    }
+
+    if (usedGroupIds.has(groupId)) {
+      return failure('VALIDATION_ERROR', '规格加料组 ID 不能重复')
+    }
+    usedGroupIds.add(groupId)
+
+    if (!normalizeString(group.name)) {
+      return failure('VALIDATION_ERROR', '规格加料组名称不能为空')
+    }
+
+    if (typeof group.required !== 'boolean') {
+      return failure('VALIDATION_ERROR', '规格加料必选字段必须是布尔值')
+    }
+
+    if (!isNonNegativeInteger(group.min_select)) {
+      return failure('VALIDATION_ERROR', '规格加料最小选择数必须是非负整数')
+    }
+
+    if (!isNonNegativeInteger(group.max_select)) {
+      return failure('VALIDATION_ERROR', '规格加料最大选择数必须是非负整数')
+    }
+
+    if (group.max_select < group.min_select) {
+      return failure('VALIDATION_ERROR', '规格加料最大选择数不能小于最小选择数')
+    }
+
+    if (type === 'spec' && group.max_select !== 1) {
+      return failure('VALIDATION_ERROR', '规格组第一阶段只支持单选')
+    }
+
+    if (type === 'spec' && group.required && group.min_select !== 1) {
+      return failure('VALIDATION_ERROR', '必选规格必须选择 1 项')
+    }
+
+    if (!isNonNegativeNumber(group.sort_order)) {
+      return failure('VALIDATION_ERROR', '规格加料排序必须是数字')
+    }
+
+    if (!Array.isArray(group.options)) {
+      return failure('VALIDATION_ERROR', '规格加料选项必须是数组')
+    }
+
+    const usedOptionIds = new Set()
+    for (const option of group.options) {
+      if (!option || typeof option !== 'object' || Array.isArray(option)) {
+        return failure('VALIDATION_ERROR', '规格加料选项不合法')
+      }
+
+      const optionId = normalizeString(option.option_id)
+      if (!optionId) {
+        return failure('VALIDATION_ERROR', '规格加料选项 ID 不能为空')
+      }
+
+      if (usedOptionIds.has(optionId)) {
+        return failure('VALIDATION_ERROR', '同一规格加料组内选项 ID 不能重复')
+      }
+      usedOptionIds.add(optionId)
+
+      if (!normalizeString(option.name)) {
+        return failure('VALIDATION_ERROR', '规格加料选项名称不能为空')
+      }
+
+      if (!isNonNegativeInteger(option.price_delta_cent)) {
+        return failure('VALIDATION_ERROR', '规格加料加价必须是非负整数分')
+      }
+
+      if (typeof option.enabled !== 'boolean') {
+        return failure('VALIDATION_ERROR', '规格加料选项启用字段必须是布尔值')
+      }
+
+      if (!isNonNegativeNumber(option.sort_order)) {
+        return failure('VALIDATION_ERROR', '规格加料选项排序必须是数字')
+      }
+    }
+  }
+
+  return null
+}
+
+function validateOptionGroups(specGroups = [], addonGroups = []) {
+  const usedGroupIds = new Set()
+  return validateOptionGroupList(specGroups, 'spec', usedGroupIds) ||
+    validateOptionGroupList(addonGroups, 'addon', usedGroupIds)
 }
 
 function isActiveMerchantStaff(staff, merchantId, openid) {
@@ -110,6 +262,9 @@ function formatDish(dish = {}) {
       ? 0
       : normalizeStockCount(dish.stock_count),
     sold_out: normalizeBooleanDefault(dish.sold_out, false),
+    spec_groups: normalizeOptionGroupList(dish.spec_groups),
+    addon_groups: normalizeOptionGroupList(dish.addon_groups),
+    has_options: hasOptions(dish),
     sort_order: Number(dish.sort_order) || 0,
     created_at: dish.created_at || null,
     updated_at: dish.updated_at || null
@@ -202,6 +357,8 @@ function buildDishCreateData(deps, merchantId, data, now, dishId, sortOrder) {
     stock_enabled: hasOwn(data, 'stock_enabled') ? data.stock_enabled : false,
     stock_count: hasOwn(data, 'stock_count') ? normalizeStockCount(data.stock_count) : 0,
     sold_out: hasOwn(data, 'sold_out') ? data.sold_out : false,
+    spec_groups: hasOwn(data, 'spec_groups') ? data.spec_groups : [],
+    addon_groups: hasOwn(data, 'addon_groups') ? data.addon_groups : [],
     sort_order: sortOrder,
     created_at: now,
     updated_at: now
@@ -260,6 +417,14 @@ function applyDishUpdateData(updateData, data) {
     updateData.sold_out = data.sold_out
   }
 
+  if (hasOwn(data, 'spec_groups')) {
+    updateData.spec_groups = data.spec_groups
+  }
+
+  if (hasOwn(data, 'addon_groups')) {
+    updateData.addon_groups = data.addon_groups
+  }
+
   if (data.sort_order !== undefined) {
     updateData.sort_order = normalizeSortOrder(data.sort_order)
   }
@@ -314,6 +479,16 @@ function validateDishData(data, options = {}) {
 
   if (hasOwn(data, 'sold_out') && typeof data.sold_out !== 'boolean') {
     return failure('VALIDATION_ERROR', '售罄开关必须是布尔值')
+  }
+
+  if (hasOwn(data, 'spec_groups') || hasOwn(data, 'addon_groups')) {
+    const optionGroupsError = validateOptionGroups(
+      hasOwn(data, 'spec_groups') ? data.spec_groups : [],
+      hasOwn(data, 'addon_groups') ? data.addon_groups : []
+    )
+    if (optionGroupsError) {
+      return optionGroupsError
+    }
   }
 
   if (hasOwn(data, 'sort_order')) {
@@ -439,6 +614,20 @@ async function handleUpdate(deps, merchantId, dishId, data) {
     return dishResult.error
   }
 
+  if (hasOwn(data, 'spec_groups') || hasOwn(data, 'addon_groups')) {
+    const optionGroupsError = validateOptionGroups(
+      hasOwn(data, 'spec_groups')
+        ? data.spec_groups
+        : normalizeOptionGroupList(dishResult.dish.spec_groups),
+      hasOwn(data, 'addon_groups')
+        ? data.addon_groups
+        : normalizeOptionGroupList(dishResult.dish.addon_groups)
+    )
+    if (optionGroupsError) {
+      return optionGroupsError
+    }
+  }
+
   if (data.category_id !== undefined) {
     let categoryResult
     try {
@@ -463,7 +652,7 @@ async function handleUpdate(deps, merchantId, dishId, data) {
 
   try {
     const updatedDish = await deps.updateDish({
-      dish_id: dishId,
+      dish_id: dishResult.dish.dish_id || dishId,
       updateData
     })
     return success('编辑餐品成功', {
@@ -502,7 +691,7 @@ async function handleStatusUpdate(deps, merchantId, dishId, status) {
 
   try {
     const updatedDish = await deps.updateDish({
-      dish_id: dishId,
+      dish_id: dishResult.dish.dish_id || dishId,
       updateData
     })
     return success(status === 'on_sale' ? '餐品已上架' : '餐品已下架', {
@@ -604,7 +793,7 @@ function createManageDishHandler(dependencies) {
       const merchantId = normalizeString(event.merchant_id)
       const action = normalizeString(event.action)
       const dishId = normalizeString(event.dish_id)
-      const data = normalizeData(event.data)
+      const data = normalizeEventData(event)
 
       if (!merchantId || !action) {
         return failure('INVALID_PARAMS', '商家 ID 和操作类型不能为空')

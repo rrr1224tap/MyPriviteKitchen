@@ -3,11 +3,58 @@ const assert = require('node:assert/strict')
 
 const { createManageDishHandler } = require('./dish-service')
 
+function createValidSpecGroups(overrides = {}) {
+  return [
+    {
+      group_id: 'size',
+      name: '规格',
+      required: true,
+      min_select: 1,
+      max_select: 1,
+      sort_order: 1,
+      options: [
+        {
+          option_id: 'normal',
+          name: '标准份',
+          price_delta_cent: 0,
+          enabled: true,
+          sort_order: 1
+        }
+      ],
+      ...overrides
+    }
+  ]
+}
+
+function createValidAddonGroups(overrides = {}) {
+  return [
+    {
+      group_id: 'extra',
+      name: '加料',
+      required: false,
+      min_select: 0,
+      max_select: 3,
+      sort_order: 1,
+      options: [
+        {
+          option_id: 'egg',
+          name: '加蛋',
+          price_delta_cent: 200,
+          enabled: true,
+          sort_order: 1
+        }
+      ],
+      ...overrides
+    }
+  ]
+}
+
 function createDependencies(options = {}) {
   const state = {
     openid: options.openid || 'staff_openid',
     now: options.now || new Date('2026-06-18T10:00:00.000Z'),
     idIndex: 1,
+    updateCalls: [],
     merchantStaff: options.merchantStaff || [
       {
         merchant_id: 'merchant_001',
@@ -108,7 +155,9 @@ function createDependencies(options = {}) {
         return state.dishes.filter((dish) => dish.merchant_id === merchantId)
       },
       findDishById: async (dishId) => {
-        return state.dishes.find((dish) => dish.dish_id === dishId) || null
+        return state.dishes.find((dish) => {
+          return dish.dish_id === dishId || dish._id === dishId
+        }) || null
       },
       findDishesByIds: async (dishIds) => {
         return state.dishes.filter((dish) => dishIds.includes(dish.dish_id))
@@ -131,6 +180,10 @@ function createDependencies(options = {}) {
         return record
       },
       updateDish: async ({ dish_id, updateData }) => {
+        state.updateCalls.push({
+          dish_id,
+          updateData
+        })
         const dish = state.dishes.find((item) => item.dish_id === dish_id)
         if (!dish) {
           return null
@@ -173,6 +226,9 @@ test('active merchant staff can list dishes for their merchant only', async () =
   assert.equal(result.data.list[0].stock_enabled, false)
   assert.equal(result.data.list[0].stock_count, 0)
   assert.equal(result.data.list[0].sold_out, false)
+  assert.deepEqual(result.data.list[0].spec_groups, [])
+  assert.deepEqual(result.data.list[0].addon_groups, [])
+  assert.equal(result.data.list[0].has_options, false)
 })
 
 test('user without active merchant staff permission cannot manage dishes', async () => {
@@ -213,7 +269,40 @@ test('create adds an on_sale dish with database price in cents', async () => {
   assert.equal(result.data.dish.stock_enabled, false)
   assert.equal(result.data.dish.stock_count, 0)
   assert.equal(result.data.dish.sold_out, false)
+  assert.deepEqual(result.data.dish.spec_groups, [])
+  assert.deepEqual(result.data.dish.addon_groups, [])
+  assert.equal(result.data.dish.has_options, false)
   assert.equal(state.dishes.some((dish) => dish.dish_id === 'dish_new_1'), true)
+  const createdDish = state.dishes.find((dish) => dish.dish_id === 'dish_new_1')
+  assert.deepEqual(createdDish.spec_groups, [])
+  assert.deepEqual(createdDish.addon_groups, [])
+})
+
+test('create saves valid spec_groups and addon_groups', async () => {
+  const { state, deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+  const specGroups = createValidSpecGroups()
+  const addonGroups = createValidAddonGroups()
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '可选规格拌饭',
+      price_cent: 2990,
+      spec_groups: specGroups,
+      addon_groups: addonGroups
+    }
+  })
+
+  const createdDish = state.dishes.find((dish) => dish.dish_id === 'dish_new_1')
+  assert.equal(result.success, true)
+  assert.deepEqual(result.data.dish.spec_groups, specGroups)
+  assert.deepEqual(result.data.dish.addon_groups, addonGroups)
+  assert.equal(result.data.dish.has_options, true)
+  assert.deepEqual(createdDish.spec_groups, specGroups)
+  assert.deepEqual(createdDish.addon_groups, addonGroups)
 })
 
 test('create accepts stock fields when values are valid', async () => {
@@ -376,6 +465,489 @@ test('update changes a dish that belongs to the requested merchant', async () =>
   assert.equal(result.data.dish.name, '本店招牌肥牛拌饭')
   assert.equal(result.data.dish.price_cent, 3190)
   assert.deepEqual(result.data.dish.tags, ['招牌推荐'])
+})
+
+test('update saves valid spec_groups and addon_groups', async () => {
+  const { state, deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+  const specGroups = createValidSpecGroups({
+    group_id: 'spicy',
+    name: '辣度',
+    options: [
+      {
+        option_id: 'medium',
+        name: '中辣',
+        price_delta_cent: 100,
+        enabled: true,
+        sort_order: 1
+      }
+    ]
+  })
+  const addonGroups = createValidAddonGroups()
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    data: {
+      spec_groups: specGroups,
+      addon_groups: addonGroups
+    }
+  })
+
+  const dish = state.dishes.find((item) => item.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.deepEqual(result.data.dish.spec_groups, specGroups)
+  assert.deepEqual(result.data.dish.addon_groups, addonGroups)
+  assert.equal(result.data.dish.has_options, true)
+  assert.deepEqual(dish.spec_groups, specGroups)
+  assert.deepEqual(dish.addon_groups, addonGroups)
+})
+
+test('update root option groups can be read back from list', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+  const specGroups = createValidSpecGroups()
+  const addonGroups = createValidAddonGroups()
+
+  const updateResult = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    spec_groups: specGroups,
+    addon_groups: addonGroups
+  })
+
+  const listResult = await handler({
+    merchant_id: 'merchant_001',
+    action: 'list'
+  })
+  const item = listResult.data.list.find((dish) => dish.dish_id === 'dish_001')
+
+  assert.equal(updateResult.success, true)
+  assert.equal(listResult.success, true)
+  assert.equal(item.spec_groups.length, 1)
+  assert.equal(item.addon_groups.length, 1)
+  assert.equal(item.has_options, true)
+})
+
+test('update nested dish option groups by document id can be read back from list', async () => {
+  const { state, deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+  const specGroups = createValidSpecGroups()
+  const addonGroups = createValidAddonGroups()
+
+  const updateResult = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'doc_dish_001',
+    dish: {
+      spec_groups: specGroups,
+      addon_groups: addonGroups
+    }
+  })
+
+  const listResult = await handler({
+    merchant_id: 'merchant_001',
+    action: 'list'
+  })
+  const item = listResult.data.list.find((dish) => dish.dish_id === 'dish_001')
+  const forbiddenFields = ['action', 'merchant_id', 'dish_id', 'dish', '_id', 'created_at', 'stock']
+  const updateData = state.updateCalls[0].updateData
+
+  assert.equal(updateResult.success, true)
+  assert.equal(state.updateCalls[0].dish_id, 'dish_001')
+  assert.equal(listResult.success, true)
+  assert.equal(item.spec_groups.length, 1)
+  assert.equal(item.addon_groups.length, 1)
+  assert.equal(item.has_options, true)
+  forbiddenFields.forEach((field) => {
+    assert.equal(Object.prototype.hasOwnProperty.call(updateData, field), false)
+  })
+})
+
+test('update without option groups does not clear existing option groups', async () => {
+  const specGroups = createValidSpecGroups()
+  const addonGroups = createValidAddonGroups()
+  const { state, deps } = createDependencies({
+    dishes: [
+      {
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        category_id: 'category_001',
+        name: '已有规格餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        sort_order: 1,
+        spec_groups: specGroups,
+        addon_groups: addonGroups
+      }
+    ]
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    data: {
+      name: '更新名称'
+    }
+  })
+
+  const dish = state.dishes.find((item) => item.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.deepEqual(result.data.dish.spec_groups, specGroups)
+  assert.deepEqual(result.data.dish.addon_groups, addonGroups)
+  assert.deepEqual(dish.spec_groups, specGroups)
+  assert.deepEqual(dish.addon_groups, addonGroups)
+})
+
+test('list returns has_options true when dish has specs or addons', async () => {
+  const { deps } = createDependencies({
+    dishes: [
+      {
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        category_id: 'category_001',
+        name: '可选规格餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        sort_order: 1,
+        spec_groups: createValidSpecGroups(),
+        addon_groups: []
+      }
+    ]
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'list'
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.list[0].has_options, true)
+  assert.deepEqual(result.data.list[0].addon_groups, [])
+})
+
+test('create fails when spec_groups is not an array', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '规格错误餐品',
+      price_cent: 1990,
+      spec_groups: {}
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when addon_groups is not an array', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '加料错误餐品',
+      price_cent: 1990,
+      addon_groups: {}
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when group_id is empty', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '空规格组餐品',
+      price_cent: 1990,
+      spec_groups: createValidSpecGroups({ group_id: '' })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when group_id is duplicated', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '重复规格组餐品',
+      price_cent: 1990,
+      spec_groups: createValidSpecGroups().concat(createValidSpecGroups())
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when group name is empty', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '空组名餐品',
+      price_cent: 1990,
+      spec_groups: createValidSpecGroups({ name: '' })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when required is not boolean', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '必选错误餐品',
+      price_cent: 1990,
+      spec_groups: createValidSpecGroups({ required: 'true' })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when options is not an array', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '选项错误餐品',
+      price_cent: 1990,
+      spec_groups: createValidSpecGroups({ options: {} })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when option_id is empty', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '空选项餐品',
+      price_cent: 1990,
+      spec_groups: createValidSpecGroups({
+        options: [{ option_id: '', name: '标准份', price_delta_cent: 0, enabled: true, sort_order: 1 }]
+      })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when option_id is duplicated inside one group', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '重复选项餐品',
+      price_cent: 1990,
+      spec_groups: createValidSpecGroups({
+        options: [
+          { option_id: 'normal', name: '标准份', price_delta_cent: 0, enabled: true, sort_order: 1 },
+          { option_id: 'normal', name: '大份', price_delta_cent: 300, enabled: true, sort_order: 2 }
+        ]
+      })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when option name is empty', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '空选项名餐品',
+      price_cent: 1990,
+      spec_groups: createValidSpecGroups({
+        options: [{ option_id: 'normal', name: '', price_delta_cent: 0, enabled: true, sort_order: 1 }]
+      })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when price_delta_cent is negative', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '负加价餐品',
+      price_cent: 1990,
+      addon_groups: createValidAddonGroups({
+        options: [{ option_id: 'egg', name: '加蛋', price_delta_cent: -1, enabled: true, sort_order: 1 }]
+      })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when price_delta_cent is not an integer', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '小数加价餐品',
+      price_cent: 1990,
+      addon_groups: createValidAddonGroups({
+        options: [{ option_id: 'egg', name: '加蛋', price_delta_cent: 1.5, enabled: true, sort_order: 1 }]
+      })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when enabled is not boolean', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '启用错误餐品',
+      price_cent: 1990,
+      addon_groups: createValidAddonGroups({
+        options: [{ option_id: 'egg', name: '加蛋', price_delta_cent: 200, enabled: 'true', sort_order: 1 }]
+      })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when max_select is smaller than min_select', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '选择数量错误餐品',
+      price_cent: 1990,
+      addon_groups: createValidAddonGroups({ min_select: 2, max_select: 1 })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when spec max_select is not 1', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '多选规格餐品',
+      price_cent: 1990,
+      spec_groups: createValidSpecGroups({ max_select: 2 })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when sort_order is not a number', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '排序错误餐品',
+      price_cent: 1990,
+      spec_groups: createValidSpecGroups({ sort_order: '1' })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
 })
 
 test('update stock_enabled succeeds', async () => {
