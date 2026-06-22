@@ -148,6 +148,7 @@
 }
 
 .dish-panel,
+.option-panel,
 .ingredient-panel,
 .quantity-panel {
   box-sizing: border-box;
@@ -244,17 +245,25 @@
   background: #ed3d43;
 }
 
+.option-panel,
 .ingredient-panel,
 .quantity-panel {
   margin-top: 12rpx;
   padding: 18rpx 22rpx;
 }
 
+.option-panel-head,
+.option-group-head,
 .section-head,
 .quantity-panel {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.option-panel-head,
+.option-group-head {
+  gap: 16rpx;
 }
 
 .section-kicker {
@@ -277,6 +286,97 @@
 .quantity-desc {
   color: #917c6e;
   font-size: 18rpx;
+}
+
+.option-panel-title {
+  margin-top: 3rpx;
+  color: #fffdf8;
+  font-size: 25rpx;
+  font-weight: bold;
+}
+
+.option-panel-title.is-dark {
+  color: #2b201a;
+}
+
+.option-panel-note {
+  flex: none;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 18rpx;
+}
+
+.option-panel-note.is-dark {
+  color: #917c6e;
+}
+
+.option-group {
+  margin-top: 15rpx;
+}
+
+.option-group-title {
+  min-width: 0;
+  color: #fffdf8;
+  font-size: 22rpx;
+  font-weight: bold;
+}
+
+.option-group-title.is-dark {
+  color: #2b201a;
+}
+
+.option-required {
+  flex: none;
+  padding: 4rpx 10rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 17rpx;
+}
+
+.option-required.is-dark {
+  background: rgba(179, 129, 69, 0.12);
+  color: #8d6d54;
+}
+
+.option-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 11rpx;
+}
+
+.option-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 50rpx;
+  box-sizing: border-box;
+  padding: 9rpx 14rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.18);
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 20rpx;
+  line-height: 1.2;
+}
+
+.option-chip.is-light-chip {
+  border-color: rgba(119, 83, 55, 0.12);
+  background: rgba(232, 218, 204, 0.58);
+  color: #665448;
+}
+
+.option-chip.is-selected {
+  border-color: rgba(255, 255, 255, 0.36);
+  background: linear-gradient(145deg, #f5474c, #c5121c);
+  color: #ffffff;
+  box-shadow: 0 8rpx 20rpx rgba(181, 9, 17, 0.24), inset 0 2rpx 2rpx rgba(255, 255, 255, 0.26);
+}
+
+.option-price {
+  margin-left: 8rpx;
+  font-size: 18rpx;
+  opacity: 0.86;
 }
 
 .ingredient-list {

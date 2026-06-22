@@ -1,36 +1,50 @@
 const { callFunction } = require('../../../utils/cloud')
-const { DEFAULT_MERCHANT_ID } = require('../../../utils/constants')
+const { DEFAULT_MERCHANT_ID, STORAGE_KEYS } = require('../../../utils/constants')
 const { formatMoney } = require('../../../utils/format')
-const { addCartItem } = require('../../../utils/cart')
 
 const FALLBACK_IMAGE = '/images/mock/home-glass-display.jpg'
 const FALLBACK_IMAGE_STYLE = 'width: 1120rpx; left: -318rpx; top: -126rpx;'
 const FALLBACK_INGREDIENTS = ['肥牛', '米饭', '时令蔬菜', '拌饭酱', '鸡蛋']
+const CART_STORAGE_KEY = STORAGE_KEYS.CART_ITEMS || 'cart_items'
 
 const FALLBACK_DISH = {
   _id: 'dish_002',
   dish_id: 'dish_002',
+  business_dish_id: 'dish_002',
   name: '招牌肥牛石锅拌饭',
   price_cent: 2990,
+  base_price_cent: 2990,
   image: FALLBACK_IMAGE,
   image_style: FALLBACK_IMAGE_STYLE,
   image_mode: 'widthFix',
   tags: ['招牌推荐', '人气 TOP1', '约12分钟'],
-  description: '肥牛现炒，锅巴焦香，拌匀更好吃。现炒好味，认真对待每一碗热饭。',
-  ingredients: FALLBACK_INGREDIENTS
+  description: '肥牛现炒，锅巴焦香，拌匀更好吃。现点现做，认真对待每一碗热饭。',
+  ingredients: FALLBACK_INGREDIENTS,
+  spec_groups: [],
+  addon_groups: [],
+  has_options: false
 }
 
 function normalizeTags(tags) {
   return Array.isArray(tags) ? tags.filter(Boolean) : []
 }
 
+function normalizeText(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
 function toSafePriceCent(value) {
   const priceCent = Number(value)
-  return Number.isFinite(priceCent) ? priceCent : 0
+  return Number.isInteger(priceCent) && priceCent >= 0 ? priceCent : 0
+}
+
+function toPositiveQuantity(value) {
+  const quantity = Number(value)
+  return Number.isInteger(quantity) && quantity > 0 ? quantity : 1
 }
 
 function getDishId(dish = {}) {
-  return dish.dish_id || dish._id || ''
+  return dish._id || dish.dish_id || ''
 }
 
 function normalizeStockCount(value) {
@@ -56,19 +70,240 @@ function getSoldOutState(dish = {}) {
   }
 }
 
-function buildCartDish(dish = {}) {
-  return {
-    dish_id: dish.dish_id,
-    merchant_id: dish.merchant_id || DEFAULT_MERCHANT_ID,
-    category_id: dish.category_id || '',
-    name: dish.name,
-    description: dish.description || '',
-    image_url: dish.image_url || dish.image || '',
-    price_cent: dish.price_cent,
-    original_price_cent: dish.original_price_cent || 0,
-    tags: normalizeTags(dish.tags),
-    status: dish.status || 'on_sale'
+function normalizeOption(option = {}) {
+  const optionId = normalizeText(option.option_id)
+
+  if (!optionId || option.enabled !== true) {
+    return null
   }
+
+  const priceDeltaCent = toSafePriceCent(option.price_delta_cent)
+
+  return {
+    option_id: optionId,
+    name: option.name || '',
+    option_name: option.name || '',
+    price_delta_cent: priceDeltaCent,
+    price_delta_text: priceDeltaCent > 0 ? `+${formatMoney(priceDeltaCent)}` : '',
+    enabled: true,
+    sort_order: Number.isFinite(option.sort_order) ? option.sort_order : 0,
+    is_selected: false
+  }
+}
+
+function normalizeOptionGroups(groups = []) {
+  if (!Array.isArray(groups)) {
+    return []
+  }
+
+  return groups.map((group = {}) => {
+    const groupId = normalizeText(group.group_id)
+    const options = Array.isArray(group.options)
+      ? group.options.map(normalizeOption).filter(Boolean)
+      : []
+
+    if (!groupId || !options.length) {
+      return null
+    }
+
+    return {
+      group_id: groupId,
+      name: group.name || '',
+      group_name: group.name || '',
+      required: group.required === true,
+      min_select: Number.isInteger(group.min_select) && group.min_select >= 0
+        ? group.min_select
+        : 0,
+      max_select: Number.isInteger(group.max_select) && group.max_select >= 0
+        ? group.max_select
+        : 0,
+      sort_order: Number.isFinite(group.sort_order) ? group.sort_order : 0,
+      options
+    }
+  }).filter(Boolean).sort((left, right) => left.sort_order - right.sort_order)
+}
+
+function createInitialSpecMap(specGroups = []) {
+  return specGroups.reduce((result, group) => {
+    if (group.required && group.options.length) {
+      result[group.group_id] = group.options[0].option_id
+    }
+    return result
+  }, {})
+}
+
+function decorateSpecGroups(specGroups = [], selectedSpecMap = {}) {
+  return specGroups.map((group) => ({
+    ...group,
+    options: group.options.map((option) => ({
+      ...option,
+      is_selected: selectedSpecMap[group.group_id] === option.option_id
+    }))
+  }))
+}
+
+function decorateAddonGroups(addonGroups = [], selectedAddonMap = {}) {
+  return addonGroups.map((group) => {
+    const selectedIds = selectedAddonMap[group.group_id] || []
+
+    return {
+      ...group,
+      options: group.options.map((option) => ({
+        ...option,
+        is_selected: selectedIds.includes(option.option_id)
+      }))
+    }
+  })
+}
+
+function createOptionMap(groups = []) {
+  return groups.reduce((result, group) => {
+    result[group.group_id] = group.options.reduce((optionMap, option) => {
+      optionMap[option.option_id] = option
+      return optionMap
+    }, {})
+    return result
+  }, {})
+}
+
+function buildSelectedSpecs(specGroups = [], selectedSpecMap = {}) {
+  const optionMap = createOptionMap(specGroups)
+
+  return Object.keys(selectedSpecMap).sort().map((groupId) => {
+    const group = specGroups.find((item) => item.group_id === groupId)
+    const optionId = selectedSpecMap[groupId]
+    const option = optionMap[groupId] && optionMap[groupId][optionId]
+
+    if (!group || !option) {
+      return null
+    }
+
+    return {
+      group_id: group.group_id,
+      group_name: group.name,
+      option_id: option.option_id,
+      option_name: option.name,
+      price_delta_cent: option.price_delta_cent
+    }
+  }).filter(Boolean)
+}
+
+function buildSelectedAddons(addonGroups = [], selectedAddonMap = {}) {
+  const optionMap = createOptionMap(addonGroups)
+
+  return Object.keys(selectedAddonMap).sort().map((groupId) => {
+    const group = addonGroups.find((item) => item.group_id === groupId)
+    const selectedIds = Array.isArray(selectedAddonMap[groupId])
+      ? [...selectedAddonMap[groupId]].sort()
+      : []
+
+    if (!group || !selectedIds.length) {
+      return null
+    }
+
+    const options = selectedIds.map((optionId) => {
+      const option = optionMap[groupId] && optionMap[groupId][optionId]
+
+      if (!option) {
+        return null
+      }
+
+      return {
+        option_id: option.option_id,
+        option_name: option.name,
+        price_delta_cent: option.price_delta_cent
+      }
+    }).filter(Boolean)
+
+    if (!options.length) {
+      return null
+    }
+
+    return {
+      group_id: group.group_id,
+      group_name: group.name,
+      options
+    }
+  }).filter(Boolean)
+}
+
+function sumSpecDelta(selectedSpecs = []) {
+  return selectedSpecs.reduce((sum, item) => sum + toSafePriceCent(item.price_delta_cent), 0)
+}
+
+function sumAddonDelta(selectedAddons = []) {
+  return selectedAddons.reduce((sum, group) => {
+    const groupTotal = Array.isArray(group.options)
+      ? group.options.reduce((optionSum, option) =>
+          optionSum + toSafePriceCent(option.price_delta_cent), 0)
+      : 0
+    return sum + groupTotal
+  }, 0)
+}
+
+function createItemKey(dishId, selectedSpecs = [], selectedAddons = []) {
+  const specParts = selectedSpecs
+    .map((item) => `spec:${item.group_id}=${item.option_id}`)
+    .sort()
+  const addonParts = selectedAddons
+    .map((group) => {
+      const optionIds = Array.isArray(group.options)
+        ? group.options.map((option) => option.option_id).sort().join(',')
+        : ''
+      return `addon:${group.group_id}=${optionIds}`
+    })
+    .sort()
+
+  return [dishId].concat(specParts, addonParts).filter(Boolean).join('|')
+}
+
+function getRawCartItems() {
+  try {
+    const items = wx.getStorageSync(CART_STORAGE_KEY)
+    return Array.isArray(items) ? items : []
+  } catch (error) {
+    return []
+  }
+}
+
+function saveRawCartItems(items = []) {
+  try {
+    wx.setStorageSync(CART_STORAGE_KEY, items)
+  } catch (error) {
+    return []
+  }
+
+  return items
+}
+
+function addCartItemByKey(cartItem, quantity) {
+  const addQuantity = toPositiveQuantity(quantity)
+  const currentItems = getRawCartItems()
+  const currentMerchantId = currentItems.length ? currentItems[0].merchant_id : ''
+  const nextItems = currentMerchantId && currentMerchantId !== cartItem.merchant_id
+    ? []
+    : currentItems
+  const targetKey = cartItem.item_key || cartItem.dish_id
+  const existsIndex = nextItems.findIndex((item) => (item.item_key || item.dish_id) === targetKey)
+
+  if (existsIndex >= 0) {
+    const oldItem = nextItems[existsIndex]
+    nextItems[existsIndex] = {
+      ...oldItem,
+      ...cartItem,
+      quantity: toPositiveQuantity(oldItem.quantity) + addQuantity,
+      updated_at: Date.now()
+    }
+  } else {
+    nextItems.push({
+      ...cartItem,
+      quantity: addQuantity,
+      selected: true,
+      updated_at: Date.now()
+    })
+  }
+
+  return saveRawCartItems(nextItems)
 }
 
 function formatIngredient(item) {
@@ -115,6 +350,10 @@ function decorateDish(rawDish, detailData = {}) {
   const tags = normalizeTags(dish.tags)
   const estimatedTime = Number(dish.estimated_time_min)
   const soldOutState = getSoldOutState(dish)
+  const specGroups = normalizeOptionGroups(dish.spec_groups)
+  const addonGroups = normalizeOptionGroups(dish.addon_groups)
+  const dishId = getDishId(dish)
+  const businessDishId = dish.dish_id || dishId
 
   if (Number.isFinite(estimatedTime) && estimatedTime > 0) {
     const timeTag = `约${estimatedTime}分钟`
@@ -124,14 +363,17 @@ function decorateDish(rawDish, detailData = {}) {
   }
 
   return {
-    _id: getDishId(dish),
-    dish_id: getDishId(dish),
+    _id: dish._id || dishId,
+    dish_id: dishId,
+    business_dish_id: businessDishId,
     merchant_id: dish.merchant_id || DEFAULT_MERCHANT_ID,
     category_id: dish.category_id || (detailData.category && detailData.category.category_id) || '',
     name: dish.name || '未命名餐品',
     price_cent: priceCent,
+    base_price_cent: priceCent,
     price_text: formatMoney(priceCent),
     image: hasRealImage ? imageUrl : FALLBACK_IMAGE,
+    image_url: imageUrl,
     image_style: hasRealImage
       ? 'width: 100%; height: 100%; left: 0; top: 0;'
       : dish.image_style || FALLBACK_IMAGE_STYLE,
@@ -141,18 +383,41 @@ function decorateDish(rawDish, detailData = {}) {
     ingredients: normalizeIngredients(detailData.ingredients, tags),
     status: dish.status || 'on_sale',
     category: detailData.category || null,
+    spec_groups: specGroups,
+    addon_groups: addonGroups,
+    has_options: dish.has_options === true || specGroups.length > 0 || addonGroups.length > 0,
     ...soldOutState
+  }
+}
+
+function createSelectionState(dish) {
+  const selectedSpecMap = createInitialSpecMap(dish.spec_groups)
+  const selectedAddonMap = {}
+  const selectedSpecs = buildSelectedSpecs(dish.spec_groups, selectedSpecMap)
+  const selectedAddons = buildSelectedAddons(dish.addon_groups, selectedAddonMap)
+  const unitPriceCent = dish.price_cent + sumSpecDelta(selectedSpecs) + sumAddonDelta(selectedAddons)
+
+  return {
+    selectedSpecMap,
+    selectedAddonMap,
+    specGroups: decorateSpecGroups(dish.spec_groups, selectedSpecMap),
+    addonGroups: decorateAddonGroups(dish.addon_groups, selectedAddonMap),
+    selectedSpecs,
+    selectedAddons,
+    unitPriceCent,
+    unitPriceText: formatMoney(unitPriceCent)
   }
 }
 
 function getFallbackDish() {
   const soldOutState = getSoldOutState(FALLBACK_DISH)
-
-  return {
+  const dish = {
     ...FALLBACK_DISH,
     ...soldOutState,
     price_text: formatMoney(FALLBACK_DISH.price_cent)
   }
+
+  return dish
 }
 
 Page({
@@ -163,6 +428,14 @@ Page({
     usingFallback: false,
     statusNotice: '正在读取餐品详情',
     dish: getFallbackDish(),
+    specGroups: [],
+    addonGroups: [],
+    selectedSpecMap: {},
+    selectedAddonMap: {},
+    selectedSpecs: [],
+    selectedAddons: [],
+    unitPriceCent: FALLBACK_DISH.price_cent,
+    unitPriceText: formatMoney(FALLBACK_DISH.price_cent),
     quantity: 1,
     totalPriceText: formatMoney(FALLBACK_DISH.price_cent),
     imageAvailable: true
@@ -207,13 +480,16 @@ Page({
         return
       }
 
+      const selectionState = createSelectionState(dish)
+
       this.setData({
         pageStatus: 'success',
         usingFallback: false,
         statusNotice: '下单后现做，高峰期请耐心等待',
         dish,
         quantity: 1,
-        totalPriceText: dish.price_text
+        totalPriceText: selectionState.unitPriceText,
+        ...selectionState
       })
     } catch (error) {
       this.useFallbackDish('餐品详情加载失败，已展示示例餐品', false)
@@ -222,6 +498,7 @@ Page({
 
   useFallbackDish(message, shouldToast = true, pageStatus = 'error') {
     const fallbackDish = getFallbackDish()
+    const selectionState = createSelectionState(fallbackDish)
 
     this.setData({
       pageStatus,
@@ -229,8 +506,9 @@ Page({
       statusNotice: message,
       dish: fallbackDish,
       quantity: 1,
-      totalPriceText: fallbackDish.price_text,
-      imageAvailable: true
+      totalPriceText: selectionState.unitPriceText,
+      imageAvailable: true,
+      ...selectionState
     })
 
     if (shouldToast) {
@@ -275,10 +553,71 @@ Page({
     })
   },
 
+  refreshOptionState(selectedSpecMap, selectedAddonMap) {
+    const dish = this.data.dish
+    const selectedSpecs = buildSelectedSpecs(dish.spec_groups, selectedSpecMap)
+    const selectedAddons = buildSelectedAddons(dish.addon_groups, selectedAddonMap)
+    const unitPriceCent = dish.price_cent + sumSpecDelta(selectedSpecs) + sumAddonDelta(selectedAddons)
+
+    this.setData({
+      selectedSpecMap,
+      selectedAddonMap,
+      selectedSpecs,
+      selectedAddons,
+      specGroups: decorateSpecGroups(dish.spec_groups, selectedSpecMap),
+      addonGroups: decorateAddonGroups(dish.addon_groups, selectedAddonMap),
+      unitPriceCent,
+      unitPriceText: formatMoney(unitPriceCent),
+      totalPriceText: formatMoney(unitPriceCent * this.data.quantity)
+    })
+  },
+
+  selectSpecOption(event) {
+    const { groupId, optionId } = event.currentTarget.dataset
+
+    if (!groupId || !optionId) {
+      return
+    }
+
+    this.refreshOptionState({
+      ...this.data.selectedSpecMap,
+      [groupId]: optionId
+    }, this.data.selectedAddonMap)
+  },
+
+  toggleAddonOption(event) {
+    const { groupId, optionId } = event.currentTarget.dataset
+
+    if (!groupId || !optionId) {
+      return
+    }
+
+    const group = this.data.addonGroups.find((item) => item.group_id === groupId)
+    const currentIds = this.data.selectedAddonMap[groupId] || []
+    const isSelected = currentIds.includes(optionId)
+    const nextIds = isSelected
+      ? currentIds.filter((id) => id !== optionId)
+      : currentIds.concat(optionId)
+    const maxSelect = group && Number.isInteger(group.max_select) ? group.max_select : 0
+
+    if (!isSelected && nextIds.length > maxSelect) {
+      wx.showToast({
+        title: `最多选择 ${maxSelect} 项`,
+        icon: 'none'
+      })
+      return
+    }
+
+    this.refreshOptionState(this.data.selectedSpecMap, {
+      ...this.data.selectedAddonMap,
+      [groupId]: nextIds
+    })
+  },
+
   updateQuantity(quantity) {
     this.setData({
       quantity,
-      totalPriceText: formatMoney(this.data.dish.price_cent * quantity)
+      totalPriceText: formatMoney(this.data.unitPriceCent * quantity)
     })
   },
 
@@ -300,6 +639,63 @@ Page({
     this.updateQuantity(this.data.quantity + 1)
   },
 
+  validateSelections() {
+    const missingSpec = this.data.specGroups.find((group) =>
+      group.required && !this.data.selectedSpecMap[group.group_id]
+    )
+
+    if (missingSpec) {
+      return {
+        valid: false,
+        message: `请选择${missingSpec.name || '必选规格'}`
+      }
+    }
+
+    const invalidAddon = this.data.addonGroups.find((group) => {
+      const selectedCount = (this.data.selectedAddonMap[group.group_id] || []).length
+      return selectedCount < group.min_select
+    })
+
+    if (invalidAddon) {
+      return {
+        valid: false,
+        message: `${invalidAddon.name || '加料'}至少选择 ${invalidAddon.min_select} 项`
+      }
+    }
+
+    return {
+      valid: true,
+      message: ''
+    }
+  },
+
+  buildCartItem() {
+    const dish = this.data.dish
+    const selectedSpecs = this.data.selectedSpecs
+    const selectedAddons = this.data.selectedAddons
+    const dishId = dish.dish_id || dish._id
+    const itemKey = createItemKey(dishId, selectedSpecs, selectedAddons)
+
+    return {
+      item_key: itemKey,
+      dish_id: dishId,
+      business_dish_id: dish.business_dish_id || dish.dish_id,
+      merchant_id: dish.merchant_id || DEFAULT_MERCHANT_ID,
+      category_id: dish.category_id || '',
+      name: dish.name,
+      description: dish.description || '',
+      image_url: dish.image_url || dish.image || '',
+      price_cent: this.data.unitPriceCent,
+      base_price_cent: dish.base_price_cent || dish.price_cent,
+      unit_price_cent: this.data.unitPriceCent,
+      original_price_cent: dish.original_price_cent || 0,
+      tags: normalizeTags(dish.tags),
+      status: dish.status || 'on_sale',
+      selected_specs: selectedSpecs,
+      selected_addons: selectedAddons
+    }
+  },
+
   addToCart() {
     if (this.data.dish.is_sold_out) {
       wx.showToast({
@@ -309,7 +705,17 @@ Page({
       return
     }
 
-    addCartItem(buildCartDish(this.data.dish), this.data.quantity)
+    const validation = this.validateSelections()
+
+    if (!validation.valid) {
+      wx.showToast({
+        title: validation.message,
+        icon: 'none'
+      })
+      return
+    }
+
+    addCartItemByKey(this.buildCartItem(), this.data.quantity)
 
     wx.showToast({
       title: '已加入购物车',

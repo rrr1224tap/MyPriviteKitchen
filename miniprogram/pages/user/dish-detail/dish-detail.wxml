@@ -34,7 +34,7 @@
           <view class="dish-name">{{pageStatus === 'loading' ? '餐品加载中' : dish.name}}</view>
           <view class="dish-subtitle">SAN YE SIGNATURE</view>
         </view>
-        <view class="dish-price">{{pageStatus === 'loading' ? '¥--' : dish.price_text}}</view>
+        <view class="dish-price">{{pageStatus === 'loading' ? '¥--' : unitPriceText}}</view>
       </view>
 
       <view wx:if="{{pageStatus !== 'loading'}}" class="tag-row">
@@ -44,6 +44,66 @@
 
       <view class="dish-description">{{pageStatus === 'loading' ? '正在读取餐品详情，请稍等。' : dish.description}}</view>
       <view class="fresh-note"><text></text>{{statusNotice}}</view>
+    </view>
+
+    <view wx:if="{{specGroups.length}}" class="option-panel glass-panel">
+      <view class="option-panel-head">
+        <view>
+          <view class="section-kicker is-light">SPEC</view>
+          <view class="option-panel-title">选择规格</view>
+        </view>
+        <view class="option-panel-note">单选</view>
+      </view>
+      <view wx:for="{{specGroups}}" wx:key="group_id" wx:for-item="group" class="option-group">
+        <view class="option-group-head">
+          <view class="option-group-title">{{group.name}}</view>
+          <view wx:if="{{group.required}}" class="option-required">必选</view>
+        </view>
+        <view class="option-chip-list">
+          <view
+            wx:for="{{group.options}}"
+            wx:key="option_id"
+            wx:for-item="option"
+            class="option-chip {{option.is_selected ? 'is-selected' : ''}}"
+            data-group-id="{{group.group_id}}"
+            data-option-id="{{option.option_id}}"
+            bindtap="selectSpecOption"
+          >
+            <text>{{option.name}}</text>
+            <text wx:if="{{option.price_delta_cent > 0}}" class="option-price">{{option.price_delta_text}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{addonGroups.length}}" class="option-panel warm-glass">
+      <view class="option-panel-head">
+        <view>
+          <view class="section-kicker">ADD-ONS</view>
+          <view class="option-panel-title is-dark">加料选择</view>
+        </view>
+        <view class="option-panel-note is-dark">可多选</view>
+      </view>
+      <view wx:for="{{addonGroups}}" wx:key="group_id" wx:for-item="group" class="option-group">
+        <view class="option-group-head">
+          <view class="option-group-title is-dark">{{group.name}}</view>
+          <view class="option-required is-dark">最多 {{group.max_select}} 项</view>
+        </view>
+        <view class="option-chip-list">
+          <view
+            wx:for="{{group.options}}"
+            wx:key="option_id"
+            wx:for-item="option"
+            class="option-chip is-light-chip {{option.is_selected ? 'is-selected' : ''}}"
+            data-group-id="{{group.group_id}}"
+            data-option-id="{{option.option_id}}"
+            bindtap="toggleAddonOption"
+          >
+            <text>{{option.name}}</text>
+            <text wx:if="{{option.price_delta_cent > 0}}" class="option-price">{{option.price_delta_text}}</text>
+          </view>
+        </view>
+      </view>
     </view>
 
     <view class="ingredient-panel warm-glass">
