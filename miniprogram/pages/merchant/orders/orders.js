@@ -1,4 +1,3 @@
-const { callFunction } = require('../../../utils/cloud')
 const { DEFAULT_MERCHANT_ID } = require('../../../utils/constants')
 const { formatMoney, formatTime } = require('../../../utils/format')
 
@@ -10,7 +9,8 @@ const STATUS_FILTERS = [
   { key: 'pending', label: '待接单', status: 'pending' },
   { key: 'accepted', label: '已接单', status: 'accepted' },
   { key: 'cooking', label: '制作中', status: 'cooking' },
-  { key: 'finished', label: '已完成', status: 'finished' }
+  { key: 'finished', label: '已完成', status: 'finished' },
+  { key: 'cancelled', label: '已取消', status: 'cancelled' }
 ]
 
 const ORDER_STATUS_TEXT = {
@@ -24,16 +24,65 @@ const ORDER_STATUS_TEXT = {
 const ORDER_ACTIONS = {
   pending: {
     text: '接单',
-    next_status: 'accepted'
+    next_status: 'accepted',
+    confirm_title: '确认接单？',
+    confirm_content: '接单后订单将进入待制作状态。',
+    confirm_text: '确认接单'
   },
   accepted: {
     text: '开始制作',
-    next_status: 'cooking'
+    next_status: 'cooking',
+    confirm_title: '确认开始制作？',
+    confirm_content: '开始制作后，请及时完成出餐。',
+    confirm_text: '开始制作'
   },
   cooking: {
     text: '完成订单',
-    next_status: 'finished'
+    next_status: 'finished',
+    confirm_title: '确认完成订单？',
+    confirm_content: '完成后订单状态将不可回退。',
+    confirm_text: '确认完成'
   }
+}
+
+const EMPTY_STATUS_TEXT = {
+  all: {
+    title: '暂无订单',
+    desc: '有新订单后会显示在这里'
+  },
+  pending: {
+    title: '暂无待接单订单',
+    desc: '新的订单会出现在这里'
+  },
+  accepted: {
+    title: '暂无已接单订单',
+    desc: '接单后可以开始制作'
+  },
+  cooking: {
+    title: '暂无制作中订单',
+    desc: '开始制作的订单会显示在这里'
+  },
+  finished: {
+    title: '暂无已完成订单',
+    desc: '完成的订单会出现在这里'
+  },
+  cancelled: {
+    title: '暂无已取消订单',
+    desc: '取消的订单会出现在这里'
+  }
+}
+
+const MERCHANT_ORDER_ERROR_TEXT = {
+  FORBIDDEN: '当前账号没有商家权限，请检查商家人员配置',
+  UNAUTHORIZED: '登录状态异常，请重新进入小程序',
+  INVALID_PARAMS: '订单信息不完整，请刷新后重试',
+  NOT_FOUND: '订单不存在或已被删除',
+  ORDER_NOT_FOUND: '订单不存在或已被删除',
+  ORDER_STATUS_INVALID: '订单状态已变化，请刷新后重试',
+  ORDER_STATUS_FLOW_ERROR: '订单状态已变化，请刷新后重试',
+  INVALID_STATUS: '订单状态已变化，请刷新后重试',
+  STATUS_CONFLICT: '订单状态已变化，请刷新后重试',
+  DATABASE_ERROR: '服务暂时不可用，请稍后重试'
 }
 
 function normalizeDateValue(value) {
@@ -41,6 +90,24 @@ function normalizeDateValue(value) {
     return value.$date
   }
   return value
+}
+
+async function callMerchantFunction(name, data) {
+  const response = await wx.cloud.callFunction({
+    name,
+    data
+  })
+  const result = response.result || {}
+
+  if (!result.success) {
+    const error = new Error(result.message || '操作失败')
+    error.code = result.code || ''
+    error.data = result.data || null
+    error.result = result
+    throw error
+  }
+
+  return result.data || {}
 }
 
 function getOrderId(order = {}) {
@@ -112,15 +179,46 @@ function normalizeOrder(order = {}) {
     remark_text: order.remark || '',
     action_text: action ? action.text : '',
     next_status: action ? action.next_status : '',
+    confirm_title: action ? action.confirm_title : '',
+    confirm_content: action ? action.confirm_content : '',
+    confirm_text: action ? action.confirm_text : '',
     items
   }
 }
 
-function getForbiddenMessage(error) {
-  if (error && error.code === 'FORBIDDEN') {
-    return '当前账号没有商家权限，请先配置 merchant_staff'
+function getMerchantOrderErrorMessage(errorOrCode) {
+  const code = typeof errorOrCode === 'string'
+    ? errorOrCode
+    : (errorOrCode && errorOrCode.code) || ''
+
+  if (!code) {
+    return '网络不太稳定，请稍后重试'
   }
-  return ''
+
+  return MERCHANT_ORDER_ERROR_TEXT[code] || '操作失败，请稍后重试'
+}
+
+function getEmptyStateText(status) {
+  const key = status || 'all'
+  return EMPTY_STATUS_TEXT[key] || EMPTY_STATUS_TEXT.all
+}
+
+function confirmOrderAction(order) {
+  return new Promise((resolve) => {
+    wx.showModal({
+      title: order.confirm_title || '确认操作？',
+      content: order.confirm_content || '确认后订单状态将更新。',
+      cancelText: '先等等',
+      confirmText: order.confirm_text || '确认',
+      confirmColor: '#E63B4A',
+      success: (result) => {
+        resolve(Boolean(result.confirm))
+      },
+      fail: () => {
+        resolve(false)
+      }
+    })
+  })
 }
 
 function getNavigationMetrics() {
@@ -150,6 +248,8 @@ Page({
     statusFilters: STATUS_FILTERS,
     activeStatus: '',
     orders: [],
+    emptyTitle: EMPTY_STATUS_TEXT.all.title,
+    emptyDesc: EMPTY_STATUS_TEXT.all.desc,
     submittingOrderId: '',
     page: 1,
     pageSize: PAGE_SIZE
@@ -180,7 +280,7 @@ Page({
     })
 
     try {
-      const data = await callFunction('getMerchantOrders', {
+      const data = await callMerchantFunction('getMerchantOrders', {
         merchant_id: DEFAULT_MERCHANT_ID,
         status: this.data.activeStatus,
         page: this.data.page,
@@ -188,9 +288,12 @@ Page({
       })
       const list = Array.isArray(data.list) ? data.list : []
       const orders = list.map(normalizeOrder)
+      const emptyState = getEmptyStateText(this.data.activeStatus)
 
       this.setData({
         orders,
+        emptyTitle: emptyState.title,
+        emptyDesc: emptyState.desc,
         pageStatus: orders.length ? 'success' : 'empty'
       })
     } catch (error) {
@@ -198,9 +301,7 @@ Page({
       this.setData({
         orders: [],
         pageStatus: 'error',
-        errorMessage: getForbiddenMessage(error) ||
-          error.message ||
-          '商家订单加载失败，请稍后重试'
+        errorMessage: getMerchantOrderErrorMessage(error)
       })
     }
   },
@@ -238,12 +339,19 @@ Page({
       return
     }
 
+    const order = this.data.orders.find((item) => item.order_id === id) || {}
+    const confirmed = await confirmOrderAction(order)
+
+    if (!confirmed) {
+      return
+    }
+
     this.setData({
       submittingOrderId: id
     })
 
     try {
-      await callFunction('updateOrderStatus', {
+      await callMerchantFunction('updateOrderStatus', {
         merchant_id: DEFAULT_MERCHANT_ID,
         order_id: id,
         next_status: nextStatus
@@ -257,16 +365,10 @@ Page({
       await this.loadOrders()
     } catch (error) {
       console.error('[merchant-orders] update status failed:', error)
-      const message = getForbiddenMessage(error) ||
-        error.message ||
-        '订单状态更新失败'
-
-      if (!error.toastShown || error.code === 'FORBIDDEN') {
-        wx.showToast({
-          title: message,
-          icon: 'none'
-        })
-      }
+      wx.showToast({
+        title: getMerchantOrderErrorMessage(error),
+        icon: 'none'
+      })
     } finally {
       this.setData({
         submittingOrderId: ''

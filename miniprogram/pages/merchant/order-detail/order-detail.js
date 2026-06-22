@@ -1,4 +1,3 @@
-const { callFunction } = require('../../../utils/cloud')
 const {
   DEFAULT_MERCHANT_ID,
   MERCHANT_ORDER_STATUS_TEXT
@@ -10,16 +9,38 @@ const BACKGROUND_IMAGE = '/images/mock/home-glass-display.jpg'
 const ORDER_ACTIONS = {
   pending: {
     text: '接单',
-    next_status: 'accepted'
+    next_status: 'accepted',
+    confirm_title: '确认接单？',
+    confirm_content: '接单后订单将进入待制作状态。',
+    confirm_text: '确认接单'
   },
   accepted: {
     text: '开始制作',
-    next_status: 'cooking'
+    next_status: 'cooking',
+    confirm_title: '确认开始制作？',
+    confirm_content: '开始制作后，请及时完成出餐。',
+    confirm_text: '开始制作'
   },
   cooking: {
     text: '完成订单',
-    next_status: 'finished'
+    next_status: 'finished',
+    confirm_title: '确认完成订单？',
+    confirm_content: '完成后订单状态将不可回退。',
+    confirm_text: '确认完成'
   }
+}
+
+const MERCHANT_ORDER_ERROR_TEXT = {
+  FORBIDDEN: '当前账号没有商家权限，请检查商家人员配置',
+  UNAUTHORIZED: '登录状态异常，请重新进入小程序',
+  INVALID_PARAMS: '订单信息不完整，请刷新后重试',
+  NOT_FOUND: '订单不存在或已被删除',
+  ORDER_NOT_FOUND: '订单不存在或已被删除',
+  ORDER_STATUS_INVALID: '订单状态已变化，请刷新后重试',
+  ORDER_STATUS_FLOW_ERROR: '订单状态已变化，请刷新后重试',
+  INVALID_STATUS: '订单状态已变化，请刷新后重试',
+  STATUS_CONFLICT: '订单状态已变化，请刷新后重试',
+  DATABASE_ERROR: '服务暂时不可用，请稍后重试'
 }
 
 const PICKUP_TYPE_TEXT = {
@@ -34,6 +55,24 @@ function normalizeDateValue(value) {
     return value.$date
   }
   return value
+}
+
+async function callMerchantFunction(name, data) {
+  const response = await wx.cloud.callFunction({
+    name,
+    data
+  })
+  const result = response.result || {}
+
+  if (!result.success) {
+    const error = new Error(result.message || '操作失败')
+    error.code = result.code || ''
+    error.data = result.data || null
+    error.result = result
+    throw error
+  }
+
+  return result.data || {}
 }
 
 function getOrderId(order = {}) {
@@ -125,17 +164,43 @@ function normalizeOrderDetail(data = {}) {
       item_count_text: `${itemCount}件商品`,
       total_amount_text: formatMoney(order.total_amount_cent),
       action_text: action ? action.text : '',
-      next_status: action ? action.next_status : ''
+      next_status: action ? action.next_status : '',
+      confirm_title: action ? action.confirm_title : '',
+      confirm_content: action ? action.confirm_content : '',
+      confirm_text: action ? action.confirm_text : ''
     },
     items
   }
 }
 
-function getForbiddenMessage(error) {
-  if (error && error.code === 'FORBIDDEN') {
-    return '当前账号没有商家权限，请先配置 merchant_staff'
+function getMerchantOrderErrorMessage(errorOrCode) {
+  const code = typeof errorOrCode === 'string'
+    ? errorOrCode
+    : (errorOrCode && errorOrCode.code) || ''
+
+  if (!code) {
+    return '网络不太稳定，请稍后重试'
   }
-  return ''
+
+  return MERCHANT_ORDER_ERROR_TEXT[code] || '操作失败，请稍后重试'
+}
+
+function confirmOrderAction(order) {
+  return new Promise((resolve) => {
+    wx.showModal({
+      title: order.confirm_title || '确认操作？',
+      content: order.confirm_content || '确认后订单状态将更新。',
+      cancelText: '先等等',
+      confirmText: order.confirm_text || '确认',
+      confirmColor: '#E63B4A',
+      success: (result) => {
+        resolve(Boolean(result.confirm))
+      },
+      fail: () => {
+        resolve(false)
+      }
+    })
+  })
 }
 
 Page({
@@ -160,7 +225,7 @@ Page({
     if (!orderId) {
       this.setData({
         pageStatus: 'error',
-        errorMessage: '缺少订单 ID，请从商家订单列表进入详情页'
+        errorMessage: '订单信息不完整，请从商家订单列表重新进入'
       })
       return
     }
@@ -200,7 +265,7 @@ Page({
     if (!orderId) {
       this.setData({
         pageStatus: 'error',
-        errorMessage: '缺少订单 ID，请从商家订单列表进入详情页'
+        errorMessage: '订单信息不完整，请从商家订单列表重新进入'
       })
       return
     }
@@ -211,7 +276,7 @@ Page({
     })
 
     try {
-      const data = await callFunction('getMerchantOrderDetail', {
+      const data = await callMerchantFunction('getMerchantOrderDetail', {
         merchant_id: DEFAULT_MERCHANT_ID,
         order_id: orderId
       })
@@ -236,9 +301,7 @@ Page({
       console.error('[merchant-order-detail] load order detail failed:', error)
       this.setData({
         pageStatus: 'error',
-        errorMessage: getForbiddenMessage(error) ||
-          error.message ||
-          '商家订单详情加载失败，请稍后重试'
+        errorMessage: getMerchantOrderErrorMessage(error)
       })
     }
   },
@@ -250,12 +313,18 @@ Page({
       return
     }
 
+    const confirmed = await confirmOrderAction(order)
+
+    if (!confirmed) {
+      return
+    }
+
     this.setData({
       submitting: true
     })
 
     try {
-      await callFunction('updateOrderStatus', {
+      await callMerchantFunction('updateOrderStatus', {
         merchant_id: DEFAULT_MERCHANT_ID,
         order_id: order.order_id,
         next_status: order.next_status
@@ -269,16 +338,10 @@ Page({
       await this.loadOrderDetail(order.order_id)
     } catch (error) {
       console.error('[merchant-order-detail] update status failed:', error)
-      const message = getForbiddenMessage(error) ||
-        error.message ||
-        '订单状态更新失败'
-
-      if (!error.toastShown || error.code === 'FORBIDDEN') {
-        wx.showToast({
-          title: message,
-          icon: 'none'
-        })
-      }
+      wx.showToast({
+        title: getMerchantOrderErrorMessage(error),
+        icon: 'none'
+      })
     } finally {
       this.setData({
         submitting: false

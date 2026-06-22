@@ -383,3 +383,9 @@ button::after {
   background: linear-gradient(135deg, #d8a2a4 0%, #b97b80 100%);
   box-shadow: none;
 }
+
+.action-button.is-submitting {
+  color: rgba(255, 247, 237, 0.82);
+  background: linear-gradient(135deg, #d8a2a4 0%, #b97b80 100%);
+  box-shadow: none;
+}

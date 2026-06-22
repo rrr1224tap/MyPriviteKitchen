@@ -25,7 +25,10 @@
         <view class="state-mark">!</view>
         <view class="state-title">订单详情加载失败</view>
         <view class="state-desc">{{errorMessage}}</view>
-        <button class="state-button" bindtap="retryLoad">重新加载</button>
+        <view class="state-actions">
+          <button class="state-button is-secondary" bindtap="goBack">返回订单列表</button>
+          <button class="state-button" bindtap="retryLoad">重新加载</button>
+        </view>
       </view>
 
       <view wx:elif="{{pageStatus === 'empty'}}" class="state-card glass-panel">
@@ -112,7 +115,7 @@
 
   <view wx:if="{{pageStatus === 'success' && order.action_text}}" class="fixed-action-bar">
     <button
-      class="action-button"
+      class="action-button {{submitting ? 'is-submitting' : ''}}"
       bindtap="handleOrderAction"
       disabled="{{submitting}}"
     >

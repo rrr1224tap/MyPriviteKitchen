@@ -56,8 +56,8 @@
 
       <view wx:elif="{{pageStatus === 'empty'}}" class="state-card glass-panel">
         <view class="state-mark">单</view>
-        <view class="state-title">暂无订单</view>
-        <view class="state-desc">当前筛选下还没有订单，收到新订单后会显示在这里</view>
+        <view class="state-title">{{emptyTitle}}</view>
+        <view class="state-desc">{{emptyDesc}}</view>
       </view>
 
       <view wx:else class="order-list">
@@ -93,7 +93,7 @@
 
           <view wx:if="{{item.action_text}}" class="action-row">
             <button
-              class="action-button"
+              class="action-button {{submittingOrderId === item.order_id ? 'is-submitting' : ''}}"
               catchtap="handleOrderAction"
               data-id="{{item.order_id}}"
               data-next-status="{{item.next_status}}"
