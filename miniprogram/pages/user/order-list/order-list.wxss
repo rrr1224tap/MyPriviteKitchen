@@ -136,6 +136,24 @@ button::after {
   font-size: 23rpx;
 }
 
+.refresh-note {
+  display: inline-flex;
+  max-width: 100%;
+  margin-top: 12rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  color: rgba(255, 246, 230, 0.74);
+  font-size: 21rpx;
+  line-height: 1.25;
+  background: rgba(255, 255, 255, 0.1);
+  overflow-wrap: anywhere;
+}
+
+.refresh-note.is-error {
+  color: #ffe0d9;
+  background: rgba(230, 59, 74, 0.18);
+}
+
 .hero-action,
 .state-button {
   flex-shrink: 0;
@@ -345,6 +363,7 @@ button::after {
 
 .hero-title,
 .hero-desc,
+.refresh-note,
 .state-title,
 .state-desc,
 .order-time,
@@ -354,6 +373,7 @@ button::after {
 }
 
 .hero-desc,
+.refresh-note,
 .order-time,
 .order-count {
   display: -webkit-box;
@@ -363,6 +383,10 @@ button::after {
 
 .hero-desc {
   -webkit-line-clamp: 2;
+}
+
+.refresh-note {
+  -webkit-line-clamp: 1;
 }
 
 .order-time,

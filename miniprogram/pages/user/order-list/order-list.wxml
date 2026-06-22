@@ -23,6 +23,11 @@
             <block wx:if="{{orders.length}}">共 {{orders.length}} 笔订单，按下单时间展示</block>
             <block wx:else>查看你的点餐进度和历史订单</block>
           </view>
+          <view wx:if="{{isRefreshing || refreshMessage || lastUpdatedText}}" class="refresh-note {{refreshMessage ? 'is-error' : ''}}">
+            <block wx:if="{{isRefreshing}}">正在刷新订单状态...</block>
+            <block wx:elif="{{refreshMessage}}">{{refreshMessage}}</block>
+            <block wx:else>{{lastUpdatedText}}</block>
+          </view>
         </view>
         <button class="hero-action" bindtap="goToMenu">继续点餐</button>
       </view>

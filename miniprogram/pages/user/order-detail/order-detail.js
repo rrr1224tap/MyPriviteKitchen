@@ -11,17 +11,17 @@ const ORDER_STATUS_META = {
   },
   accepted: {
     text: '商家已接单',
-    desc: '等待开始制作',
+    desc: '商家已接单，等待制作',
     className: 'accepted'
   },
   cooking: {
     text: '制作中',
-    desc: '餐品正在制作，请稍候',
+    desc: '商家正在制作，请稍候',
     className: 'cooking'
   },
   finished: {
     text: '已完成',
-    desc: '感谢惠顾',
+    desc: '订单已完成，感谢惠顾',
     className: 'finished'
   },
   cancelled: {
@@ -32,7 +32,7 @@ const ORDER_STATUS_META = {
 }
 const UNKNOWN_ORDER_STATUS_META = {
   text: '状态更新中',
-  desc: '请稍后刷新',
+  desc: '状态更新中，请稍后刷新',
   className: 'unknown'
 }
 
@@ -75,7 +75,7 @@ function getCancelOrderErrorMessage(error = {}) {
     INVALID_PARAMS: '订单信息不完整，请刷新后重试',
     NOT_FOUND: '订单不存在或已被删除',
     FORBIDDEN: '当前账号无法操作该订单',
-    STATUS_CONFLICT: '订单状态已变化，当前不可取消',
+    STATUS_CONFLICT: '订单状态已变化，当前不可取消，请刷新状态',
     DATABASE_ERROR: '服务暂时不可用，请稍后重试'
   }
 
@@ -84,6 +84,23 @@ function getCancelOrderErrorMessage(error = {}) {
   }
 
   return messageMap[code] || '取消失败，请稍后重试'
+}
+
+function formatRefreshTime(date = new Date()) {
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `最近更新：${hours}:${minutes}`
+}
+
+function showToastIfNeeded(error, message) {
+  if (error && error.toastShown) {
+    return
+  }
+
+  wx.showToast({
+    title: message,
+    icon: 'none'
+  })
 }
 
 async function callCancelUserOrder(orderId) {
@@ -296,7 +313,10 @@ Page({
     order: null,
     items: [],
     progress: [],
-    cancelling: false
+    cancelling: false,
+    isRefreshing: false,
+    lastUpdatedText: '',
+    refreshMessage: ''
   },
 
   onLoad(options = {}) {
@@ -322,7 +342,9 @@ Page({
 
   onShow() {
     if (this.data.orderId && this.data.pageStatus !== 'loading') {
-      this.loadOrderDetail(this.data.orderId)
+      this.loadOrderDetail(this.data.orderId, {
+        showLoading: false
+      })
     }
   },
 
@@ -332,7 +354,9 @@ Page({
       return
     }
 
-    this.loadOrderDetail(this.data.orderId).finally(() => {
+    this.loadOrderDetail(this.data.orderId, {
+      showLoading: false
+    }).finally(() => {
       wx.stopPullDownRefresh()
     })
   },
@@ -341,11 +365,21 @@ Page({
     this.setData(getNavigationMetrics())
   },
 
-  async loadOrderDetail(orderId) {
+  async loadOrderDetail(orderId, options = {}) {
+    const hasCurrentOrder = Boolean(this.data.order)
+    const showBlockingLoading = options.showLoading !== false && !hasCurrentOrder
+
     this.setData({
-      pageStatus: 'loading',
-      errorMessage: ''
+      errorMessage: '',
+      refreshMessage: '',
+      isRefreshing: !showBlockingLoading
     })
+
+    if (showBlockingLoading) {
+      this.setData({
+        pageStatus: 'loading'
+      })
+    }
 
     try {
       const data = await callFunction('getOrderDetail', {
@@ -368,13 +402,27 @@ Page({
         pageStatus: 'success',
         order: detail.order,
         items: detail.items,
-        progress: detail.progress
+        progress: detail.progress,
+        lastUpdatedText: formatRefreshTime()
       })
     } catch (error) {
       console.error('[order-detail] load order detail failed:', error)
+      const message = getOrderPageErrorMessage(error)
+
+      if (hasCurrentOrder || !showBlockingLoading) {
+        this.setData({
+          refreshMessage: message
+        })
+        showToastIfNeeded(error, message)
+      } else {
+        this.setData({
+          pageStatus: 'error',
+          errorMessage: message
+        })
+      }
+    } finally {
       this.setData({
-        pageStatus: 'error',
-        errorMessage: getOrderPageErrorMessage(error)
+        isRefreshing: false
       })
     }
   },
@@ -394,7 +442,9 @@ Page({
       return
     }
 
-    this.loadOrderDetail(this.data.orderId)
+    this.loadOrderDetail(this.data.orderId, {
+      showLoading: true
+    })
   },
 
   goBack() {
@@ -412,6 +462,16 @@ Page({
   goToMenu() {
     wx.navigateTo({
       url: '/pages/user/menu/menu'
+    })
+  },
+
+  refreshOrderStatus() {
+    if (!this.data.orderId || this.data.isRefreshing || this.data.cancelling) {
+      return
+    }
+
+    this.loadOrderDetail(this.data.orderId, {
+      showLoading: false
     })
   },
 
@@ -437,7 +497,7 @@ Page({
   async cancelOrder() {
     const orderId = this.data.orderId || (this.data.order && this.data.order.order_id)
 
-    if (!orderId || this.data.cancelling) {
+    if (!orderId || this.data.cancelling || this.data.isRefreshing) {
       return
     }
 
@@ -451,7 +511,9 @@ Page({
         title: '订单已取消',
         icon: 'success'
       })
-      await this.loadOrderDetail(orderId)
+      await this.loadOrderDetail(orderId, {
+        showLoading: false
+      })
     } catch (error) {
       console.error('[order-detail] cancel order failed:', error)
       wx.showToast({

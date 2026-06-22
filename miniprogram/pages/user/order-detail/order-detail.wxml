@@ -43,24 +43,40 @@
           <view>
             <view class="hero-kicker">ORDER DETAIL</view>
             <view class="hero-title">{{order.status_text}}</view>
+            <view class="hero-status-desc">{{order.status_desc}}</view>
             <view class="hero-desc">订单号 {{order.order_no}}</view>
             <view class="hero-time">{{order.created_time}}</view>
           </view>
           <view class="status-tag status-{{order.status_class}}">{{order.status_text}}</view>
         </view>
 
-        <view wx:if="{{order.can_cancel}}" class="order-action-panel glass-panel">
+        <view class="order-action-panel glass-panel">
           <view>
-            <view class="action-title">还未接单，可取消</view>
-            <view class="action-desc">取消后订单状态不可恢复</view>
+            <view class="action-title">状态同步</view>
+            <view class="action-desc {{refreshMessage ? 'is-error' : ''}}">
+              <block wx:if="{{isRefreshing}}">正在同步最新状态</block>
+              <block wx:elif="{{refreshMessage}}">{{refreshMessage}}</block>
+              <block wx:elif="{{lastUpdatedText}}">{{lastUpdatedText}}</block>
+              <block wx:else>{{order.status_desc}}</block>
+            </view>
           </view>
-          <button
-            class="cancel-order-button {{cancelling ? 'is-loading' : ''}}"
-            disabled="{{cancelling}}"
-            bindtap="confirmCancelOrder"
-          >
-            {{cancelling ? '取消中...' : '取消订单'}}
-          </button>
+          <view class="order-action-buttons">
+            <button
+              class="refresh-status-button {{isRefreshing ? 'is-loading' : ''}}"
+              disabled="{{isRefreshing || cancelling}}"
+              bindtap="refreshOrderStatus"
+            >
+              {{isRefreshing ? '刷新中...' : '刷新状态'}}
+            </button>
+            <button
+              wx:if="{{order.can_cancel}}"
+              class="cancel-order-button {{cancelling ? 'is-loading' : ''}}"
+              disabled="{{cancelling || isRefreshing}}"
+              bindtap="confirmCancelOrder"
+            >
+              {{cancelling ? '取消中...' : '取消订单'}}
+            </button>
+          </view>
         </view>
 
         <view class="progress-panel glass-panel">

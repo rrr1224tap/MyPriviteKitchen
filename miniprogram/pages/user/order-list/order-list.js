@@ -13,17 +13,17 @@ const ORDER_STATUS_META = {
   },
   accepted: {
     text: '商家已接单',
-    desc: '等待开始制作',
+    desc: '商家已接单，等待制作',
     className: 'accepted'
   },
   cooking: {
     text: '制作中',
-    desc: '餐品正在制作，请稍候',
+    desc: '商家正在制作，请稍候',
     className: 'cooking'
   },
   finished: {
     text: '已完成',
-    desc: '感谢惠顾',
+    desc: '订单已完成，感谢惠顾',
     className: 'finished'
   },
   cancelled: {
@@ -34,7 +34,7 @@ const ORDER_STATUS_META = {
 }
 const UNKNOWN_ORDER_STATUS_META = {
   text: '状态更新中',
-  desc: '请稍后刷新',
+  desc: '状态更新中，请稍后刷新',
   className: 'unknown'
 }
 
@@ -78,7 +78,7 @@ function getCancelOrderErrorMessage(error = {}) {
     INVALID_PARAMS: '订单信息不完整，请刷新后重试',
     NOT_FOUND: '订单不存在或已被删除',
     FORBIDDEN: '当前账号无法操作该订单',
-    STATUS_CONFLICT: '订单状态已变化，当前不可取消',
+    STATUS_CONFLICT: '订单状态已变化，当前不可取消，请刷新状态',
     DATABASE_ERROR: '服务暂时不可用，请稍后重试'
   }
 
@@ -87,6 +87,23 @@ function getCancelOrderErrorMessage(error = {}) {
   }
 
   return messageMap[code] || '取消失败，请稍后重试'
+}
+
+function formatRefreshTime(date = new Date()) {
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `最近更新：${hours}:${minutes}`
+}
+
+function showToastIfNeeded(error, message) {
+  if (error && error.toastShown) {
+    return
+  }
+
+  wx.showToast({
+    title: message,
+    icon: 'none'
+  })
 }
 
 async function callCancelUserOrder(orderId) {
@@ -198,7 +215,10 @@ Page({
     errorMessage: '',
     page: 1,
     pageSize: PAGE_SIZE,
-    cancellingOrderId: ''
+    cancellingOrderId: '',
+    isRefreshing: false,
+    lastUpdatedText: '',
+    refreshMessage: ''
   },
 
   onReady() {
@@ -210,20 +230,35 @@ Page({
   },
 
   onShow() {
-    this.loadOrders()
+    const hasLoaded = this.data.pageStatus !== 'loading'
+    this.loadOrders({
+      showLoading: !hasLoaded
+    })
   },
 
   onPullDownRefresh() {
-    this.loadOrders().finally(() => {
+    this.loadOrders({
+      showLoading: false
+    }).finally(() => {
       wx.stopPullDownRefresh()
     })
   },
 
-  async loadOrders() {
+  async loadOrders(options = {}) {
+    const hasCurrentOrders = this.data.orders.length > 0
+    const showBlockingLoading = options.showLoading !== false && !hasCurrentOrders
+
     this.setData({
-      pageStatus: 'loading',
-      errorMessage: ''
+      errorMessage: '',
+      refreshMessage: '',
+      isRefreshing: !showBlockingLoading
     })
+
+    if (showBlockingLoading) {
+      this.setData({
+        pageStatus: 'loading'
+      })
+    }
 
     try {
       const data = await callFunction('getUserOrders', {
@@ -237,14 +272,28 @@ Page({
 
       this.setData({
         orders,
-        pageStatus: orders.length ? 'success' : 'empty'
+        pageStatus: orders.length ? 'success' : 'empty',
+        lastUpdatedText: formatRefreshTime()
       })
     } catch (error) {
       console.error('[order-list] load orders failed:', error)
+      const message = getOrderPageErrorMessage(error)
+
+      if (hasCurrentOrders || !showBlockingLoading) {
+        this.setData({
+          refreshMessage: message
+        })
+        showToastIfNeeded(error, message)
+      } else {
+        this.setData({
+          orders: [],
+          pageStatus: 'error',
+          errorMessage: message
+        })
+      }
+    } finally {
       this.setData({
-        orders: [],
-        pageStatus: 'error',
-        errorMessage: getOrderPageErrorMessage(error)
+        isRefreshing: false
       })
     }
   },
@@ -256,7 +305,9 @@ Page({
   },
 
   retryLoad() {
-    this.loadOrders()
+    this.loadOrders({
+      showLoading: true
+    })
   },
 
   goBack() {
@@ -324,7 +375,9 @@ Page({
         title: '订单已取消',
         icon: 'success'
       })
-      await this.loadOrders()
+      await this.loadOrders({
+        showLoading: false
+      })
     } catch (error) {
       console.error('[order-list] cancel order failed:', error)
       wx.showToast({
