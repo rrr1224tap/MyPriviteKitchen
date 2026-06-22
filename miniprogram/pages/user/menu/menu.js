@@ -5,6 +5,7 @@ const { formatMoney } = require('../../../utils/format')
 const MENU_REFERENCE = '/images/mock/menu-glass-display.jpg'
 const HOME_REFERENCE = '/images/mock/home-glass-display.jpg'
 const CART_STORAGE_KEY = STORAGE_KEYS.CART_ITEMS || 'cart_items'
+const BRAND_NAME = '小厨食堂'
 
 const FALLBACK_IMAGE_STYLES = [
   'width: 750rpx; left: -192rpx; top: -676rpx;',
@@ -76,7 +77,7 @@ const MOCK_DISHES = [
 const FALLBACK_MENU = {
   merchant: {
     merchant_id: DEFAULT_MERCHANT_ID,
-    name: '三也拌饭',
+    name: BRAND_NAME,
     notice: '今日现炒现做，高峰期请耐心等待',
     business_status: 'open'
   },
@@ -274,7 +275,7 @@ function normalizeCategory(category) {
 
 function normalizeMerchant(merchant = {}) {
   return {
-    name: merchant.name || '三也拌饭',
+    name: BRAND_NAME,
     branch: merchant.branch_name || merchant.branch || '星都里店',
     notice: merchant.notice || '今日现炒现做，高峰期请耐心等待',
     statusText: merchant.business_status === 'closed'
@@ -333,9 +334,7 @@ Page({
   data: {
     statusBarHeight: 20,
     navigationHeight: 44,
-    menuReference: MENU_REFERENCE,
     homeReference: HOME_REFERENCE,
-    menuImageAvailable: true,
     homeImageAvailable: true,
     pageStatus: 'loading',
     usingFallback: false,
@@ -449,12 +448,6 @@ Page({
   handleHomeImageError() {
     this.setData({
       homeImageAvailable: false
-    })
-  },
-
-  handleMenuImageError() {
-    this.setData({
-      menuImageAvailable: false
     })
   },
 

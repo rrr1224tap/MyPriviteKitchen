@@ -37,35 +37,6 @@
       </view>
       <view class="search-button" bindtap="openSearch">搜</view>
     </view>
-
-    <view class="member-banner dark-glass">
-      <view class="member-crown">VIP</view>
-      <view class="member-copy">
-        <view class="member-title"><text>会员</text> 饭友享价</view>
-        <view class="member-desc">本单预计可省 ¥6 · 下单再得成长值</view>
-      </view>
-      <view class="member-action">去开通 <text>›</text></view>
-    </view>
-
-    <view class="promo-banner">
-      <view class="promo-copy">
-        <view class="promo-kicker">WEEKLY SPECIAL</view>
-        <view class="promo-title">本周热辣推荐</view>
-        <view class="promo-desc">精选爆款 · 限时 8 元优惠</view>
-        <view class="promo-button">立即抢购 <text>›</text></view>
-      </view>
-      <view class="promo-food-window">
-        <image
-          wx:if="{{menuImageAvailable}}"
-          class="promo-food-source"
-          src="{{menuReference}}"
-          mode="widthFix"
-          binderror="handleMenuImageError"
-        ></image>
-      </view>
-      <view class="promo-shade"></view>
-      <view class="promo-dots"><text class="is-active"></text><text></text><text></text><text></text></view>
-    </view>
   </view>
 
   <view wx:if="{{usingFallback}}" class="fallback-notice dark-glass">

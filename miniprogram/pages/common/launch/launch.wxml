@@ -14,13 +14,13 @@
     <view class="hero-vignette"></view>
 
     <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
-      <view class="nav-wordmark">三也拌饭<text>甄选</text></view>
+      <view class="nav-wordmark">小厨食堂</view>
     </view>
 
     <view class="hero-copy">
       <view class="brand-sign">
-        <view class="brand-cn">三也</view>
-        <view class="brand-en">SAN YE · KITCHEN</view>
+        <view class="brand-cn">小厨食堂</view>
+        <view class="brand-en">XIAO CHU · KITCHEN</view>
       </view>
       <view class="hero-kicker"><text class="kicker-line"></text>今日主推 · 热气上桌</view>
       <view class="hero-title">招牌肥牛<text>石锅拌饭</text></view>
@@ -33,18 +33,6 @@
   </view>
 
   <view class="home-content">
-    <view class="member-card glass-light">
-      <view class="member-emblem">
-        <view class="member-emblem-inner">VIP</view>
-      </view>
-      <view class="member-copy">
-        <view class="member-title">三也饭友会</view>
-        <view class="member-desc">新客领 8 元券 · 每单累计成长值</view>
-      </view>
-      <view class="member-action">立即加入</view>
-      <view class="member-glow"></view>
-    </view>
-
     <view class="section-heading">
       <view>
         <view class="section-title">今天怎么吃</view>
