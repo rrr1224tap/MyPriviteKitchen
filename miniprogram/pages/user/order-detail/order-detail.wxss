@@ -536,3 +536,33 @@ button::after {
   background: rgba(255, 255, 255, 0.84);
   box-shadow: inset 0 0 0 1rpx rgba(124, 88, 72, 0.12);
 }
+
+.hero-title,
+.hero-time,
+.section-title,
+.timeline-title,
+.timeline-time,
+.items-empty,
+.state-title,
+.state-desc {
+  overflow-wrap: anywhere;
+}
+
+.status-tag,
+.item-count,
+.continue-button,
+.state-button,
+.info-row {
+  box-sizing: border-box;
+}
+
+.status-tag,
+.item-count {
+  min-height: 46rpx;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.state-actions {
+  flex-wrap: wrap;
+}

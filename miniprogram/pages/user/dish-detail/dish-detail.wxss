@@ -606,3 +606,52 @@
   background: rgba(255, 255, 255, 0.1);
   box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.08);
 }
+
+.dish-name,
+.dish-description,
+.option-group-title,
+.option-chip,
+.ingredient-item,
+.error-title,
+.error-desc {
+  overflow-wrap: anywhere;
+}
+
+.dish-name,
+.option-group-title,
+.option-chip {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.dish-name {
+  -webkit-line-clamp: 2;
+}
+
+.option-group-title,
+.option-chip {
+  -webkit-line-clamp: 1;
+}
+
+.dish-tag,
+.option-required,
+.ingredient-item {
+  border-radius: 999rpx;
+}
+
+.detail-error-card {
+  background: rgba(61, 48, 41, 0.78);
+}
+
+.error-mark {
+  width: 86rpx;
+  height: 86rpx;
+  border-color: rgba(239, 197, 124, 0.36);
+  background: rgba(255, 236, 208, 0.16);
+  line-height: 86rpx;
+}
+
+.error-button {
+  box-sizing: border-box;
+}

@@ -389,3 +389,57 @@ button::after {
   background: linear-gradient(135deg, #d8a2a4 0%, #b97b80 100%);
   box-shadow: none;
 }
+
+.merchant-hero > view:first-child,
+.order-card-head > view:first-child,
+.order-remark > view:last-child,
+.order-count {
+  min-width: 0;
+}
+
+.hero-title,
+.hero-desc,
+.state-title,
+.state-desc,
+.order-no,
+.order-time,
+.order-summary,
+.order-remark,
+.order-count,
+.order-total,
+.order-total-label {
+  overflow-wrap: anywhere;
+}
+
+.hero-desc,
+.order-no,
+.order-summary,
+.order-remark {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.hero-desc,
+.order-no,
+.order-summary {
+  -webkit-line-clamp: 2;
+}
+
+.order-remark {
+  -webkit-line-clamp: 3;
+}
+
+.hero-badge,
+.filter-tab,
+.state-button,
+.status-tag,
+.action-button {
+  box-sizing: border-box;
+}
+
+.status-tag {
+  min-height: 46rpx;
+  line-height: 1.2;
+  text-align: center;
+}

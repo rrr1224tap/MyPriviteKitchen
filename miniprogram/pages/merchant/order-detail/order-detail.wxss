@@ -465,3 +465,67 @@ button::after {
   background: rgba(255, 255, 255, 0.84);
   box-shadow: inset 0 0 0 1rpx rgba(124, 88, 72, 0.12);
 }
+
+.detail-hero > view:first-child,
+.section-head > view:first-child,
+.info-value {
+  min-width: 0;
+}
+
+.hero-title,
+.hero-desc,
+.hero-time,
+.section-title,
+.remark-content,
+.dish-name,
+.dish-option-line,
+.dish-price,
+.dish-subtotal,
+.empty-items,
+.info-value,
+.total-note,
+.total-price,
+.state-title,
+.state-desc {
+  overflow-wrap: anywhere;
+}
+
+.hero-desc,
+.dish-name,
+.dish-option-line {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.hero-desc,
+.dish-name {
+  -webkit-line-clamp: 2;
+}
+
+.dish-option-line {
+  -webkit-line-clamp: 2;
+}
+
+.dish-side {
+  max-width: 180rpx;
+}
+
+.status-tag,
+.item-count,
+.action-button,
+.state-button,
+.info-row {
+  box-sizing: border-box;
+}
+
+.status-tag,
+.item-count {
+  min-height: 46rpx;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.state-actions {
+  flex-wrap: wrap;
+}

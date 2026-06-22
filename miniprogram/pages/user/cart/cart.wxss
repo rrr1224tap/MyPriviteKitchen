@@ -651,3 +651,41 @@
   font-size: 34rpx;
   font-weight: normal;
 }
+
+.overview-title,
+.overview-desc,
+.cart-name,
+.cart-option-line,
+.pickup-title,
+.pickup-desc,
+.summary-row,
+.total-note,
+.empty-title,
+.empty-desc,
+.submit-saving {
+  overflow-wrap: anywhere;
+}
+
+.cart-name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.cart-option-line {
+  -webkit-line-clamp: 2;
+}
+
+.overview-clear,
+.cart-remove,
+.empty-button,
+.submit-button,
+.stepper-button,
+.pickup-option {
+  box-sizing: border-box;
+}
+
+.empty-state {
+  border: 1rpx solid rgba(255, 255, 255, 0.2);
+}
