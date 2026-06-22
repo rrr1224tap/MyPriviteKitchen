@@ -1,11 +1,12 @@
 const { formatMoney } = require('../../../utils/format')
-const cartUtils = require('../../../utils/cart')
 const { callFunction } = require('../../../utils/cloud')
-const { DEFAULT_MERCHANT_ID } = require('../../../utils/constants')
+const { DEFAULT_MERCHANT_ID, STORAGE_KEYS } = require('../../../utils/constants')
 
 const DISCOUNT_CENT = 600
 const FALLBACK_IMAGE = '/images/mock/menu-glass-display.jpg'
 const FALLBACK_BACKGROUND = '/images/mock/home-glass-display.jpg'
+const CART_STORAGE_KEY = STORAGE_KEYS.CART_ITEMS || 'cart_items'
+const LEGACY_CART_STORAGE_KEY = 'cart'
 const FALLBACK_IMAGE_STYLES = [
   'width: 750rpx; left: -192rpx; top: -846rpx;',
   'width: 750rpx; left: -192rpx; top: -676rpx;',
@@ -13,29 +14,242 @@ const FALLBACK_IMAGE_STYLES = [
   'width: 750rpx; left: -410rpx; top: -412rpx;'
 ]
 
+const CREATE_ORDER_ERROR_TEXT = {
+  DISH_SOLD_OUT: '有餐品已售罄，请重新选择',
+  STOCK_NOT_ENOUGH: '库存不足，请调整数量',
+  DISH_OFF_SALE: '有餐品已下架，请重新选择',
+  VALIDATION_ERROR: '规格或加料选择无效，请重新选择',
+  INVALID_PARAMS: '订单参数有误，请重新选择'
+}
+
 function getFallbackImageStyle(index) {
   return FALLBACK_IMAGE_STYLES[index % FALLBACK_IMAGE_STYLES.length]
+}
+
+function toSafeInteger(value, fallback = 0) {
+  const numberValue = Number(value)
+
+  if (!Number.isFinite(numberValue)) {
+    return fallback
+  }
+
+  return Math.floor(numberValue)
+}
+
+function normalizeQuantity(quantity, fallback = 1) {
+  const safeQuantity = toSafeInteger(quantity, fallback)
+
+  return safeQuantity > 0 ? safeQuantity : fallback
+}
+
+function normalizeTags(tags) {
+  return Array.isArray(tags) ? tags.filter(Boolean) : []
+}
+
+function normalizeSelectedSpecs(selectedSpecs) {
+  if (!Array.isArray(selectedSpecs)) {
+    return []
+  }
+
+  return selectedSpecs.map((spec = {}) => ({
+    group_id: spec.group_id || '',
+    group_name: spec.group_name || '',
+    option_id: spec.option_id || '',
+    option_name: spec.option_name || spec.name || '',
+    price_delta_cent: Math.max(0, toSafeInteger(spec.price_delta_cent, 0))
+  })).filter((spec) => spec.group_id && spec.option_id)
+}
+
+function normalizeSelectedAddons(selectedAddons) {
+  if (!Array.isArray(selectedAddons)) {
+    return []
+  }
+
+  return selectedAddons.map((group = {}) => {
+    const options = Array.isArray(group.options)
+      ? group.options.map((option = {}) => ({
+          option_id: option.option_id || '',
+          option_name: option.option_name || option.name || '',
+          price_delta_cent: Math.max(0, toSafeInteger(option.price_delta_cent, 0))
+        })).filter((option) => option.option_id)
+      : []
+
+    return {
+      group_id: group.group_id || '',
+      group_name: group.group_name || '',
+      options
+    }
+  }).filter((group) => group.group_id && group.options.length)
+}
+
+function getItemKey(item = {}) {
+  return item.item_key || item.dish_id || item._id || item.id || ''
+}
+
+function normalizeCartItem(item = {}) {
+  const dishId = item.dish_id || item._id || item.id || ''
+  const itemKey = getItemKey(item)
+
+  if (!dishId || !itemKey) {
+    return null
+  }
+
+  const unitPriceCent = Math.max(0, toSafeInteger(item.unit_price_cent || item.price_cent, 0))
+  const selectedSpecs = normalizeSelectedSpecs(item.selected_specs)
+  const selectedAddons = normalizeSelectedAddons(item.selected_addons)
+
+  return {
+    ...item,
+    item_key: itemKey,
+    dish_id: dishId,
+    business_dish_id: item.business_dish_id || item.dish_id || '',
+    merchant_id: item.merchant_id || DEFAULT_MERCHANT_ID,
+    category_id: item.category_id || '',
+    name: item.name || '未命名餐品',
+    description: item.description || '',
+    image_url: item.image_url || item.image || item.display_image || '',
+    price_cent: unitPriceCent,
+    base_price_cent: Math.max(0, toSafeInteger(item.base_price_cent || item.price_cent, unitPriceCent)),
+    unit_price_cent: unitPriceCent,
+    original_price_cent: Math.max(0, toSafeInteger(item.original_price_cent, 0)),
+    tags: normalizeTags(item.tags),
+    selected_specs: selectedSpecs,
+    selected_addons: selectedAddons,
+    quantity: normalizeQuantity(item.quantity, 1),
+    selected: item.selected !== false,
+    updated_at: item.updated_at || Date.now()
+  }
+}
+
+function readStorageItems(key) {
+  try {
+    const items = wx.getStorageSync(key)
+    return Array.isArray(items) ? items : []
+  } catch (error) {
+    return []
+  }
+}
+
+function getCartItems() {
+  const cartItems = readStorageItems(CART_STORAGE_KEY)
+  const legacyItems = cartItems.length ? [] : readStorageItems(LEGACY_CART_STORAGE_KEY)
+  const sourceItems = cartItems.length ? cartItems : legacyItems
+
+  return sourceItems.map(normalizeCartItem).filter(Boolean)
+}
+
+function saveCartItems(items = []) {
+  const nextItems = Array.isArray(items)
+    ? items.map(normalizeCartItem).filter(Boolean)
+    : []
+
+  try {
+    wx.setStorageSync(CART_STORAGE_KEY, nextItems)
+  } catch (error) {
+    return []
+  }
+
+  return nextItems
+}
+
+function clearCartStorage() {
+  try {
+    wx.removeStorageSync(CART_STORAGE_KEY)
+    wx.removeStorageSync(LEGACY_CART_STORAGE_KEY)
+  } catch (error) {
+    saveCartItems([])
+  }
+}
+
+function updateCartItemQuantity(itemKey, quantity) {
+  const nextQuantity = toSafeInteger(quantity, 0)
+  const items = getCartItems()
+
+  if (nextQuantity <= 0) {
+    return saveCartItems(items.filter((item) => item.item_key !== itemKey))
+  }
+
+  return saveCartItems(items.map((item) => {
+    if (item.item_key !== itemKey) {
+      return item
+    }
+
+    return {
+      ...item,
+      quantity: nextQuantity,
+      updated_at: Date.now()
+    }
+  }))
+}
+
+function getCartSummary(items = getCartItems()) {
+  return items.filter((item) => item.selected !== false).reduce((summary, item) => {
+    const quantity = normalizeQuantity(item.quantity, 1)
+    const unitPriceCent = Math.max(0, toSafeInteger(item.unit_price_cent || item.price_cent, 0))
+
+    return {
+      total_quantity: summary.total_quantity + quantity,
+      total_amount_cent: summary.total_amount_cent + unitPriceCent * quantity
+    }
+  }, {
+    total_quantity: 0,
+    total_amount_cent: 0
+  })
+}
+
+function buildSpecText(selectedSpecs = []) {
+  const optionNames = selectedSpecs.map((spec) => spec.option_name).filter(Boolean)
+
+  return optionNames.length ? `规格：${optionNames.join('、')}` : ''
+}
+
+function buildAddonText(selectedAddons = []) {
+  const optionNames = selectedAddons.reduce((result, group) => {
+    const names = Array.isArray(group.options)
+      ? group.options.map((option) => option.option_name).filter(Boolean)
+      : []
+    return result.concat(names)
+  }, [])
+
+  return optionNames.length ? `加料：${optionNames.join('、')}` : ''
 }
 
 function decorateItems(items) {
   return items.map((item, index) => {
     const hasRealImage = Boolean(item.image_url)
-    const priceCent = Number(item.price_cent) || 0
-    const quantity = Number(item.quantity) || 1
+    const unitPriceCent = Math.max(0, toSafeInteger(item.unit_price_cent || item.price_cent, 0))
+    const quantity = normalizeQuantity(item.quantity, 1)
 
     return {
       ...item,
-      spec: item.spec || '标准份 · 门店现做',
       image: hasRealImage ? item.image_url : FALLBACK_IMAGE,
       image_style: hasRealImage
         ? 'width: 100%; height: 100%; left: 0; top: 0;'
         : getFallbackImageStyle(index),
       image_mode: hasRealImage ? 'aspectFill' : 'widthFix',
       image_available: true,
-      price_text: formatMoney(priceCent),
-      subtotal_text: formatMoney(priceCent * quantity)
+      spec_text: buildSpecText(item.selected_specs),
+      addon_text: buildAddonText(item.selected_addons),
+      price_text: formatMoney(unitPriceCent),
+      subtotal_text: formatMoney(unitPriceCent * quantity)
     }
   })
+}
+
+function buildCreateOrderSpecs(selectedSpecs = []) {
+  return selectedSpecs.map((spec) => ({
+    group_id: spec.group_id,
+    option_id: spec.option_id
+  })).filter((spec) => spec.group_id && spec.option_id)
+}
+
+function buildCreateOrderAddons(selectedAddons = []) {
+  return selectedAddons.map((group) => ({
+    group_id: group.group_id,
+    option_ids: Array.isArray(group.options)
+      ? group.options.map((option) => option.option_id).filter(Boolean)
+      : []
+  })).filter((group) => group.group_id && group.option_ids.length)
 }
 
 Page({
@@ -83,8 +297,8 @@ Page({
   },
 
   refreshCart() {
-    const items = cartUtils.getCartItems()
-    const summary = cartUtils.getCartSummary()
+    const items = getCartItems()
+    const summary = getCartSummary(items)
     const discountAmountCent = summary.total_amount_cent
       ? Math.min(DISCOUNT_CENT, summary.total_amount_cent)
       : 0
@@ -100,15 +314,26 @@ Page({
   },
 
   changeQuantity(event) {
-    const dishId = event.currentTarget.dataset.id
+    const itemKey = event.currentTarget.dataset.key
     const step = Number(event.currentTarget.dataset.step)
-    const currentItem = this.data.items.find((item) => item.dish_id === dishId)
+    const currentItem = this.data.items.find((item) => item.item_key === itemKey)
 
     if (!currentItem || !Number.isFinite(step)) {
       return
     }
 
-    cartUtils.updateCartItemQuantity(dishId, currentItem.quantity + step)
+    updateCartItemQuantity(itemKey, currentItem.quantity + step)
+    this.refreshCart()
+  },
+
+  removeItem(event) {
+    const itemKey = event.currentTarget.dataset.key
+
+    if (!itemKey) {
+      return
+    }
+
+    updateCartItemQuantity(itemKey, 0)
     this.refreshCart()
   },
 
@@ -119,7 +344,7 @@ Page({
       confirmColor: '#E63B4A',
       success: (result) => {
         if (result.confirm) {
-          cartUtils.clearCart()
+          clearCartStorage()
           this.refreshCart()
         }
       }
@@ -133,9 +358,9 @@ Page({
   },
 
   handleItemImageError(event) {
-    const dishId = event.currentTarget.dataset.id
+    const itemKey = event.currentTarget.dataset.key
     const items = this.data.items.map((item, index) => {
-      if (item.dish_id !== dishId) {
+      if (item.item_key !== itemKey) {
         return item
       }
 
@@ -173,11 +398,13 @@ Page({
   },
 
   buildCreateOrderPayload() {
-    const cartItems = cartUtils.getCartItems()
+    const cartItems = getCartItems()
     const items = cartItems
       .map((item) => ({
         dish_id: item.dish_id,
-        quantity: Number(item.quantity) || 0
+        quantity: normalizeQuantity(item.quantity, 0),
+        selected_specs: buildCreateOrderSpecs(item.selected_specs),
+        selected_addons: buildCreateOrderAddons(item.selected_addons)
       }))
       .filter((item) => item.dish_id && Number.isInteger(item.quantity) && item.quantity > 0)
     const merchantId = cartItems[0] && cartItems[0].merchant_id
@@ -204,6 +431,17 @@ Page({
     })
   },
 
+  showSubmitError(error) {
+    const message = CREATE_ORDER_ERROR_TEXT[error && error.code]
+
+    if (message) {
+      wx.showToast({
+        title: message,
+        icon: 'none'
+      })
+    }
+  },
+
   async submitOrder() {
     if (this.data.submitting) {
       return
@@ -226,7 +464,7 @@ Page({
     try {
       const order = await callFunction('createOrder', payload)
 
-      cartUtils.clearCart()
+      clearCartStorage()
       this.refreshCart()
 
       wx.showModal({
@@ -245,6 +483,7 @@ Page({
       })
     } catch (error) {
       console.error('submit order failed', error)
+      this.showSubmitError(error)
     } finally {
       this.setData({
         submitting: false

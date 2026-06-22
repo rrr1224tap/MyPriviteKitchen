@@ -33,7 +33,7 @@
     </view>
 
     <view class="cart-list">
-      <view wx:for="{{items}}" wx:key="dish_id" class="cart-item glass-panel">
+      <view wx:for="{{items}}" wx:key="item_key" class="cart-item glass-panel">
         <view class="cart-image-window">
           <image
             wx:if="{{item.image_available}}"
@@ -42,23 +42,29 @@
             style="{{item.image_style}}"
             mode="{{item.image_mode}}"
             lazy-load="{{true}}"
-            data-id="{{item.dish_id}}"
+            data-key="{{item.item_key}}"
             binderror="handleItemImageError"
           ></image>
           <view class="image-gloss"></view>
         </view>
         <view class="cart-info">
-          <view class="cart-name">{{item.name}}</view>
-          <view class="cart-spec">{{item.spec}}</view>
+          <view class="cart-item-head">
+            <view class="cart-name">{{item.name}}</view>
+            <view class="cart-remove" data-key="{{item.item_key}}" bindtap="removeItem">移除</view>
+          </view>
+          <view wx:if="{{item.spec_text || item.addon_text}}" class="cart-option-summary">
+            <view wx:if="{{item.spec_text}}" class="cart-option-line">{{item.spec_text}}</view>
+            <view wx:if="{{item.addon_text}}" class="cart-option-line">{{item.addon_text}}</view>
+          </view>
           <view class="cart-item-bottom">
             <view>
               <view class="cart-price">{{item.price_text}}</view>
               <view class="cart-subtotal">小计 {{item.subtotal_text}}</view>
             </view>
             <view class="stepper">
-              <view class="stepper-button is-minus" data-id="{{item.dish_id}}" data-step="-1" bindtap="changeQuantity">−</view>
+              <view class="stepper-button is-minus" data-key="{{item.item_key}}" data-step="-1" bindtap="changeQuantity">−</view>
               <view class="stepper-value">{{item.quantity}}</view>
-              <view class="stepper-button" data-id="{{item.dish_id}}" data-step="1" bindtap="changeQuantity">＋</view>
+              <view class="stepper-button" data-key="{{item.item_key}}" data-step="1" bindtap="changeQuantity">＋</view>
             </view>
           </view>
         </view>
