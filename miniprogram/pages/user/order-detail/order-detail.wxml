@@ -25,7 +25,10 @@
         <view class="state-mark">!</view>
         <view class="state-title">订单详情加载失败</view>
         <view class="state-desc">{{errorMessage}}</view>
-        <button class="state-button" bindtap="retryLoad">重新加载</button>
+        <view class="state-actions">
+          <button class="state-button is-secondary" bindtap="goBack">返回订单列表</button>
+          <button class="state-button" bindtap="retryLoad">重新加载</button>
+        </view>
       </view>
 
       <view wx:elif="{{pageStatus === 'empty'}}" class="state-card glass-panel">
@@ -77,21 +80,24 @@
             <view class="item-count">{{order.item_count_text}}</view>
           </view>
 
-          <view class="order-item" wx:for="{{items}}" wx:key="order_item_id">
-            <view class="dish-emblem">{{index + 1}}</view>
-            <view class="dish-info">
-              <view class="dish-name">{{item.dish_name}}</view>
-              <view wx:if="{{item.spec_text || item.addon_text}}" class="dish-options">
-                <view wx:if="{{item.spec_text}}" class="dish-option-line">{{item.spec_text}}</view>
-                <view wx:if="{{item.addon_text}}" class="dish-option-line">{{item.addon_text}}</view>
+          <block wx:if="{{items.length}}">
+            <view class="order-item" wx:for="{{items}}" wx:key="item_key">
+              <view class="dish-emblem">{{index + 1}}</view>
+              <view class="dish-info">
+                <view class="dish-name">{{item.dish_name}}</view>
+                <view wx:if="{{item.spec_text || item.addon_text}}" class="dish-options">
+                  <view wx:if="{{item.spec_text}}" class="dish-option-line">{{item.spec_text}}</view>
+                  <view wx:if="{{item.addon_text}}" class="dish-option-line">{{item.addon_text}}</view>
+                </view>
+                <view class="dish-price">单价 {{item.unit_price_text}}</view>
               </view>
-              <view class="dish-price">单价 {{item.unit_price_text}}</view>
+              <view class="dish-side">
+                <view class="dish-quantity">x{{item.quantity}}</view>
+                <view class="dish-subtotal">{{item.subtotal_text}}</view>
+              </view>
             </view>
-            <view class="dish-side">
-              <view class="dish-quantity">x{{item.quantity}}</view>
-              <view class="dish-subtotal">{{item.subtotal_text}}</view>
-            </view>
-          </view>
+          </block>
+          <view wx:else class="items-empty">商品信息暂不可用</view>
         </view>
 
         <view class="info-panel glass-panel">

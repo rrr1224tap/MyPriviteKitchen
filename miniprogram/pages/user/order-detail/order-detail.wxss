@@ -133,6 +133,11 @@ button::after {
   padding: 30rpx;
 }
 
+.detail-hero > view:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
 .hero-kicker,
 .section-kicker {
   color: #d1ad72;
@@ -149,9 +154,15 @@ button::after {
 }
 
 .hero-desc {
+  display: -webkit-box;
+  overflow: hidden;
   margin-top: 10rpx;
   color: rgba(255, 246, 230, 0.72);
   font-size: 23rpx;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .hero-time {
@@ -193,6 +204,11 @@ button::after {
   background: #eeeeee;
 }
 
+.status-unknown {
+  color: #8a6b42;
+  background: #fff5df;
+}
+
 .progress-panel,
 .items-panel,
 .info-panel,
@@ -209,6 +225,10 @@ button::after {
   align-items: center;
   justify-content: space-between;
   gap: 20rpx;
+}
+
+.section-head > view:first-child {
+  min-width: 0;
 }
 
 .section-title {
@@ -301,6 +321,7 @@ button::after {
 }
 
 .order-item {
+  align-items: flex-start;
   margin-top: 22rpx;
   padding: 20rpx 0;
   border-top: 1rpx solid rgba(82, 53, 35, 0.08);
@@ -326,10 +347,15 @@ button::after {
 }
 
 .dish-name {
+  display: -webkit-box;
+  overflow: hidden;
   color: #2a211d;
   font-size: 27rpx;
   font-weight: 800;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .dish-options {
@@ -340,9 +366,14 @@ button::after {
 }
 
 .dish-option-line {
+  display: -webkit-box;
+  overflow: hidden;
   color: rgba(42, 33, 29, 0.58);
   font-size: 20rpx;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .dish-price {
@@ -352,6 +383,7 @@ button::after {
 }
 
 .dish-side {
+  max-width: 180rpx;
   flex: none;
   text-align: right;
 }
@@ -366,9 +398,21 @@ button::after {
   color: #e63b4a;
   font-size: 27rpx;
   font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.items-empty {
+  margin-top: 22rpx;
+  padding: 28rpx 24rpx;
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.54);
+  color: rgba(42, 33, 29, 0.58);
+  font-size: 24rpx;
+  text-align: center;
 }
 
 .info-row {
+  align-items: flex-start;
   margin-top: 24rpx;
   padding: 20rpx 22rpx;
   border-radius: 22rpx;
@@ -376,17 +420,21 @@ button::after {
 }
 
 .info-label {
+  flex: none;
   color: rgba(255, 255, 255, 0.48);
   font-size: 22rpx;
 }
 
 .info-value {
+  min-width: 0;
   max-width: 430rpx;
+  flex: 1;
   color: rgba(255, 250, 244, 0.9);
   font-size: 24rpx;
   font-weight: 700;
   line-height: 1.45;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .total-panel {
@@ -406,9 +454,11 @@ button::after {
 }
 
 .total-price {
+  flex: none;
   color: #ff5055;
   font-size: 42rpx;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .continue-button,
@@ -468,4 +518,21 @@ button::after {
 .state-button {
   width: 240rpx;
   margin: 30rpx auto 0;
+}
+
+.state-actions {
+  display: flex;
+  justify-content: center;
+  gap: 18rpx;
+  margin-top: 30rpx;
+}
+
+.state-actions .state-button {
+  margin: 0;
+}
+
+.state-button.is-secondary {
+  color: #7c5848;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: inset 0 0 0 1rpx rgba(124, 88, 72, 0.12);
 }

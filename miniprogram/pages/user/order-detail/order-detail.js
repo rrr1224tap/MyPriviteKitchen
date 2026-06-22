@@ -3,20 +3,37 @@ const { formatMoney, formatTime } = require('../../../utils/format')
 
 const BACKGROUND_IMAGE = '/images/mock/home-glass-display.jpg'
 
-const ORDER_STATUS_TEXT = {
-  pending: '待接单',
-  accepted: '已接单',
-  cooking: '制作中',
-  finished: '已完成',
-  cancelled: '已取消'
+const ORDER_STATUS_META = {
+  pending: {
+    text: '待商家接单',
+    desc: '等待商家接单',
+    className: 'pending'
+  },
+  accepted: {
+    text: '商家已接单',
+    desc: '等待开始制作',
+    className: 'accepted'
+  },
+  cooking: {
+    text: '制作中',
+    desc: '餐品正在制作，请稍候',
+    className: 'cooking'
+  },
+  finished: {
+    text: '已完成',
+    desc: '感谢惠顾',
+    className: 'finished'
+  },
+  cancelled: {
+    text: '已取消',
+    desc: '订单已取消',
+    className: 'cancelled'
+  }
 }
-
-const ORDER_STATUS_CLASS = {
-  pending: 'pending',
-  accepted: 'accepted',
-  cooking: 'cooking',
-  finished: 'finished',
-  cancelled: 'cancelled'
+const UNKNOWN_ORDER_STATUS_META = {
+  text: '状态更新中',
+  desc: '请稍后刷新',
+  className: 'unknown'
 }
 
 const PICKUP_TYPE_TEXT = {
@@ -37,12 +54,18 @@ function getOrderId(order) {
   return order.order_id || order._id || ''
 }
 
-function getStatusText(status) {
-  return ORDER_STATUS_TEXT[status] || '未知状态'
+function getOrderStatusMeta(status) {
+  return ORDER_STATUS_META[status] || UNKNOWN_ORDER_STATUS_META
 }
 
-function getStatusClass(status) {
-  return ORDER_STATUS_CLASS[status] || 'cancelled'
+function getOrderPageErrorMessage(error = {}) {
+  const code = error.code || ''
+
+  if (!code) {
+    return '网络不太稳定，请稍后重试'
+  }
+
+  return '订单信息暂时不可用，请稍后重试'
 }
 
 function normalizeSelectedSpecs(selectedSpecs) {
@@ -69,7 +92,7 @@ function formatSelectedAddons(item = {}) {
   }, []).join('、')
 }
 
-function formatOrderItem(item = {}) {
+function formatOrderItem(item = {}, index = 0) {
   const quantity = Number(item.quantity) || 0
   const unitPriceCent = Number(item.unit_price_cent || item.price_cent) || 0
   const subtotalCent = Number(item.subtotal_cent) || unitPriceCent * quantity
@@ -78,6 +101,7 @@ function formatOrderItem(item = {}) {
 
   return {
     ...item,
+    item_key: item.order_item_id || item._id || item.item_key || item.dish_id || `item_${index}`,
     dish_name: item.dish_name || '餐品',
     selected_specs: normalizeSelectedSpecs(item.selected_specs),
     selected_addons: normalizeSelectedAddons(item.selected_addons),
@@ -105,7 +129,7 @@ function buildProgress(order) {
       {
         key: 'cancelled',
         title: '订单已取消',
-        time: order.cancelled_time || '时间待确认',
+        time: order.cancelled_time || '等待更新',
         done: true,
         active: true
       }
@@ -118,7 +142,20 @@ function buildProgress(order) {
     cooking: 2,
     finished: 3
   }
-  const activeIndex = orderIndex[status] || 0
+
+  if (!Object.prototype.hasOwnProperty.call(orderIndex, status)) {
+    return [
+      {
+        key: 'unknown',
+        title: '状态更新中',
+        time: '请稍后刷新',
+        done: true,
+        active: true
+      }
+    ]
+  }
+
+  const activeIndex = orderIndex[status]
 
   return [
     {
@@ -131,21 +168,21 @@ function buildProgress(order) {
     {
       key: 'accepted',
       title: '商家已接单',
-      time: order.accepted_time || '等待商家接单',
+      time: order.accepted_time || '等待更新',
       done: activeIndex >= 1,
       active: activeIndex === 1
     },
     {
       key: 'cooking',
       title: '正在制作中',
-      time: order.cooking_time || '等待开始制作',
+      time: order.cooking_time || '等待更新',
       done: activeIndex >= 2,
       active: activeIndex === 2
     },
     {
       key: 'finished',
       title: '订单已完成',
-      time: order.finished_time || '等待完成',
+      time: order.finished_time || '等待更新',
       done: activeIndex >= 3,
       active: activeIndex === 3
     }
@@ -154,8 +191,12 @@ function buildProgress(order) {
 
 function normalizeOrderDetail(data = {}) {
   const order = data.order || {}
-  const status = order.status || 'pending'
-  const items = Array.isArray(data.items) ? data.items.map(formatOrderItem) : []
+  const status = order.status || ''
+  const statusMeta = getOrderStatusMeta(status)
+  const rawItems = Array.isArray(data.items)
+    ? data.items
+    : (Array.isArray(order.items) ? order.items : [])
+  const items = rawItems.map(formatOrderItem)
   const createdTime = formatTime(normalizeDateValue(order.created_at))
   const acceptedTime = formatTime(normalizeDateValue(order.accepted_at))
   const cookingTime = formatTime(normalizeDateValue(order.cooking_at))
@@ -165,10 +206,11 @@ function normalizeOrderDetail(data = {}) {
   const normalizedOrder = {
     ...order,
     order_id: getOrderId(order),
-    order_no: order.order_no || getOrderId(order),
+    order_no: order.order_no || getOrderId(order) || '待确认',
     status,
-    status_text: getStatusText(status),
-    status_class: getStatusClass(status),
+    status_text: statusMeta.text,
+    status_desc: statusMeta.desc,
+    status_class: statusMeta.className,
     created_time: createdTime || '时间待确认',
     accepted_time: acceptedTime,
     cooking_time: cookingTime,
@@ -223,7 +265,7 @@ Page({
     if (!orderId) {
       this.setData({
         pageStatus: 'error',
-        errorMessage: '缺少订单 ID，请从订单列表进入详情页'
+        errorMessage: '订单信息暂时不可用，请从订单列表重新进入'
       })
       return
     }
@@ -292,7 +334,7 @@ Page({
       console.error('[order-detail] load order detail failed:', error)
       this.setData({
         pageStatus: 'error',
-        errorMessage: error.message || '订单详情加载失败，请稍后重试'
+        errorMessage: getOrderPageErrorMessage(error)
       })
     }
   },
@@ -307,7 +349,7 @@ Page({
     if (!this.data.orderId) {
       this.setData({
         pageStatus: 'error',
-        errorMessage: '缺少订单 ID，请从订单列表进入详情页'
+        errorMessage: '订单信息暂时不可用，请从订单列表重新进入'
       })
       return
     }

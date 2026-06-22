@@ -216,10 +216,21 @@ button::after {
   gap: 20rpx;
 }
 
+.order-card-main {
+  min-width: 0;
+  flex: 1;
+}
+
 .order-no {
+  display: -webkit-box;
+  overflow: hidden;
   color: #2a211d;
   font-size: 27rpx;
   font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .order-time {
@@ -261,7 +272,14 @@ button::after {
   background: #eeeeee;
 }
 
+.status-unknown {
+  color: #8a6b42;
+  background: #fff5df;
+}
+
 .order-summary {
+  display: -webkit-box;
+  overflow: hidden;
   margin-top: 24rpx;
   padding: 22rpx 24rpx;
   border-radius: 22rpx;
@@ -269,6 +287,9 @@ button::after {
   font-size: 24rpx;
   line-height: 1.45;
   background: rgba(255, 255, 255, 0.54);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .order-card-foot {
@@ -276,11 +297,14 @@ button::after {
 }
 
 .order-count {
+  min-width: 0;
+  flex: 1;
   color: rgba(42, 33, 29, 0.5);
   font-size: 23rpx;
 }
 
 .order-total {
+  flex: none;
   color: #e63b4a;
   font-size: 34rpx;
   font-weight: 900;

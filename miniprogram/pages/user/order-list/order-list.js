@@ -5,20 +5,37 @@ const { formatMoney, formatTime } = require('../../../utils/format')
 const PAGE_SIZE = 20
 const BACKGROUND_IMAGE = '/images/mock/home-glass-display.jpg'
 
-const ORDER_STATUS_TEXT = {
-  pending: '待接单',
-  accepted: '已接单',
-  cooking: '制作中',
-  finished: '已完成',
-  cancelled: '已取消'
+const ORDER_STATUS_META = {
+  pending: {
+    text: '待商家接单',
+    desc: '等待商家接单',
+    className: 'pending'
+  },
+  accepted: {
+    text: '商家已接单',
+    desc: '等待开始制作',
+    className: 'accepted'
+  },
+  cooking: {
+    text: '制作中',
+    desc: '餐品正在制作，请稍候',
+    className: 'cooking'
+  },
+  finished: {
+    text: '已完成',
+    desc: '感谢惠顾',
+    className: 'finished'
+  },
+  cancelled: {
+    text: '已取消',
+    desc: '订单已取消',
+    className: 'cancelled'
+  }
 }
-
-const ORDER_STATUS_CLASS = {
-  pending: 'pending',
-  accepted: 'accepted',
-  cooking: 'cooking',
-  finished: 'finished',
-  cancelled: 'cancelled'
+const UNKNOWN_ORDER_STATUS_META = {
+  text: '状态更新中',
+  desc: '请稍后刷新',
+  className: 'unknown'
 }
 
 function getOrderId(order) {
@@ -38,6 +55,20 @@ function normalizeSelectedSpecs(selectedSpecs) {
 
 function normalizeSelectedAddons(selectedAddons) {
   return Array.isArray(selectedAddons) ? selectedAddons : []
+}
+
+function getOrderStatusMeta(status) {
+  return ORDER_STATUS_META[status] || UNKNOWN_ORDER_STATUS_META
+}
+
+function getOrderPageErrorMessage(error = {}) {
+  const code = error.code || ''
+
+  if (!code) {
+    return '网络不太稳定，请稍后重试'
+  }
+
+  return '订单加载失败，请重新加载'
 }
 
 function formatSelectedSpecs(item = {}) {
@@ -65,7 +96,7 @@ function formatItemOptionText(item = {}) {
 
 function buildItemSummary(items) {
   if (!Array.isArray(items) || !items.length) {
-    return '暂无商品明细'
+    return '商品信息暂不可用'
   }
 
   const names = items.slice(0, 2).map((item) => {
@@ -81,16 +112,18 @@ function buildItemSummary(items) {
 
 function normalizeOrder(order) {
   const items = Array.isArray(order.items) ? order.items : []
-  const status = order.status || 'pending'
+  const status = order.status || ''
+  const statusMeta = getOrderStatusMeta(status)
   const itemCount = Number(order.item_count) || items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
 
   return {
     ...order,
     order_id: getOrderId(order),
-    order_no: order.order_no || getOrderId(order),
+    order_no: order.order_no || getOrderId(order) || '待确认',
     status,
-    status_text: ORDER_STATUS_TEXT[status] || '未知状态',
-    status_class: ORDER_STATUS_CLASS[status] || 'cancelled',
+    status_text: statusMeta.text,
+    status_desc: statusMeta.desc,
+    status_class: statusMeta.className,
     created_time: formatTime(normalizeDateValue(order.created_at)) || '时间待确认',
     item_summary: buildItemSummary(items),
     item_count_text: `${itemCount}件商品`,
@@ -171,7 +204,7 @@ Page({
       this.setData({
         orders: [],
         pageStatus: 'error',
-        errorMessage: error.message || '订单加载失败，请稍后重试'
+        errorMessage: getOrderPageErrorMessage(error)
       })
     }
   },
