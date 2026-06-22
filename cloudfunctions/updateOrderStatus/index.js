@@ -33,18 +33,21 @@ async function findOrderById(orderId) {
   return (result.data && result.data[0]) || null
 }
 
-async function updateOrderStatus({ order_id, updateData }) {
+async function updateOrderStatus({ order_id, current_status, updateData }) {
   const result = await db
     .collection('orders')
     .where({
-      order_id
+      order_id,
+      status: current_status
     })
     .update({
       data: updateData
     })
 
   if (!result.stats || result.stats.updated <= 0) {
-    throw new Error('order update failed')
+    const error = new Error('order status conflict')
+    error.code = 'STATUS_CONFLICT'
+    throw error
   }
 
   return result

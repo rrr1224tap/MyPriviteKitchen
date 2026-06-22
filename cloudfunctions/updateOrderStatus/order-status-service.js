@@ -57,6 +57,10 @@ function isStatusFlowAllowed(currentStatus, nextStatus) {
   return (ALLOWED_STATUS_FLOW[currentStatus] || []).includes(nextStatus)
 }
 
+function isStatusConflictError(error) {
+  return error && error.code === 'STATUS_CONFLICT'
+}
+
 function isActiveMerchantStaff(staff = {}, merchantId, openid) {
   return Boolean(
     staff &&
@@ -102,7 +106,7 @@ function createUpdateOrderStatusHandler(dependencies) {
       }
 
       if (!isValidOrderStatus(nextStatus)) {
-        return failure('ORDER_STATUS_INVALID', '订单目标状态不合法')
+        return failure('INVALID_STATUS', '订单目标状态不合法')
       }
 
       const staff = await dependencies.findMerchantStaff({
@@ -127,11 +131,11 @@ function createUpdateOrderStatusHandler(dependencies) {
       const oldStatus = normalizeText(order.status)
 
       if (!isValidOrderStatus(oldStatus)) {
-        return failure('ORDER_STATUS_INVALID', '订单当前状态不合法')
+        return failure('INVALID_STATUS', '订单当前状态不合法')
       }
 
       if (!isStatusFlowAllowed(oldStatus, nextStatus)) {
-        return failure('ORDER_STATUS_FLOW_ERROR', '订单状态流转不允许')
+        return failure('STATUS_CONFLICT', '订单当前状态不允许执行该操作')
       }
 
       const now = dependencies.now()
@@ -140,9 +144,14 @@ function createUpdateOrderStatusHandler(dependencies) {
       try {
         await dependencies.updateOrderStatus({
           order_id: getOrderId(order),
+          current_status: oldStatus,
           updateData
         })
       } catch (error) {
+        if (isStatusConflictError(error)) {
+          return failure('STATUS_CONFLICT', '订单状态已变化，请刷新后重试')
+        }
+
         if (typeof dependencies.logError === 'function') {
           dependencies.logError('updateOrderStatus database update failed', error)
         }
