@@ -91,8 +91,20 @@
             <view class="order-total">{{item.total_amount_text}}</view>
           </view>
 
-          <view wx:if="{{item.action_text}}" class="action-row">
+          <view wx:if="{{item.has_action}}" class="action-row">
             <button
+              wx:if="{{item.cancel_action_text}}"
+              class="action-button is-danger {{submittingOrderId === item.order_id ? 'is-submitting' : ''}}"
+              catchtap="handleOrderAction"
+              data-id="{{item.order_id}}"
+              data-next-status="{{item.cancel_next_status}}"
+              disabled="{{submittingOrderId === item.order_id}}"
+            >
+              <block wx:if="{{submittingOrderId === item.order_id}}">处理中...</block>
+              <block wx:else>{{item.cancel_action_text}}</block>
+            </button>
+            <button
+              wx:if="{{item.action_text}}"
               class="action-button {{submittingOrderId === item.order_id ? 'is-submitting' : ''}}"
               catchtap="handleOrderAction"
               data-id="{{item.order_id}}"

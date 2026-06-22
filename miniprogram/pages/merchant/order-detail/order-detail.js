@@ -30,6 +30,17 @@ const ORDER_ACTIONS = {
   }
 }
 
+const CANCEL_ORDER_ACTION = {
+  text: '取消订单',
+  next_status: 'cancelled',
+  confirm_title: '确认取消订单？',
+  confirm_content: '取消后订单状态将不可回退，请确认是否取消。',
+  confirm_text: '确认取消',
+  success_text: '订单已取消'
+}
+
+const CANCELABLE_STATUSES = ['pending', 'accepted']
+
 const MERCHANT_ORDER_ERROR_TEXT = {
   FORBIDDEN: '当前账号没有商家权限，请检查商家人员配置',
   UNAUTHORIZED: '登录状态异常，请重新进入小程序',
@@ -137,10 +148,33 @@ function formatOrderItem(item = {}) {
   }
 }
 
+function canCancelOrder(status) {
+  return CANCELABLE_STATUSES.includes(status)
+}
+
+function getActionConfig(order = {}, nextStatus = '') {
+  if (nextStatus === CANCEL_ORDER_ACTION.next_status && order.cancel_action_text) {
+    return {
+      confirm_title: order.cancel_confirm_title,
+      confirm_content: order.cancel_confirm_content,
+      confirm_text: order.cancel_confirm_text,
+      success_text: order.cancel_success_text
+    }
+  }
+
+  return {
+    confirm_title: order.confirm_title,
+    confirm_content: order.confirm_content,
+    confirm_text: order.confirm_text,
+    success_text: '操作成功'
+  }
+}
+
 function normalizeOrderDetail(data = {}) {
   const order = data.order || {}
   const status = order.status || 'pending'
   const action = ORDER_ACTIONS[status] || null
+  const cancelAction = canCancelOrder(status) ? CANCEL_ORDER_ACTION : null
   const items = Array.isArray(data.items) ? data.items.map(formatOrderItem) : []
   const itemCount = Number(order.item_count) ||
     items.reduce((sum, item) => sum + item.quantity, 0)
@@ -167,7 +201,14 @@ function normalizeOrderDetail(data = {}) {
       next_status: action ? action.next_status : '',
       confirm_title: action ? action.confirm_title : '',
       confirm_content: action ? action.confirm_content : '',
-      confirm_text: action ? action.confirm_text : ''
+      confirm_text: action ? action.confirm_text : '',
+      has_action: Boolean(action || cancelAction),
+      cancel_action_text: cancelAction ? cancelAction.text : '',
+      cancel_next_status: cancelAction ? cancelAction.next_status : '',
+      cancel_confirm_title: cancelAction ? cancelAction.confirm_title : '',
+      cancel_confirm_content: cancelAction ? cancelAction.confirm_content : '',
+      cancel_confirm_text: cancelAction ? cancelAction.confirm_text : '',
+      cancel_success_text: cancelAction ? cancelAction.success_text : ''
     },
     items
   }
@@ -306,14 +347,18 @@ Page({
     }
   },
 
-  async handleOrderAction() {
+  async handleOrderAction(event = {}) {
     const order = this.data.order || {}
+    const nextStatus = event.currentTarget && event.currentTarget.dataset
+      ? event.currentTarget.dataset.nextStatus || order.next_status
+      : order.next_status
 
-    if (!order.order_id || !order.next_status || this.data.submitting) {
+    if (!order.order_id || !nextStatus || this.data.submitting) {
       return
     }
 
-    const confirmed = await confirmOrderAction(order)
+    const actionConfig = getActionConfig(order, nextStatus)
+    const confirmed = await confirmOrderAction(actionConfig)
 
     if (!confirmed) {
       return
@@ -327,11 +372,11 @@ Page({
       await callMerchantFunction('updateOrderStatus', {
         merchant_id: DEFAULT_MERCHANT_ID,
         order_id: order.order_id,
-        next_status: order.next_status
+        next_status: nextStatus
       })
 
       wx.showToast({
-        title: '操作成功',
+        title: actionConfig.success_text || '操作成功',
         icon: 'success'
       })
 

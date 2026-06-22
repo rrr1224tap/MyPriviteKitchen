@@ -45,6 +45,17 @@ const ORDER_ACTIONS = {
   }
 }
 
+const CANCEL_ORDER_ACTION = {
+  text: '取消订单',
+  next_status: 'cancelled',
+  confirm_title: '确认取消订单？',
+  confirm_content: '取消后订单状态将不可回退，请确认是否取消。',
+  confirm_text: '确认取消',
+  success_text: '订单已取消'
+}
+
+const CANCELABLE_STATUSES = ['pending', 'accepted']
+
 const EMPTY_STATUS_TEXT = {
   all: {
     title: '暂无订单',
@@ -158,10 +169,33 @@ function buildItemSummary(items) {
   return items.length > 2 ? `${names.join('、')} 等${items.length}件` : names.join('、')
 }
 
+function canCancelOrder(status) {
+  return CANCELABLE_STATUSES.includes(status)
+}
+
+function getActionConfig(order = {}, nextStatus = '') {
+  if (nextStatus === CANCEL_ORDER_ACTION.next_status && order.cancel_action_text) {
+    return {
+      confirm_title: order.cancel_confirm_title,
+      confirm_content: order.cancel_confirm_content,
+      confirm_text: order.cancel_confirm_text,
+      success_text: order.cancel_success_text
+    }
+  }
+
+  return {
+    confirm_title: order.confirm_title,
+    confirm_content: order.confirm_content,
+    confirm_text: order.confirm_text,
+    success_text: '操作成功'
+  }
+}
+
 function normalizeOrder(order = {}) {
   const items = Array.isArray(order.items) ? order.items : []
   const status = order.status || 'pending'
   const action = ORDER_ACTIONS[status] || null
+  const cancelAction = canCancelOrder(status) ? CANCEL_ORDER_ACTION : null
   const itemCount = Number(order.item_count) ||
     items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
 
@@ -182,6 +216,13 @@ function normalizeOrder(order = {}) {
     confirm_title: action ? action.confirm_title : '',
     confirm_content: action ? action.confirm_content : '',
     confirm_text: action ? action.confirm_text : '',
+    has_action: Boolean(action || cancelAction),
+    cancel_action_text: cancelAction ? cancelAction.text : '',
+    cancel_next_status: cancelAction ? cancelAction.next_status : '',
+    cancel_confirm_title: cancelAction ? cancelAction.confirm_title : '',
+    cancel_confirm_content: cancelAction ? cancelAction.confirm_content : '',
+    cancel_confirm_text: cancelAction ? cancelAction.confirm_text : '',
+    cancel_success_text: cancelAction ? cancelAction.success_text : '',
     items
   }
 }
@@ -340,7 +381,8 @@ Page({
     }
 
     const order = this.data.orders.find((item) => item.order_id === id) || {}
-    const confirmed = await confirmOrderAction(order)
+    const actionConfig = getActionConfig(order, nextStatus)
+    const confirmed = await confirmOrderAction(actionConfig)
 
     if (!confirmed) {
       return
@@ -358,7 +400,7 @@ Page({
       })
 
       wx.showToast({
-        title: '操作成功',
+        title: actionConfig.success_text || '操作成功',
         icon: 'success'
       })
 

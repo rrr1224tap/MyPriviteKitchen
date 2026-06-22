@@ -14,7 +14,7 @@
   </view>
 
   <scroll-view class="detail-scroll" scroll-y enhanced show-scrollbar="{{false}}">
-    <view class="detail-content {{order && order.action_text ? 'has-action' : ''}}" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+    <view class="detail-content {{order && order.has_action ? 'has-action' : ''}}" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
       <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
         <view class="state-mark">...</view>
         <view class="state-title">正在读取订单详情</view>
@@ -113,10 +113,22 @@
     </view>
   </scroll-view>
 
-  <view wx:if="{{pageStatus === 'success' && order.action_text}}" class="fixed-action-bar">
+  <view wx:if="{{pageStatus === 'success' && order.has_action}}" class="fixed-action-bar">
     <button
+      wx:if="{{order.cancel_action_text}}"
+      class="action-button is-danger {{submitting ? 'is-submitting' : ''}}"
+      bindtap="handleOrderAction"
+      data-next-status="{{order.cancel_next_status}}"
+      disabled="{{submitting}}"
+    >
+      <block wx:if="{{submitting}}">处理中...</block>
+      <block wx:else>{{order.cancel_action_text}}</block>
+    </button>
+    <button
+      wx:if="{{order.action_text}}"
       class="action-button {{submitting ? 'is-submitting' : ''}}"
       bindtap="handleOrderAction"
+      data-next-status="{{order.next_status}}"
       disabled="{{submitting}}"
     >
       <block wx:if="{{submitting}}">处理中...</block>
