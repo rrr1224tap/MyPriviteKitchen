@@ -1,5 +1,4 @@
 const { formatMoney } = require('../../../utils/format')
-const { callFunction } = require('../../../utils/cloud')
 const { DEFAULT_MERCHANT_ID, STORAGE_KEYS } = require('../../../utils/constants')
 
 const DISCOUNT_CENT = 600
@@ -16,11 +15,24 @@ const FALLBACK_IMAGE_STYLES = [
 
 const CREATE_ORDER_ERROR_TEXT = {
   DISH_SOLD_OUT: '有餐品已售罄，请重新选择',
-  STOCK_NOT_ENOUGH: '库存不足，请调整数量',
+  STOCK_NOT_ENOUGH: '库存不足，请调整数量后重试',
   DISH_OFF_SALE: '有餐品已下架，请重新选择',
-  VALIDATION_ERROR: '规格或加料选择无效，请重新选择',
-  INVALID_PARAMS: '订单参数有误，请重新选择'
+  VALIDATION_ERROR: '规格或加料选择已变化，请重新选择',
+  INVALID_PARAMS: '订单信息不完整，请重新选择',
+  AMOUNT_ERROR: '订单金额校验失败，请重新选择',
+  NOT_FOUND: '有餐品信息不存在，请重新选择',
+  DATABASE_ERROR: '服务暂时不可用，请稍后重试'
 }
+const ORDER_RESELECT_CODES = [
+  'DISH_SOLD_OUT',
+  'STOCK_NOT_ENOUGH',
+  'DISH_OFF_SALE',
+  'VALIDATION_ERROR',
+  'NOT_FOUND'
+]
+const ORDER_RESELECT_MESSAGE = '餐品状态或规格已变化，请返回菜单重新选择。'
+const ORDER_NETWORK_ERROR_TEXT = '网络不太稳定，请稍后重试'
+const ORDER_UNKNOWN_ERROR_TEXT = '下单失败，请稍后重试'
 
 function getFallbackImageStyle(index) {
   return FALLBACK_IMAGE_STYLES[index % FALLBACK_IMAGE_STYLES.length]
@@ -252,6 +264,36 @@ function buildCreateOrderAddons(selectedAddons = []) {
   })).filter((group) => group.group_id && group.option_ids.length)
 }
 
+function getOrderErrorCode(error = {}) {
+  return error.code || ''
+}
+
+function getOrderErrorMessage(code) {
+  return CREATE_ORDER_ERROR_TEXT[code] || ORDER_UNKNOWN_ERROR_TEXT
+}
+
+function shouldGuideToMenu(code) {
+  return ORDER_RESELECT_CODES.includes(code)
+}
+
+async function callCreateOrder(payload) {
+  const response = await wx.cloud.callFunction({
+    name: 'createOrder',
+    data: payload
+  })
+  const result = response.result || {}
+
+  if (!result.success) {
+    const error = new Error(result.message || ORDER_UNKNOWN_ERROR_TEXT)
+    error.code = result.code || ''
+    error.data = result.data || null
+    error.result = result
+    throw error
+  }
+
+  return result.data || {}
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -314,6 +356,10 @@ Page({
   },
 
   changeQuantity(event) {
+    if (this.data.submitting) {
+      return
+    }
+
     const itemKey = event.currentTarget.dataset.key
     const step = Number(event.currentTarget.dataset.step)
     const currentItem = this.data.items.find((item) => item.item_key === itemKey)
@@ -327,6 +373,10 @@ Page({
   },
 
   removeItem(event) {
+    if (this.data.submitting) {
+      return
+    }
+
     const itemKey = event.currentTarget.dataset.key
 
     if (!itemKey) {
@@ -338,6 +388,10 @@ Page({
   },
 
   clearCart() {
+    if (this.data.submitting) {
+      return
+    }
+
     wx.showModal({
       title: '清空购物车',
       content: '确认移除当前已选餐品吗？',
@@ -384,6 +438,10 @@ Page({
   },
 
   selectPickup(event) {
+    if (this.data.submitting) {
+      return
+    }
+
     this.setData({
       pickupType: event.currentTarget.dataset.type
     })
@@ -432,14 +490,36 @@ Page({
   },
 
   showSubmitError(error) {
-    const message = CREATE_ORDER_ERROR_TEXT[error && error.code]
+    const code = getOrderErrorCode(error)
 
-    if (message) {
+    if (!code) {
       wx.showToast({
-        title: message,
+        title: ORDER_NETWORK_ERROR_TEXT,
         icon: 'none'
       })
+      return
     }
+
+    if (shouldGuideToMenu(code)) {
+      wx.showModal({
+        title: '下单失败',
+        content: ORDER_RESELECT_MESSAGE,
+        cancelText: '我知道了',
+        confirmText: '去菜单',
+        confirmColor: '#E63B4A',
+        success: (result) => {
+          if (result.confirm) {
+            this.goToMenu()
+          }
+        }
+      })
+      return
+    }
+
+    wx.showToast({
+      title: getOrderErrorMessage(code),
+      icon: 'none'
+    })
   },
 
   async submitOrder() {
@@ -451,7 +531,7 @@ Page({
 
     if (!payload.items.length) {
       wx.showToast({
-        title: '购物车为空',
+        title: '购物车还是空的，先去点餐吧',
         icon: 'none'
       })
       return
@@ -462,7 +542,7 @@ Page({
     })
 
     try {
-      const order = await callFunction('createOrder', payload)
+      const order = await callCreateOrder(payload)
 
       clearCartStorage()
       this.refreshCart()

@@ -15,7 +15,7 @@
   <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
     <view class="back-button" bindtap="goBack">‹</view>
     <view class="nav-title">购物车</view>
-    <view wx:if="{{items.length}}" class="clear-button" bindtap="clearCart">清空</view>
+    <view wx:if="{{items.length}}" class="clear-button {{submitting ? 'is-disabled' : ''}}" bindtap="clearCart">清空</view>
     <view wx:else class="nav-placeholder"></view>
   </view>
 
@@ -28,7 +28,7 @@
       </view>
       <view class="overview-actions">
         <view class="overview-count">{{totalCount}}</view>
-        <view class="overview-clear" bindtap="clearCart">清空</view>
+        <view class="overview-clear {{submitting ? 'is-disabled' : ''}}" bindtap="clearCart">清空</view>
       </view>
     </view>
 
@@ -50,7 +50,7 @@
         <view class="cart-info">
           <view class="cart-item-head">
             <view class="cart-name">{{item.name}}</view>
-            <view class="cart-remove" data-key="{{item.item_key}}" bindtap="removeItem">移除</view>
+            <view class="cart-remove {{submitting ? 'is-disabled' : ''}}" data-key="{{item.item_key}}" bindtap="removeItem">移除</view>
           </view>
           <view wx:if="{{item.spec_text || item.addon_text}}" class="cart-option-summary">
             <view wx:if="{{item.spec_text}}" class="cart-option-line">{{item.spec_text}}</view>
@@ -62,9 +62,9 @@
               <view class="cart-subtotal">小计 {{item.subtotal_text}}</view>
             </view>
             <view class="stepper">
-              <view class="stepper-button is-minus" data-key="{{item.item_key}}" data-step="-1" bindtap="changeQuantity">−</view>
+              <view class="stepper-button is-minus {{submitting ? 'is-disabled' : ''}}" data-key="{{item.item_key}}" data-step="-1" bindtap="changeQuantity">−</view>
               <view class="stepper-value">{{item.quantity}}</view>
-              <view class="stepper-button" data-key="{{item.item_key}}" data-step="1" bindtap="changeQuantity">＋</view>
+              <view class="stepper-button {{submitting ? 'is-disabled' : ''}}" data-key="{{item.item_key}}" data-step="1" bindtap="changeQuantity">＋</view>
             </view>
           </view>
         </view>
@@ -80,7 +80,7 @@
         <view class="pickup-time">预计 15 分钟</view>
       </view>
       <view class="pickup-options">
-        <view class="pickup-option {{pickupType === 'pickup' ? 'is-active' : ''}}" data-type="pickup" bindtap="selectPickup">
+        <view class="pickup-option {{pickupType === 'pickup' ? 'is-active' : ''}} {{submitting ? 'is-disabled' : ''}}" data-type="pickup" bindtap="selectPickup">
           <view class="pickup-icon">取</view>
           <view>
             <view class="pickup-title">到店自提</view>
@@ -88,7 +88,7 @@
           </view>
           <view class="option-mark"></view>
         </view>
-        <view class="pickup-option {{pickupType === 'dine' ? 'is-active' : ''}}" data-type="dine" bindtap="selectPickup">
+        <view class="pickup-option {{pickupType === 'dine' ? 'is-active' : ''}} {{submitting ? 'is-disabled' : ''}}" data-type="dine" bindtap="selectPickup">
           <view class="pickup-icon is-dine">堂</view>
           <view>
             <view class="pickup-title">堂食点餐</view>
@@ -142,7 +142,7 @@
     </view>
     <view class="submit-saving">已优惠 <text>{{discountAmountText}}</text></view>
     <button
-      class="submit-button"
+      class="submit-button {{submitting ? 'is-disabled' : ''}}"
       bindtap="submitOrder"
       loading="{{submitting}}"
       disabled="{{submitting}}"
