@@ -45,16 +45,30 @@ const ORDER_ACTIONS = {
   }
 }
 
+const ACTION_SUCCESS_TEXT = {
+  accepted: '已接单',
+  cooking: '已开始制作',
+  finished: '订单已完成',
+  cancelled: '订单已取消'
+}
+
 const CANCEL_ORDER_ACTION = {
   text: '取消订单',
   next_status: 'cancelled',
   confirm_title: '确认取消订单？',
   confirm_content: '取消后订单状态将不可回退，请确认是否取消。',
   confirm_text: '确认取消',
-  success_text: '订单已取消'
+  success_text: ACTION_SUCCESS_TEXT.cancelled
 }
 
 const CANCELABLE_STATUSES = ['pending', 'accepted']
+const STATUS_CONFLICT_CODES = [
+  'ORDER_STATUS_INVALID',
+  'ORDER_STATUS_FLOW_ERROR',
+  'INVALID_STATUS',
+  'STATUS_CONFLICT'
+]
+const REFRESH_FAILED_MESSAGE = '操作成功，但刷新失败，请手动刷新'
 
 const EMPTY_STATUS_TEXT = {
   all: {
@@ -187,8 +201,12 @@ function getActionConfig(order = {}, nextStatus = '') {
     confirm_title: order.confirm_title,
     confirm_content: order.confirm_content,
     confirm_text: order.confirm_text,
-    success_text: '操作成功'
+    success_text: getActionSuccessText(nextStatus)
   }
+}
+
+function getActionSuccessText(nextStatus) {
+  return ACTION_SUCCESS_TEXT[nextStatus] || '操作成功'
 }
 
 function normalizeOrder(order = {}) {
@@ -239,6 +257,11 @@ function getMerchantOrderErrorMessage(errorOrCode) {
   return MERCHANT_ORDER_ERROR_TEXT[code] || '操作失败，请稍后重试'
 }
 
+function isStatusConflictError(error = {}) {
+  const code = error.code || ''
+  return STATUS_CONFLICT_CODES.includes(code)
+}
+
 function getEmptyStateText(status) {
   const key = status || 'all'
   return EMPTY_STATUS_TEXT[key] || EMPTY_STATUS_TEXT.all
@@ -249,7 +272,7 @@ function confirmOrderAction(order) {
     wx.showModal({
       title: order.confirm_title || '确认操作？',
       content: order.confirm_content || '确认后订单状态将更新。',
-      cancelText: '先等等',
+      cancelText: '再想想',
       confirmText: order.confirm_text || '确认',
       confirmColor: '#E63B4A',
       success: (result) => {
@@ -314,11 +337,20 @@ Page({
     })
   },
 
-  async loadOrders() {
+  async loadOrders(options = {}) {
+    const hasCurrentOrders = this.data.orders.length > 0
+    const showBlockingLoading = options.showLoading === true ||
+      (options.showLoading !== false && !hasCurrentOrders)
+
     this.setData({
-      pageStatus: 'loading',
       errorMessage: ''
     })
+
+    if (showBlockingLoading) {
+      this.setData({
+        pageStatus: 'loading'
+      })
+    }
 
     try {
       const data = await callMerchantFunction('getMerchantOrders', {
@@ -337,13 +369,28 @@ Page({
         emptyDesc: emptyState.desc,
         pageStatus: orders.length ? 'success' : 'empty'
       })
+      return true
     } catch (error) {
       console.error('[merchant-orders] load orders failed:', error)
+
+      if (options.silentError) {
+        return false
+      }
+
+      if (hasCurrentOrders && !showBlockingLoading) {
+        wx.showToast({
+          title: getMerchantOrderErrorMessage(error),
+          icon: 'none'
+        })
+        return false
+      }
+
       this.setData({
         orders: [],
         pageStatus: 'error',
         errorMessage: getMerchantOrderErrorMessage(error)
       })
+      return false
     }
   },
 
@@ -393,23 +440,37 @@ Page({
     })
 
     try {
-      await callMerchantFunction('updateOrderStatus', {
-        merchant_id: DEFAULT_MERCHANT_ID,
-        order_id: id,
-        next_status: nextStatus
+      try {
+        await callMerchantFunction('updateOrderStatus', {
+          merchant_id: DEFAULT_MERCHANT_ID,
+          order_id: id,
+          next_status: nextStatus
+        })
+      } catch (error) {
+        console.error('[merchant-orders] update status failed:', error)
+        wx.showToast({
+          title: getMerchantOrderErrorMessage(error),
+          icon: 'none'
+        })
+
+        if (isStatusConflictError(error)) {
+          await this.loadOrders({
+            showLoading: false,
+            silentError: true
+          })
+        }
+
+        return
+      }
+
+      const refreshed = await this.loadOrders({
+        showLoading: false,
+        silentError: true
       })
 
       wx.showToast({
-        title: actionConfig.success_text || '操作成功',
-        icon: 'success'
-      })
-
-      await this.loadOrders()
-    } catch (error) {
-      console.error('[merchant-orders] update status failed:', error)
-      wx.showToast({
-        title: getMerchantOrderErrorMessage(error),
-        icon: 'none'
+        title: refreshed ? actionConfig.success_text : REFRESH_FAILED_MESSAGE,
+        icon: refreshed ? 'success' : 'none'
       })
     } finally {
       this.setData({
