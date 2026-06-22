@@ -128,7 +128,7 @@
             <view class="dish-description">{{item.description}}</view>
             <view class="dish-footer">
               <view class="dish-price">{{item.price_text}}</view>
-              <view class="add-button {{item.is_sold_out ? 'is-disabled' : ''}}" data-id="{{item._id}}" catchtap="addDish">{{item.is_sold_out ? '售' : '＋'}}</view>
+              <view class="add-button {{item.has_options ? 'is-options' : ''}} {{item.is_sold_out ? 'is-disabled' : ''}}" data-id="{{item._id}}" catchtap="addDish">{{item.is_sold_out ? '售罄' : (item.has_options ? '选规格' : '＋')}}</view>
             </view>
           </view>
         </view>

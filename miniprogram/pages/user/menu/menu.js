@@ -1,10 +1,10 @@
 const { callFunction } = require('../../../utils/cloud')
-const { DEFAULT_MERCHANT_ID } = require('../../../utils/constants')
+const { DEFAULT_MERCHANT_ID, STORAGE_KEYS } = require('../../../utils/constants')
 const { formatMoney } = require('../../../utils/format')
-const { addCartItem, getCartSummary } = require('../../../utils/cart')
 
 const MENU_REFERENCE = '/images/mock/menu-glass-display.jpg'
 const HOME_REFERENCE = '/images/mock/home-glass-display.jpg'
+const CART_STORAGE_KEY = STORAGE_KEYS.CART_ITEMS || 'cart_items'
 
 const FALLBACK_IMAGE_STYLES = [
   'width: 750rpx; left: -192rpx; top: -676rpx;',
@@ -93,7 +93,23 @@ function normalizeTags(tags) {
 }
 
 function getDishId(dish) {
-  return dish.dish_id || dish._id || ''
+  return dish._id || dish.dish_id || ''
+}
+
+function toSafeInteger(value, fallback = 0) {
+  const numberValue = Number(value)
+
+  if (!Number.isFinite(numberValue)) {
+    return fallback
+  }
+
+  return Math.floor(numberValue)
+}
+
+function normalizeQuantity(quantity, fallback = 1) {
+  const safeQuantity = toSafeInteger(quantity, fallback)
+
+  return safeQuantity > 0 ? safeQuantity : fallback
 }
 
 function getFallbackImageStyle(index) {
@@ -124,22 +140,100 @@ function getSoldOutState(dish = {}) {
 }
 
 function buildCartDish(dish = {}) {
+  const dishId = getDishId(dish)
+  const priceCent = Math.max(0, toSafeInteger(dish.price_cent, 0))
+
   return {
-    dish_id: dish.dish_id,
+    item_key: dishId,
+    dish_id: dishId,
+    business_dish_id: dish.business_dish_id || dish.dish_id || '',
     merchant_id: dish.merchant_id || DEFAULT_MERCHANT_ID,
     category_id: dish.category_id || '',
     name: dish.name,
     description: dish.description || '',
     image_url: dish.image_url || dish.display_image || dish.image || '',
-    price_cent: dish.price_cent,
+    price_cent: priceCent,
+    base_price_cent: priceCent,
+    unit_price_cent: priceCent,
     original_price_cent: dish.original_price_cent || 0,
     tags: normalizeTags(dish.tags),
-    status: dish.status || 'on_sale'
+    status: dish.status || 'on_sale',
+    selected_specs: [],
+    selected_addons: []
   }
+}
+
+function readCartItems() {
+  try {
+    const items = wx.getStorageSync(CART_STORAGE_KEY)
+    return Array.isArray(items) ? items : []
+  } catch (error) {
+    return []
+  }
+}
+
+function saveCartItems(items = []) {
+  try {
+    wx.setStorageSync(CART_STORAGE_KEY, items)
+  } catch (error) {
+    return []
+  }
+
+  return items
+}
+
+function getItemKey(item = {}) {
+  return item.item_key || item.dish_id || item._id || item.id || ''
+}
+
+function addCartItemByKey(cartItem, quantity = 1) {
+  const addQuantity = normalizeQuantity(quantity, 1)
+  const currentItems = readCartItems()
+  const currentMerchantId = currentItems.length ? currentItems[0].merchant_id : ''
+  const nextItems = currentMerchantId && currentMerchantId !== cartItem.merchant_id
+    ? []
+    : currentItems
+  const targetKey = cartItem.item_key || cartItem.dish_id
+  const existsIndex = nextItems.findIndex((item) => getItemKey(item) === targetKey)
+
+  if (existsIndex >= 0) {
+    const oldItem = nextItems[existsIndex]
+    nextItems[existsIndex] = {
+      ...oldItem,
+      ...cartItem,
+      quantity: normalizeQuantity(oldItem.quantity, 1) + addQuantity,
+      updated_at: Date.now()
+    }
+  } else {
+    nextItems.push({
+      ...cartItem,
+      quantity: addQuantity,
+      selected: true,
+      updated_at: Date.now()
+    })
+  }
+
+  return saveCartItems(nextItems)
+}
+
+function getLocalCartSummary() {
+  return readCartItems().filter((item) => item.selected !== false).reduce((summary, item) => {
+    const quantity = normalizeQuantity(item.quantity, 1)
+    const unitPriceCent = Math.max(0, toSafeInteger(item.unit_price_cent || item.price_cent, 0))
+
+    return {
+      total_quantity: summary.total_quantity + quantity,
+      total_amount_cent: summary.total_amount_cent + unitPriceCent * quantity
+    }
+  }, {
+    total_quantity: 0,
+    total_amount_cent: 0
+  })
 }
 
 function normalizeDish(dish, categoryId, index) {
   const dishId = getDishId(dish)
+  const businessDishId = dish.dish_id || dishId
   const imageUrl = dish.image_url || dish.image || ''
   const hasRealImage = Boolean(imageUrl)
   const priceCent = Number(dish.price_cent)
@@ -150,6 +244,7 @@ function normalizeDish(dish, categoryId, index) {
     ...dish,
     _id: dishId,
     dish_id: dishId,
+    business_dish_id: businessDishId,
     category_id: dish.category_id || categoryId,
     name: dish.name || '未命名餐品',
     description: dish.description || '暂无餐品介绍',
@@ -157,6 +252,7 @@ function normalizeDish(dish, categoryId, index) {
     price_text: formatMoney(safePriceCent),
     tags: normalizeTags(dish.tags),
     status: dish.status || 'on_sale',
+    has_options: dish.has_options === true,
     display_image: hasRealImage ? imageUrl : MENU_REFERENCE,
     image_style: hasRealImage
       ? 'width: 100%; height: 100%; left: 0; top: 0;'
@@ -309,7 +405,7 @@ Page({
   },
 
   refreshCartSummary() {
-    const summary = getCartSummary()
+    const summary = getLocalCartSummary()
 
     this.setData({
       cartCount: summary.total_quantity,
@@ -403,7 +499,18 @@ Page({
       return
     }
 
-    addCartItem(buildCartDish(dish), 1)
+    if (dish.has_options) {
+      this.openDish({
+        currentTarget: {
+          dataset: {
+            id: dish._id
+          }
+        }
+      })
+      return
+    }
+
+    addCartItemByKey(buildCartDish(dish), 1)
     this.refreshCartSummary()
 
     wx.showToast({

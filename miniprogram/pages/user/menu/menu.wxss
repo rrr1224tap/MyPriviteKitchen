@@ -594,7 +594,16 @@
   box-shadow: 0 9rpx 20rpx rgba(180, 9, 18, 0.42), inset 0 2rpx 2rpx rgba(255, 255, 255, 0.35);
 }
 
+.add-button.is-options {
+  width: 116rpx;
+  height: 54rpx;
+  border-radius: 999rpx;
+  font-size: 21rpx;
+}
+
 .add-button.is-disabled {
+  width: 76rpx;
+  border-radius: 999rpx;
   background: linear-gradient(145deg, #d8cec4, #a99a8e);
   color: rgba(255, 255, 255, 0.86);
   font-size: 22rpx;
