@@ -86,6 +86,9 @@ function formatOrder(order = {}, items = []) {
 
 function formatOrderItem(item = {}) {
   const unitPriceCent = Number(item.unit_price_cent || item.price_cent)
+  const basePriceCent = Number(item.base_price_cent)
+  const specDeltaCent = Number(item.spec_delta_cent)
+  const addonDeltaCent = Number(item.addon_delta_cent)
   const subtotalCent = Number(item.subtotal_cent)
   const quantity = Number(item.quantity)
 
@@ -99,10 +102,15 @@ function formatOrderItem(item = {}) {
     dish_name: item.dish_name || '',
     dish_image_url: item.dish_image_url || item.dish_image || '',
     dish_image: item.dish_image || item.dish_image_url || '',
+    base_price_cent: isSafeAmount(basePriceCent) ? basePriceCent : 0,
+    spec_delta_cent: isSafeAmount(specDeltaCent) ? specDeltaCent : 0,
+    addon_delta_cent: isSafeAmount(addonDeltaCent) ? addonDeltaCent : 0,
     unit_price_cent: isSafeAmount(unitPriceCent) ? unitPriceCent : 0,
     price_cent: isSafeAmount(unitPriceCent) ? unitPriceCent : 0,
     quantity: Number.isInteger(quantity) && quantity > 0 ? quantity : 0,
     subtotal_cent: isSafeAmount(subtotalCent) ? subtotalCent : 0,
+    selected_specs: Array.isArray(item.selected_specs) ? item.selected_specs : [],
+    selected_addons: Array.isArray(item.selected_addons) ? item.selected_addons : [],
     created_at: item.created_at || null
   }
 }
@@ -185,4 +193,3 @@ function createGetUserOrdersHandler(dependencies) {
 module.exports = {
   createGetUserOrdersHandler
 }
-

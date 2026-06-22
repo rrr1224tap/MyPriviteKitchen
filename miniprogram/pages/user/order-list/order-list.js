@@ -32,6 +32,37 @@ function normalizeDateValue(value) {
   return value
 }
 
+function normalizeSelectedSpecs(selectedSpecs) {
+  return Array.isArray(selectedSpecs) ? selectedSpecs : []
+}
+
+function normalizeSelectedAddons(selectedAddons) {
+  return Array.isArray(selectedAddons) ? selectedAddons : []
+}
+
+function formatSelectedSpecs(item = {}) {
+  return normalizeSelectedSpecs(item.selected_specs)
+    .map((spec) => spec.option_name || spec.name || '')
+    .filter(Boolean)
+    .join(' / ')
+}
+
+function formatSelectedAddons(item = {}) {
+  return normalizeSelectedAddons(item.selected_addons).reduce((result, group) => {
+    const optionNames = Array.isArray(group.options)
+      ? group.options.map((option) => option.option_name || option.name || '').filter(Boolean)
+      : []
+    return result.concat(optionNames)
+  }, []).join('、')
+}
+
+function formatItemOptionText(item = {}) {
+  return [
+    formatSelectedSpecs(item),
+    formatSelectedAddons(item)
+  ].filter(Boolean).join(' / ')
+}
+
 function buildItemSummary(items) {
   if (!Array.isArray(items) || !items.length) {
     return '暂无商品明细'
@@ -40,10 +71,12 @@ function buildItemSummary(items) {
   const names = items.slice(0, 2).map((item) => {
     const name = item.dish_name || item.name || '餐品'
     const quantity = Number(item.quantity) || 0
-    return `${name} x${quantity}`
+    const optionText = formatItemOptionText(item)
+    const optionSuffix = optionText ? `（${optionText}）` : ''
+    return `${name}${optionSuffix} x${quantity}`
   })
 
-  return items.length > 2 ? `${names.join('、')} 等${items.length}件` : names.join('、')
+  return items.length > 2 ? `${names.join('、')} 等 ${items.length} 件` : names.join('、')
 }
 
 function normalizeOrder(order) {

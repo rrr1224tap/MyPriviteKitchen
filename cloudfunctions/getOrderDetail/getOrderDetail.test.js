@@ -26,9 +26,34 @@ const ITEMS = [
     dish_id: 'dish_001',
     dish_name: 'beef rice',
     dish_image_url: 'beef-rice.png',
+    base_price_cent: 2990,
+    spec_delta_cent: 300,
+    addon_delta_cent: 200,
     unit_price_cent: 2990,
     quantity: 1,
-    subtotal_cent: 2990
+    subtotal_cent: 2990,
+    selected_specs: [
+      {
+        group_id: 'size',
+        group_name: '规格',
+        option_id: 'large',
+        option_name: '大份',
+        price_delta_cent: 300
+      }
+    ],
+    selected_addons: [
+      {
+        group_id: 'extra',
+        group_name: '加料',
+        options: [
+          {
+            option_id: 'egg',
+            option_name: '加蛋',
+            price_delta_cent: 200
+          }
+        ]
+      }
+    ]
   },
   {
     order_item_id: 'order_item_002',
@@ -64,6 +89,33 @@ test('getOrderDetail returns current user order with item details', async () => 
   assert.equal(result.data.items.length, 2)
   assert.equal(result.data.items[0].unit_price_cent, 2990)
   assert.equal(result.data.items[0].subtotal_cent, 2990)
+  assert.equal(result.data.items[0].base_price_cent, 2990)
+  assert.equal(result.data.items[0].spec_delta_cent, 300)
+  assert.equal(result.data.items[0].addon_delta_cent, 200)
+  assert.deepEqual(result.data.items[0].selected_specs, [
+    {
+      group_id: 'size',
+      group_name: '规格',
+      option_id: 'large',
+      option_name: '大份',
+      price_delta_cent: 300
+    }
+  ])
+  assert.deepEqual(result.data.items[0].selected_addons, [
+    {
+      group_id: 'extra',
+      group_name: '加料',
+      options: [
+        {
+          option_id: 'egg',
+          option_name: '加蛋',
+          price_delta_cent: 200
+        }
+      ]
+    }
+  ])
+  assert.deepEqual(result.data.items[1].selected_specs, [])
+  assert.deepEqual(result.data.items[1].selected_addons, [])
 })
 
 test('getOrderDetail returns INVALID_PARAMS when order_id is missing', async () => {
@@ -100,4 +152,3 @@ test('getOrderDetail returns FORBIDDEN when order belongs to another user', asyn
   assert.equal(result.success, false)
   assert.equal(result.code, 'FORBIDDEN')
 })
-

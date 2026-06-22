@@ -54,9 +54,34 @@ const ORDER_ITEMS = [
     order_id: 'order_001',
     dish_id: 'dish_001',
     dish_name: 'beef rice',
+    base_price_cent: 2990,
+    spec_delta_cent: 300,
+    addon_delta_cent: 200,
     unit_price_cent: 2990,
     quantity: 1,
-    subtotal_cent: 2990
+    subtotal_cent: 2990,
+    selected_specs: [
+      {
+        group_id: 'size',
+        group_name: '规格',
+        option_id: 'large',
+        option_name: '大份',
+        price_delta_cent: 300
+      }
+    ],
+    selected_addons: [
+      {
+        group_id: 'extra',
+        group_name: '加料',
+        options: [
+          {
+            option_id: 'egg',
+            option_name: '加蛋',
+            price_delta_cent: 200
+          }
+        ]
+      }
+    ]
   },
   {
     order_item_id: 'order_item_002',
@@ -128,6 +153,33 @@ test('getUserOrders returns current user orders with item details', async () => 
   )
   assert.equal(result.data.list[0].items.length, 2)
   assert.equal(result.data.list[0].items[0].unit_price_cent, 2990)
+  assert.equal(result.data.list[0].items[0].base_price_cent, 2990)
+  assert.equal(result.data.list[0].items[0].spec_delta_cent, 300)
+  assert.equal(result.data.list[0].items[0].addon_delta_cent, 200)
+  assert.deepEqual(result.data.list[0].items[0].selected_specs, [
+    {
+      group_id: 'size',
+      group_name: '规格',
+      option_id: 'large',
+      option_name: '大份',
+      price_delta_cent: 300
+    }
+  ])
+  assert.deepEqual(result.data.list[0].items[0].selected_addons, [
+    {
+      group_id: 'extra',
+      group_name: '加料',
+      options: [
+        {
+          option_id: 'egg',
+          option_name: '加蛋',
+          price_delta_cent: 200
+        }
+      ]
+    }
+  ])
+  assert.deepEqual(result.data.list[0].items[1].selected_specs, [])
+  assert.deepEqual(result.data.list[0].items[1].selected_addons, [])
   assert.equal(result.data.pagination.total, 2)
 })
 
@@ -165,4 +217,3 @@ test('getUserOrders never returns other openid orders', async () => {
     ['order_001']
   )
 })
-

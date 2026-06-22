@@ -81,6 +81,10 @@
             <view class="dish-emblem">{{index + 1}}</view>
             <view class="dish-info">
               <view class="dish-name">{{item.dish_name}}</view>
+              <view wx:if="{{item.spec_text || item.addon_text}}" class="dish-options">
+                <view wx:if="{{item.spec_text}}" class="dish-option-line">{{item.spec_text}}</view>
+                <view wx:if="{{item.addon_text}}" class="dish-option-line">{{item.addon_text}}</view>
+              </view>
               <view class="dish-price">单价 {{item.unit_price_text}}</view>
             </view>
             <view class="dish-side">

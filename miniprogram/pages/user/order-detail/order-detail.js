@@ -45,14 +45,45 @@ function getStatusClass(status) {
   return ORDER_STATUS_CLASS[status] || 'cancelled'
 }
 
+function normalizeSelectedSpecs(selectedSpecs) {
+  return Array.isArray(selectedSpecs) ? selectedSpecs : []
+}
+
+function normalizeSelectedAddons(selectedAddons) {
+  return Array.isArray(selectedAddons) ? selectedAddons : []
+}
+
+function formatSelectedSpecs(item = {}) {
+  return normalizeSelectedSpecs(item.selected_specs)
+    .map((spec) => spec.option_name || spec.name || '')
+    .filter(Boolean)
+    .join(' / ')
+}
+
+function formatSelectedAddons(item = {}) {
+  return normalizeSelectedAddons(item.selected_addons).reduce((result, group) => {
+    const optionNames = Array.isArray(group.options)
+      ? group.options.map((option) => option.option_name || option.name || '').filter(Boolean)
+      : []
+    return result.concat(optionNames)
+  }, []).join('、')
+}
+
 function formatOrderItem(item = {}) {
   const quantity = Number(item.quantity) || 0
   const unitPriceCent = Number(item.unit_price_cent || item.price_cent) || 0
   const subtotalCent = Number(item.subtotal_cent) || unitPriceCent * quantity
+  const specText = formatSelectedSpecs(item)
+  const addonText = formatSelectedAddons(item)
 
   return {
     ...item,
     dish_name: item.dish_name || '餐品',
+    selected_specs: normalizeSelectedSpecs(item.selected_specs),
+    selected_addons: normalizeSelectedAddons(item.selected_addons),
+    spec_text: specText ? `规格：${specText}` : '',
+    addon_text: addonText ? `加料：${addonText}` : '',
+    has_options: Boolean(specText || addonText),
     quantity,
     unit_price_text: formatMoney(unitPriceCent),
     subtotal_text: formatMoney(subtotalCent)
