@@ -71,6 +71,44 @@ function getOrderPageErrorMessage(error = {}) {
   return '订单加载失败，请重新加载'
 }
 
+function getCancelOrderErrorMessage(error = {}) {
+  const code = error.code || (error.result && error.result.code) || ''
+  const messageMap = {
+    UNAUTHORIZED: '登录状态异常，请重新进入小程序',
+    INVALID_PARAMS: '订单信息不完整，请刷新后重试',
+    NOT_FOUND: '订单不存在或已被删除',
+    FORBIDDEN: '当前账号无法操作该订单',
+    STATUS_CONFLICT: '订单状态已变化，当前不可取消',
+    DATABASE_ERROR: '服务暂时不可用，请稍后重试'
+  }
+
+  if (!code) {
+    return '网络不太稳定，请稍后重试'
+  }
+
+  return messageMap[code] || '取消失败，请稍后重试'
+}
+
+async function callCancelUserOrder(orderId) {
+  const response = await wx.cloud.callFunction({
+    name: 'cancelUserOrder',
+    data: {
+      order_id: orderId
+    }
+  })
+  const result = response.result || {}
+
+  if (!result.success) {
+    const error = new Error(result.message || '取消失败')
+    error.code = result.code || ''
+    error.data = result.data || null
+    error.result = result
+    throw error
+  }
+
+  return result.data || {}
+}
+
 function formatSelectedSpecs(item = {}) {
   return normalizeSelectedSpecs(item.selected_specs)
     .map((spec) => spec.option_name || spec.name || '')
@@ -124,6 +162,7 @@ function normalizeOrder(order) {
     status_text: statusMeta.text,
     status_desc: statusMeta.desc,
     status_class: statusMeta.className,
+    can_cancel: status === 'pending',
     created_time: formatTime(normalizeDateValue(order.created_at)) || '时间待确认',
     item_summary: buildItemSummary(items),
     item_count_text: `${itemCount}件商品`,
@@ -158,7 +197,8 @@ Page({
     orders: [],
     errorMessage: '',
     page: 1,
-    pageSize: PAGE_SIZE
+    pageSize: PAGE_SIZE,
+    cancellingOrderId: ''
   },
 
   onReady() {
@@ -250,5 +290,51 @@ Page({
     wx.navigateTo({
       url: `/pages/user/order-detail/order-detail?order_id=${encodeURIComponent(orderId)}`
     })
+  },
+
+  confirmCancelOrder(event) {
+    const orderId = event.currentTarget.dataset.id
+
+    if (!orderId || this.data.cancellingOrderId) {
+      return
+    }
+
+    wx.showModal({
+      title: '确认取消订单？',
+      content: '订单取消后不可恢复，请确认是否取消。',
+      cancelText: '再想想',
+      confirmText: '确认取消',
+      confirmColor: '#e63b4a',
+      success: (res) => {
+        if (res.confirm) {
+          this.cancelOrder(orderId)
+        }
+      }
+    })
+  },
+
+  async cancelOrder(orderId) {
+    this.setData({
+      cancellingOrderId: orderId
+    })
+
+    try {
+      await callCancelUserOrder(orderId)
+      wx.showToast({
+        title: '订单已取消',
+        icon: 'success'
+      })
+      await this.loadOrders()
+    } catch (error) {
+      console.error('[order-list] cancel order failed:', error)
+      wx.showToast({
+        title: getCancelOrderErrorMessage(error),
+        icon: 'none'
+      })
+    } finally {
+      this.setData({
+        cancellingOrderId: ''
+      })
+    }
   }
 })

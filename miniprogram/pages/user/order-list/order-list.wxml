@@ -69,6 +69,17 @@
             <view class="order-count">{{item.item_count_text}}</view>
             <view class="order-total">{{item.total_amount_text}}</view>
           </view>
+
+          <view wx:if="{{item.can_cancel}}" class="order-card-actions">
+            <button
+              class="cancel-order-button {{cancellingOrderId === item.order_id ? 'is-loading' : ''}}"
+              data-id="{{item.order_id}}"
+              disabled="{{cancellingOrderId === item.order_id}}"
+              catchtap="confirmCancelOrder"
+            >
+              {{cancellingOrderId === item.order_id ? '取消中...' : '取消订单'}}
+            </button>
+          </view>
         </view>
       </view>
     </view>

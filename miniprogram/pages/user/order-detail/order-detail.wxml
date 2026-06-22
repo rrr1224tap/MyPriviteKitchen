@@ -49,6 +49,20 @@
           <view class="status-tag status-{{order.status_class}}">{{order.status_text}}</view>
         </view>
 
+        <view wx:if="{{order.can_cancel}}" class="order-action-panel glass-panel">
+          <view>
+            <view class="action-title">还未接单，可取消</view>
+            <view class="action-desc">取消后订单状态不可恢复</view>
+          </view>
+          <button
+            class="cancel-order-button {{cancelling ? 'is-loading' : ''}}"
+            disabled="{{cancelling}}"
+            bindtap="confirmCancelOrder"
+          >
+            {{cancelling ? '取消中...' : '取消订单'}}
+          </button>
+        </view>
+
         <view class="progress-panel glass-panel">
           <view class="section-head">
             <view>
