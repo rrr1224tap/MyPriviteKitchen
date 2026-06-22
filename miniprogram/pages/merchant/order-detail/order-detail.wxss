@@ -289,6 +289,19 @@ button::after {
   font-size: 21rpx;
 }
 
+.dish-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  margin-top: 8rpx;
+}
+
+.dish-option-line {
+  color: rgba(42, 33, 29, 0.58);
+  font-size: 20rpx;
+  line-height: 1.35;
+}
+
 .dish-side {
   flex: none;
   text-align: right;

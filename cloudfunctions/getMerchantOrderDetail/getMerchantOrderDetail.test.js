@@ -61,9 +61,34 @@ const ORDER_ITEMS = [
     dish_id: 'dish_001',
     dish_name: '招牌肥牛石锅拌饭',
     dish_image_url: '',
+    base_price_cent: 2990,
+    spec_delta_cent: 300,
+    addon_delta_cent: 200,
     unit_price_cent: 2990,
     quantity: 1,
     subtotal_cent: 2990,
+    selected_specs: [
+      {
+        group_id: 'size',
+        group_name: '规格',
+        option_id: 'large',
+        option_name: '大份',
+        price_delta_cent: 300
+      }
+    ],
+    selected_addons: [
+      {
+        group_id: 'extra',
+        group_name: '加料',
+        options: [
+          {
+            option_id: 'egg',
+            option_name: '加蛋',
+            price_delta_cent: 200
+          }
+        ]
+      }
+    ],
     created_at: new Date('2026-06-17T10:30:00.000Z')
   },
   {
@@ -150,6 +175,33 @@ test('active merchant staff can view own merchant order detail', async () => {
   assert.equal(result.data.order.total_amount_cent, 5580)
   assert.equal(result.data.items.length, 2)
   assert.equal(result.data.items[0].unit_price_cent, 2990)
+  assert.equal(result.data.items[0].base_price_cent, 2990)
+  assert.equal(result.data.items[0].spec_delta_cent, 300)
+  assert.equal(result.data.items[0].addon_delta_cent, 200)
+  assert.deepEqual(result.data.items[0].selected_specs, [
+    {
+      group_id: 'size',
+      group_name: '规格',
+      option_id: 'large',
+      option_name: '大份',
+      price_delta_cent: 300
+    }
+  ])
+  assert.deepEqual(result.data.items[0].selected_addons, [
+    {
+      group_id: 'extra',
+      group_name: '加料',
+      options: [
+        {
+          option_id: 'egg',
+          option_name: '加蛋',
+          price_delta_cent: 200
+        }
+      ]
+    }
+  ])
+  assert.deepEqual(result.data.items[1].selected_specs, [])
+  assert.deepEqual(result.data.items[1].selected_addons, [])
 })
 
 test('unauthorized user cannot view merchant order detail', async () => {
