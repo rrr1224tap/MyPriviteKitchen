@@ -28,7 +28,17 @@
   </view>
 
   <view class="detail-content">
-    <view class="dish-panel glass-panel">
+    <view wx:if="{{pageStatus === 'error'}}" class="detail-error-card glass-panel">
+      <view class="error-mark">!</view>
+      <view class="error-title">{{errorTitle}}</view>
+      <view class="error-desc">{{errorMessage}}</view>
+      <view class="error-actions">
+        <button wx:if="{{canRetry}}" class="error-button secondary" bindtap="retryLoad">重新加载</button>
+        <button class="error-button primary" bindtap="goToMenu">返回菜单</button>
+      </view>
+    </view>
+
+    <view wx:if="{{pageStatus !== 'error'}}" class="dish-panel glass-panel">
       <view class="dish-head">
         <view class="dish-title-wrap">
           <view class="dish-name">{{pageStatus === 'loading' ? '餐品加载中' : dish.name}}</view>
@@ -46,7 +56,7 @@
       <view class="fresh-note"><text></text>{{statusNotice}}</view>
     </view>
 
-    <view wx:if="{{specGroups.length}}" class="option-panel glass-panel">
+    <view wx:if="{{pageStatus !== 'error' && specGroups.length}}" class="option-panel glass-panel">
       <view class="option-panel-head">
         <view>
           <view class="section-kicker is-light">SPEC</view>
@@ -76,7 +86,7 @@
       </view>
     </view>
 
-    <view wx:if="{{addonGroups.length}}" class="option-panel warm-glass">
+    <view wx:if="{{pageStatus !== 'error' && addonGroups.length}}" class="option-panel warm-glass">
       <view class="option-panel-head">
         <view>
           <view class="section-kicker">ADD-ONS</view>
@@ -106,7 +116,7 @@
       </view>
     </view>
 
-    <view class="ingredient-panel warm-glass">
+    <view wx:if="{{pageStatus !== 'error'}}" class="ingredient-panel warm-glass">
       <view class="section-head">
         <view>
           <view class="section-kicker">INGREDIENTS</view>
@@ -122,7 +132,7 @@
       </view>
     </view>
 
-    <view class="quantity-panel glass-panel">
+    <view wx:if="{{pageStatus !== 'error'}}" class="quantity-panel glass-panel">
       <view>
         <view class="section-kicker is-light">QUANTITY</view>
         <view class="quantity-title">选择数量</view>
@@ -135,15 +145,15 @@
       </view>
     </view>
 
-    <view class="detail-spacer"></view>
+    <view wx:if="{{pageStatus !== 'error'}}" class="detail-spacer"></view>
   </view>
 
-  <view class="purchase-bar glass-panel">
+  <view wx:if="{{pageStatus !== 'error'}}" class="purchase-bar glass-panel">
     <view class="purchase-summary">
       <view class="purchase-label">合计</view>
       <view class="purchase-price">{{pageStatus === 'loading' ? '¥--' : totalPriceText}}</view>
     </view>
     <view class="purchase-count">{{quantity}} 份</view>
-    <button class="add-cart-button {{dish.is_sold_out ? 'is-disabled' : ''}}" bindtap="addToCart" disabled="{{pageStatus === 'loading'}}">{{dish.is_sold_out ? '已售罄' : '加入购物车'}}<text wx:if="{{!dish.is_sold_out}}">›</text></button>
+    <button class="add-cart-button {{pageStatus !== 'success' || dish.is_sold_out ? 'is-disabled' : ''}}" bindtap="addToCart" disabled="{{pageStatus !== 'success'}}">{{dish.is_sold_out ? '已售罄' : '加入购物车'}}<text wx:if="{{!dish.is_sold_out}}">›</text></button>
   </view>
 </view>

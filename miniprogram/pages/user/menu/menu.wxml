@@ -68,6 +68,14 @@
     </view>
   </view>
 
+  <view wx:if="{{usingFallback}}" class="fallback-notice dark-glass">
+    <view class="fallback-copy">
+      <view class="fallback-title">{{fallbackNoticeTitle}}</view>
+      <view class="fallback-desc">{{fallbackNoticeDesc}}</view>
+    </view>
+    <view class="fallback-retry" bindtap="retryLoad">重试</view>
+  </view>
+
   <view class="menu-body dark-glass">
     <scroll-view class="category-list" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
       <view
@@ -96,6 +104,13 @@
         <view class="empty-emblem">餐</view>
         <view class="empty-title">菜单加载中</view>
         <view class="empty-desc">正在读取门店餐品</view>
+      </view>
+
+      <view wx:elif="{{pageStatus === 'error'}}" class="empty-dishes">
+        <view class="empty-emblem">!</view>
+        <view class="empty-title">{{emptyTitle}}</view>
+        <view class="empty-desc">{{emptyDesc}}</view>
+        <button class="empty-action" bindtap="retryLoad">重新加载</button>
       </view>
 
       <view wx:elif="{{dishes.length}}" class="dish-items">

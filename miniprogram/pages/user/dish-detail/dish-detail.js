@@ -6,6 +6,13 @@ const FALLBACK_IMAGE = '/images/mock/home-glass-display.jpg'
 const FALLBACK_IMAGE_STYLE = 'width: 1120rpx; left: -318rpx; top: -126rpx;'
 const FALLBACK_INGREDIENTS = ['肥牛', '米饭', '时令蔬菜', '拌饭酱', '鸡蛋']
 const CART_STORAGE_KEY = STORAGE_KEYS.CART_ITEMS || 'cart_items'
+const DETAIL_ERROR_TEXT = {
+  title: '餐品信息加载失败',
+  missingId: '缺少餐品信息，请返回菜单重新选择',
+  loadFailed: '服务暂时不可用，请稍后重试',
+  notFound: '没有找到餐品信息，请返回菜单重新选择',
+  notReady: '餐品信息未加载成功，请返回菜单重新选择'
+}
 
 const FALLBACK_DISH = {
   _id: 'dish_002',
@@ -426,7 +433,11 @@ Page({
     navigationHeight: 44,
     pageStatus: 'loading',
     usingFallback: false,
+    dishId: '',
     statusNotice: '正在读取餐品详情',
+    errorTitle: '',
+    errorMessage: '',
+    canRetry: false,
     dish: getFallbackDish(),
     specGroups: [],
     addonGroups: [],
@@ -450,21 +461,37 @@ Page({
 
     this.setData({
       statusBarHeight,
-      navigationHeight
+      navigationHeight,
+      dishId
     })
 
     if (!dishId) {
-      this.useFallbackDish('缺少餐品ID，已展示示例餐品')
+      this.showErrorState({
+        message: DETAIL_ERROR_TEXT.missingId,
+        canRetry: false
+      })
       return
     }
 
     this.loadDishDetail(dishId)
   },
 
-  async loadDishDetail(dishId) {
+  async loadDishDetail(dishId = this.data.dishId) {
+    if (!dishId) {
+      this.showErrorState({
+        message: DETAIL_ERROR_TEXT.missingId,
+        canRetry: false
+      })
+      return
+    }
+
     this.setData({
       pageStatus: 'loading',
+      usingFallback: false,
       statusNotice: '正在读取餐品详情',
+      errorTitle: '',
+      errorMessage: '',
+      canRetry: false,
       imageAvailable: true
     })
 
@@ -473,10 +500,23 @@ Page({
         dish_id: dishId,
         merchant_id: DEFAULT_MERCHANT_ID
       })
-      const dish = decorateDish(detailData.dish, detailData)
+      const rawDish = detailData && detailData.dish
+
+      if (!rawDish) {
+        this.showErrorState({
+          message: DETAIL_ERROR_TEXT.notFound,
+          canRetry: false
+        })
+        return
+      }
+
+      const dish = decorateDish(rawDish, detailData)
 
       if (!dish.dish_id) {
-        this.useFallbackDish('没有找到餐品数据，已展示示例餐品', true, 'empty')
+        this.showErrorState({
+          message: DETAIL_ERROR_TEXT.notFound,
+          canRetry: false
+        })
         return
       }
 
@@ -485,6 +525,9 @@ Page({
       this.setData({
         pageStatus: 'success',
         usingFallback: false,
+        errorTitle: '',
+        errorMessage: '',
+        canRetry: false,
         statusNotice: '下单后现做，高峰期请耐心等待',
         dish,
         quantity: 1,
@@ -492,31 +535,52 @@ Page({
         ...selectionState
       })
     } catch (error) {
-      this.useFallbackDish('餐品详情加载失败，已展示示例餐品', false)
+      this.showErrorState({
+        message: DETAIL_ERROR_TEXT.loadFailed,
+        canRetry: true
+      })
     }
   },
 
-  useFallbackDish(message, shouldToast = true, pageStatus = 'error') {
-    const fallbackDish = getFallbackDish()
-    const selectionState = createSelectionState(fallbackDish)
-
+  showErrorState({ title = DETAIL_ERROR_TEXT.title, message, canRetry = false }) {
     this.setData({
-      pageStatus,
-      usingFallback: true,
+      pageStatus: 'error',
+      usingFallback: false,
       statusNotice: message,
-      dish: fallbackDish,
+      errorTitle: title,
+      errorMessage: message,
+      canRetry,
+      dish: null,
+      specGroups: [],
+      addonGroups: [],
+      selectedSpecMap: {},
+      selectedAddonMap: {},
+      selectedSpecs: [],
+      selectedAddons: [],
+      unitPriceCent: 0,
+      unitPriceText: formatMoney(0),
       quantity: 1,
-      totalPriceText: selectionState.unitPriceText,
-      imageAvailable: true,
-      ...selectionState
+      totalPriceText: formatMoney(0),
+      imageAvailable: false
     })
+  },
 
-    if (shouldToast) {
-      wx.showToast({
-        title: message,
-        icon: 'none'
+  retryLoad() {
+    if (!this.data.dishId) {
+      this.showErrorState({
+        message: DETAIL_ERROR_TEXT.missingId,
+        canRetry: false
       })
+      return
     }
+
+    this.loadDishDetail(this.data.dishId)
+  },
+
+  goToMenu() {
+    wx.reLaunch({
+      url: '/pages/user/menu/menu'
+    })
   },
 
   goBack() {
@@ -533,6 +597,13 @@ Page({
   },
 
   handleImageError() {
+    if (!this.data.dish) {
+      this.setData({
+        imageAvailable: false
+      })
+      return
+    }
+
     if (this.data.dish.image === FALLBACK_IMAGE) {
       this.setData({
         imageAvailable: false
@@ -555,6 +626,11 @@ Page({
 
   refreshOptionState(selectedSpecMap, selectedAddonMap) {
     const dish = this.data.dish
+
+    if (!dish || this.data.pageStatus !== 'success') {
+      return
+    }
+
     const selectedSpecs = buildSelectedSpecs(dish.spec_groups, selectedSpecMap)
     const selectedAddons = buildSelectedAddons(dish.addon_groups, selectedAddonMap)
     const unitPriceCent = dish.price_cent + sumSpecDelta(selectedSpecs) + sumAddonDelta(selectedAddons)
@@ -622,12 +698,24 @@ Page({
   },
 
   decreaseQuantity() {
+    if (this.data.pageStatus !== 'success') {
+      return
+    }
+
     if (this.data.quantity > 1) {
       this.updateQuantity(this.data.quantity - 1)
     }
   },
 
   increaseQuantity() {
+    if (this.data.pageStatus !== 'success' || !this.data.dish || !getDishId(this.data.dish)) {
+      wx.showToast({
+        title: DETAIL_ERROR_TEXT.notReady,
+        icon: 'none'
+      })
+      return
+    }
+
     if (this.data.dish.is_sold_out) {
       wx.showToast({
         title: '该餐品已售罄',
@@ -640,6 +728,13 @@ Page({
   },
 
   validateSelections() {
+    if (this.data.pageStatus !== 'success' || !this.data.dish) {
+      return {
+        valid: false,
+        message: DETAIL_ERROR_TEXT.notReady
+      }
+    }
+
     const missingSpec = this.data.specGroups.find((group) =>
       group.required && !this.data.selectedSpecMap[group.group_id]
     )
@@ -697,6 +792,14 @@ Page({
   },
 
   addToCart() {
+    if (this.data.pageStatus !== 'success' || !this.data.dish || !getDishId(this.data.dish)) {
+      wx.showToast({
+        title: DETAIL_ERROR_TEXT.notReady,
+        icon: 'none'
+      })
+      return
+    }
+
     if (this.data.dish.is_sold_out) {
       wx.showToast({
         title: '该餐品已售罄',

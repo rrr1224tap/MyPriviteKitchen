@@ -347,6 +347,8 @@ Page({
     allDishes: [],
     emptyTitle: '菜单加载中',
     emptyDesc: '正在读取门店餐品',
+    fallbackNoticeTitle: '',
+    fallbackNoticeDesc: '',
     cartCount: 0,
     cartAmountCent: 0,
     cartAmountText: formatMoney(0)
@@ -379,6 +381,9 @@ Page({
   async loadMenu() {
     this.setData({
       pageStatus: 'loading',
+      usingFallback: false,
+      fallbackNoticeTitle: '',
+      fallbackNoticeDesc: '',
       emptyTitle: '菜单加载中',
       emptyDesc: '正在读取门店餐品'
     })
@@ -391,17 +396,44 @@ Page({
 
       this.setData({
         ...menuState,
-        usingFallback: false
+        usingFallback: false,
+        fallbackNoticeTitle: '',
+        fallbackNoticeDesc: ''
       })
     } catch (error) {
       const fallbackState = buildMenuState(FALLBACK_MENU)
+      const hasFallbackMenu = fallbackState.categories.length && fallbackState.allDishes.length
+
+      if (!hasFallbackMenu) {
+        this.setData({
+          merchant: normalizeMerchant(FALLBACK_MENU.merchant),
+          categories: [],
+          categoryDishesMap: {},
+          allDishes: [],
+          activeCategory: '',
+          dishes: [],
+          pageStatus: 'error',
+          usingFallback: false,
+          fallbackNoticeTitle: '',
+          fallbackNoticeDesc: '',
+          emptyTitle: '菜单加载失败',
+          emptyDesc: '服务暂时不可用，请稍后重试'
+        })
+        return
+      }
 
       this.setData({
         ...fallbackState,
         pageStatus: 'success',
-        usingFallback: true
+        usingFallback: true,
+        fallbackNoticeTitle: '当前为示例菜单',
+        fallbackNoticeDesc: '实际菜单加载失败，可点击重试'
       })
     }
+  },
+
+  retryLoad() {
+    this.loadMenu()
   },
 
   refreshCartSummary() {
