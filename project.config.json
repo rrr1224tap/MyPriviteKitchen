@@ -19,7 +19,48 @@
   "compileType": "miniprogram",
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "miniprogram/design_refs"
+      },
+      {
+        "type": "folder",
+        "value": "design_refs"
+      },
+      {
+        "type": "folder",
+        "value": "ai-docs"
+      },
+      {
+        "type": "folder",
+        "value": ".agents"
+      },
+      {
+        "type": "folder",
+        "value": ".git"
+      },
+      {
+        "type": "folder",
+        "value": "cloudfunctions"
+      },
+      {
+        "type": "file",
+        "value": "*.md"
+      },
+      {
+        "type": "file",
+        "value": "*.test.js"
+      },
+      {
+        "type": "file",
+        "value": "*.map"
+      },
+      {
+        "type": "file",
+        "value": "*.log"
+      }
+    ],
     "include": []
   },
   "appid": "wx555d52f9864e2e8e",
