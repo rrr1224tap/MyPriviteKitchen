@@ -9,7 +9,7 @@
   <view class="background-shade"></view>
 
   <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
-    <view class="nav-back" bindtap="goBack">‹</view>
+    <view class="nav-back" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
     <view class="nav-title">商家订单</view>
   </view>
 
@@ -42,20 +42,20 @@
       </scroll-view>
 
       <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
-        <view class="state-mark">...</view>
+        <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-clock.svg" mode="aspectFit"></image></view>
         <view class="state-title">正在读取商家订单</view>
         <view class="state-desc">正在同步门店最新订单，请稍等</view>
       </view>
 
       <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
-        <view class="state-mark">!</view>
+        <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image></view>
         <view class="state-title">订单加载失败</view>
         <view class="state-desc">{{errorMessage}}</view>
         <button class="state-button" bindtap="retryLoad">重新加载</button>
       </view>
 
       <view wx:elif="{{pageStatus === 'empty'}}" class="state-card glass-panel">
-        <view class="state-mark">单</view>
+        <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-order.svg" mode="aspectFit"></image></view>
         <view class="state-title">{{emptyTitle}}</view>
         <view class="state-desc">{{emptyDesc}}</view>
       </view>

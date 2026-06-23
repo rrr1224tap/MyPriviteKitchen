@@ -81,3 +81,34 @@ page {
   color: #777777;
   font-size: 20rpx;
 }
+
+.nav-icon-image,
+.state-icon-image,
+.dish-fallback-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+.state-mark,
+.error-mark,
+.empty-emblem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-icon-image {
+  width: 34rpx;
+  height: 34rpx;
+}
+
+.state-icon-image {
+  width: 64rpx;
+  height: 64rpx;
+}
+
+.dish-fallback-icon {
+  width: 56rpx;
+  height: 56rpx;
+  opacity: 0.78;
+}

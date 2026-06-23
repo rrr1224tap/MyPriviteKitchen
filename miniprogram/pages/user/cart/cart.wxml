@@ -13,7 +13,7 @@
   </view>
 
   <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
-    <view class="back-button" bindtap="goBack">‹</view>
+    <view class="back-button" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
     <view class="nav-title">购物车</view>
     <view wx:if="{{items.length}}" class="clear-button {{submitting ? 'is-disabled' : ''}}" bindtap="clearCart">清空</view>
     <view wx:else class="nav-placeholder"></view>
@@ -81,7 +81,7 @@
       </view>
       <view class="pickup-options">
         <view class="pickup-option {{pickupType === 'pickup' ? 'is-active' : ''}} {{submitting ? 'is-disabled' : ''}}" data-type="pickup" bindtap="selectPickup">
-          <view class="pickup-icon">取</view>
+          <view class="pickup-icon"><image class="pickup-icon-image" src="/images/icons/icon-pickup.svg" mode="aspectFit"></image></view>
           <view>
             <view class="pickup-title">到店自提</view>
             <view class="pickup-desc">提前下单，到店即取</view>
@@ -89,7 +89,7 @@
           <view class="option-mark"></view>
         </view>
         <view class="pickup-option {{pickupType === 'dine' ? 'is-active' : ''}} {{submitting ? 'is-disabled' : ''}}" data-type="dine" bindtap="selectPickup">
-          <view class="pickup-icon is-dine">堂</view>
+          <view class="pickup-icon is-dine"><image class="pickup-icon-image" src="/images/icons/icon-dine.svg" mode="aspectFit"></image></view>
           <view>
             <view class="pickup-title">堂食点餐</view>
             <view class="pickup-desc">到店享用，热气上桌</view>
@@ -129,7 +129,7 @@
   </view>
 
   <view wx:else class="empty-state glass-panel">
-    <view class="empty-emblem"><text>餐</text></view>
+    <view class="empty-emblem"><image class="empty-icon-image" src="/images/icons/icon-empty-dish.svg" mode="aspectFit"></image></view>
     <view class="empty-title">购物车还是空的</view>
     <view class="empty-desc">去挑几份热气腾腾的好味吧</view>
     <button class="empty-button" bindtap="goToMenu">去点餐<text>→</text></button>

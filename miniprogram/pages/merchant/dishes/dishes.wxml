@@ -9,7 +9,7 @@
   <view class="background-shade"></view>
 
   <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
-    <view class="nav-back" bindtap="goBack">‹</view>
+    <view class="nav-back" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
     <view class="nav-title">餐品管理</view>
   </view>
 
@@ -49,20 +49,20 @@
       </scroll-view>
 
       <view wx:if="{{pageStatus === 'loading'}}" class="state-card warm-glass">
-        <view class="state-mark">等</view>
+        <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-clock.svg" mode="aspectFit"></image></view>
         <view class="state-title">正在加载餐品</view>
         <view class="state-desc">正在同步当前门店的餐品数据</view>
       </view>
 
       <view wx:elif="{{pageStatus === 'error'}}" class="state-card warm-glass">
-        <view class="state-mark">!</view>
+        <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image></view>
         <view class="state-title">餐品加载失败</view>
         <view class="state-desc">{{errorMessage}}</view>
         <button class="state-button" bindtap="retryLoad">重新加载</button>
       </view>
 
       <view wx:elif="{{pageStatus === 'empty'}}" class="state-card warm-glass">
-        <view class="state-mark">菜</view>
+        <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-dish.svg" mode="aspectFit"></image></view>
         <view class="state-title">还没有餐品</view>
         <view class="state-desc">先新增一个餐品，上架后会出现在用户点餐菜单中</view>
         <button class="state-button" bindtap="handleCreateTap" disabled="{{submitting}}">新增餐品</button>
@@ -76,7 +76,7 @@
         >
           <view class="dish-main">
             <image wx:if="{{item.image_url}}" class="dish-image" src="{{item.image_url}}" mode="aspectFill" />
-            <view wx:else class="dish-image dish-image-fallback">餐</view>
+            <view wx:else class="dish-image dish-image-fallback"><image class="dish-fallback-icon" src="/images/icons/icon-empty-dish.svg" mode="aspectFit"></image></view>
             <view class="dish-copy">
               <view class="dish-head">
                 <view class="dish-name">{{item.name}}</view>

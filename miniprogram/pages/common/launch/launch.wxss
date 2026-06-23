@@ -529,3 +529,48 @@
   color: #ffffff;
   box-shadow: 0 8rpx 18rpx rgba(213, 45, 50, 0.26);
 }
+
+.ui-icon,
+.entry-icon-image,
+.order-icon-image,
+.service-icon-image,
+.tab-icon-image {
+  display: block;
+}
+
+.entry-icon-image {
+  width: 42rpx;
+  height: 42rpx;
+}
+
+.order-icon-image {
+  width: 40rpx;
+  height: 40rpx;
+}
+
+.service-icon-image {
+  width: 34rpx;
+  height: 34rpx;
+  margin-right: 8rpx;
+}
+
+.tab-icon {
+  width: 52rpx;
+  height: 44rpx;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tab-icon-image {
+  width: 42rpx;
+  height: 42rpx;
+}
+
+.tab-item.is-active .tab-icon {
+  border-color: transparent;
+  background: transparent;
+  color: #d52d32;
+  box-shadow: none;
+}

@@ -17,7 +17,7 @@
     <view class="hero-shade"></view>
 
     <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
-      <view class="back-button" bindtap="goBack">‹</view>
+      <view class="back-button" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
       <view class="nav-title">餐品详情</view>
       <view class="nav-placeholder"></view>
     </view>
@@ -29,7 +29,7 @@
 
   <view class="detail-content">
     <view wx:if="{{pageStatus === 'error'}}" class="detail-error-card glass-panel">
-      <view class="error-mark">!</view>
+      <view class="error-mark"><image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image></view>
       <view class="error-title">{{errorTitle}}</view>
       <view class="error-desc">{{errorMessage}}</view>
       <view class="error-actions">

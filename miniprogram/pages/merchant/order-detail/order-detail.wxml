@@ -9,20 +9,20 @@
   <view class="background-shade"></view>
 
   <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
-    <view class="nav-back" bindtap="goBack">‹</view>
+    <view class="nav-back" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
     <view class="nav-title">商家订单详情</view>
   </view>
 
   <scroll-view class="detail-scroll" scroll-y enhanced show-scrollbar="{{false}}">
     <view class="detail-content {{order && order.has_action ? 'has-action' : ''}}" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
       <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
-        <view class="state-mark">...</view>
+        <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-clock.svg" mode="aspectFit"></image></view>
         <view class="state-title">正在读取订单详情</view>
         <view class="state-desc">正在同步订单信息和商品明细</view>
       </view>
 
       <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
-        <view class="state-mark">!</view>
+        <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image></view>
         <view class="state-title">订单详情加载失败</view>
         <view class="state-desc">{{errorMessage}}</view>
         <view class="state-actions">
@@ -32,7 +32,7 @@
       </view>
 
       <view wx:elif="{{pageStatus === 'empty'}}" class="state-card glass-panel">
-        <view class="state-mark">单</view>
+        <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-order.svg" mode="aspectFit"></image></view>
         <view class="state-title">没有找到订单</view>
         <view class="state-desc">请返回商家订单列表，选择有效订单查看</view>
         <button class="state-button" bindtap="goBack">返回订单列表</button>

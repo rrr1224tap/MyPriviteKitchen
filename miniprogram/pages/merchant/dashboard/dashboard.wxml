@@ -9,7 +9,7 @@
   <view class="background-shade"></view>
 
   <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
-    <view class="nav-back" bindtap="goBack">‹</view>
+    <view class="nav-back" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
     <view class="nav-title">商家工作台</view>
   </view>
 
@@ -24,7 +24,7 @@
     </view>
 
     <view class="entry-card warm-glass" bindtap="goToOrders">
-      <view class="entry-icon">单</view>
+      <view class="entry-icon"><image class="entry-icon-image" src="/images/icons/icon-merchant-orders.svg" mode="aspectFit"></image></view>
       <view class="entry-copy">
         <view class="entry-title">进入商家订单</view>
         <view class="entry-desc">查看订单列表，处理待接单、制作中和已完成订单</view>
@@ -33,7 +33,7 @@
     </view>
 
     <view class="entry-card warm-glass" bindtap="goToCategories">
-      <view class="entry-icon">类</view>
+      <view class="entry-icon"><image class="entry-icon-image" src="/images/icons/icon-category.svg" mode="aspectFit"></image></view>
       <view class="entry-copy">
         <view class="entry-title">分类管理</view>
         <view class="entry-desc">新增、编辑、停用分类，并调整点餐页展示顺序</view>
@@ -42,7 +42,7 @@
     </view>
 
     <view class="entry-card warm-glass" bindtap="goToDishes">
-      <view class="entry-icon">菜</view>
+      <view class="entry-icon"><image class="entry-icon-image" src="/images/icons/icon-dish.svg" mode="aspectFit"></image></view>
       <view class="entry-copy">
         <view class="entry-title">餐品管理</view>
         <view class="entry-desc">维护餐品信息、价格、上下架和展示顺序</view>

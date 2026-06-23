@@ -43,13 +43,13 @@
 
     <view class="entry-row">
       <view class="entry-card dine-card glass-light" bindtap="goToMenu">
-        <view class="entry-icon dine-icon"><text class="icon-dome">餐</text></view>
+        <view class="entry-icon dine-icon"><image class="ui-icon entry-icon-image" src="/images/icons/icon-dine.svg" mode="aspectFit"></image></view>
         <view class="entry-title">堂食点餐</view>
         <view class="entry-desc">到店即点，热气上桌</view>
         <view class="entry-arrow">→</view>
       </view>
       <view class="entry-card pickup-card glass-light" bindtap="goToMenu">
-        <view class="entry-icon pickup-icon"><text>取</text></view>
+        <view class="entry-icon pickup-icon"><image class="ui-icon entry-icon-image" src="/images/icons/icon-pickup.svg" mode="aspectFit"></image></view>
         <view class="entry-title">到店自提</view>
         <view class="entry-desc">提前下单，免排队</view>
         <view class="entry-arrow">→</view>
@@ -57,7 +57,7 @@
     </view>
 
     <view class="order-entry glass-light" bindtap="goToOrders">
-      <view class="order-icon">单</view>
+      <view class="order-icon"><image class="ui-icon order-icon-image" src="/images/icons/icon-order-active.svg" mode="aspectFit"></image></view>
       <view class="order-copy">
         <view class="entry-title">我的订单</view>
         <view class="entry-desc">查看制作进度与历史订单</view>
@@ -66,9 +66,9 @@
     </view>
 
     <view class="service-strip glass-light">
-      <view class="service-item"><text class="service-icon">时</text>营业时间 10:30 - 21:30</view>
+      <view class="service-item"><image class="service-icon-image" src="/images/icons/icon-clock.svg" mode="aspectFit"></image>营业时间 10:30 - 21:30</view>
       <view class="service-divider"></view>
-      <view class="service-item"><text class="service-icon">店</text>门店现做 · 支持自提</view>
+      <view class="service-item"><image class="service-icon-image" src="/images/icons/icon-store.svg" mode="aspectFit"></image>门店现做 · 支持自提</view>
     </view>
 
     <view class="merchant-entry" bindtap="goToMerchant">商家工作台</view>
@@ -76,19 +76,19 @@
 
   <view class="premium-tabbar glass-light">
     <view class="tab-item is-active">
-      <view class="tab-icon">首</view>
+      <view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-home-active.svg" mode="aspectFit"></image></view>
       <view>首页</view>
     </view>
     <view class="tab-item" bindtap="goToMenu">
-      <view class="tab-icon">餐</view>
+      <view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-bowl.svg" mode="aspectFit"></image></view>
       <view>点餐</view>
     </view>
     <view class="tab-item" bindtap="goToOrders">
-      <view class="tab-icon">单</view>
+      <view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-order.svg" mode="aspectFit"></image></view>
       <view>订单</view>
     </view>
     <view class="tab-item" bindtap="goToMerchant">
-      <view class="tab-icon">我</view>
+      <view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-user.svg" mode="aspectFit"></image></view>
       <view>我的</view>
     </view>
   </view>
