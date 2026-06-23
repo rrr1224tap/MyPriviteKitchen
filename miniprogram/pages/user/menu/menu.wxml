@@ -131,7 +131,7 @@
 
   <view class="cart-bar dark-glass" bindtap="goToCart">
     <view class="cart-icon-wrap">
-      <view class="cart-icon"><image class="cart-icon-image" src="/images/icons/icon-cart.svg" mode="aspectFit"></image></view>
+      <view class="cart-icon"><image class="cart-icon-image" src="/images/ui-icons/cart.png" mode="aspectFit"></image></view>
       <view class="cart-count">{{cartCount}}</view>
     </view>
     <view class="cart-summary">
@@ -143,8 +143,8 @@
   </view>
 
   <view class="menu-tabbar dark-glass">
-    <view class="tab-item" bindtap="goHome"><view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-home.svg" mode="aspectFit"></image></view><view>首页</view></view>
-    <view class="tab-item is-active"><view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-bowl-active.svg" mode="aspectFit"></image></view><view>点餐</view></view>
-    <view class="tab-item" bindtap="goToOrders"><view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-order.svg" mode="aspectFit"></image></view><view>订单</view></view>
+    <view class="tab-item" bindtap="goHome"><view class="tab-icon"><image class="tab-icon-image" src="/images/ui-icons/tab-home.png" mode="aspectFit"></image></view><view>首页</view></view>
+    <view class="tab-item is-active"><view class="tab-icon"><image class="tab-icon-image" src="/images/ui-icons/tab-menu.png" mode="aspectFit"></image></view><view>点餐</view></view>
+    <view class="tab-item" bindtap="goToOrders"><view class="tab-icon"><image class="tab-icon-image" src="/images/ui-icons/tab-order.png" mode="aspectFit"></image></view><view>订单</view></view>
   </view>
 </view>

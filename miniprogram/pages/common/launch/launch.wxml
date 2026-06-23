@@ -10,6 +10,12 @@
         mode="widthFix"
         binderror="handleHomeImageError"
       ></image>
+      <image
+        wx:else
+        class="hero-food-placeholder"
+        src="/images/placeholders/food-placeholder.svg"
+        mode="aspectFit"
+      ></image>
     </view>
     <view class="hero-vignette"></view>
 
@@ -22,77 +28,154 @@
         <view class="brand-cn">小厨食堂</view>
         <view class="brand-en">XIAO CHU · KITCHEN</view>
       </view>
-      <view class="hero-kicker"><text class="kicker-line"></text>今日主推 · 热气上桌</view>
-      <view class="hero-title">招牌肥牛<text>石锅拌饭</text></view>
-      <view class="hero-desc">现炒好味，认真对待每一碗热饭</view>
+      <view class="hero-desc">现炒现做 · <text>锅气十足</text> · 每一碗都很用心</view>
+      <view class="hero-status-row">
+        <view class="hero-status-pill hero-status-open"><text class="status-dot"></text>营业中</view>
+        <view class="hero-status-pill">
+          <image class="status-icon" src="/images/icons/icon-clock.svg" mode="aspectFit"></image>
+          <text>10:30-21:30</text>
+        </view>
+      </view>
       <button class="hero-button" bindtap="goToMenu">
         <text>立即点餐</text>
-        <text class="button-arrow">→</text>
       </button>
     </view>
   </view>
 
   <view class="home-content">
-    <view class="section-heading">
-      <view>
-        <view class="section-title">今天怎么吃</view>
-        <view class="section-subtitle">选择你的用餐方式</view>
-      </view>
-      <view class="open-pill"><text></text>营业中</view>
-    </view>
-
     <view class="entry-row">
       <view class="entry-card dine-card glass-light" bindtap="goToMenu">
-        <view class="entry-icon dine-icon"><image class="ui-icon entry-icon-image" src="/images/icons/icon-dine.svg" mode="aspectFit"></image></view>
-        <view class="entry-title">堂食点餐</view>
-        <view class="entry-desc">到店即点，热气上桌</view>
-        <view class="entry-arrow">→</view>
+        <view class="entry-icon dine-icon">
+          <image class="ui-icon entry-icon-image" src="/images/ui-icons/home-eat.png" mode="aspectFit"></image>
+        </view>
+        <view class="entry-title">回家吃饭</view>
+        <view class="entry-desc">我今天必须吃到</view>
       </view>
       <view class="entry-card pickup-card glass-light" bindtap="goToMenu">
-        <view class="entry-icon pickup-icon"><image class="ui-icon entry-icon-image" src="/images/icons/icon-pickup.svg" mode="aspectFit"></image></view>
-        <view class="entry-title">到店自提</view>
-        <view class="entry-desc">提前下单，免排队</view>
-        <view class="entry-arrow">→</view>
+        <view class="entry-icon pickup-icon">
+          <image class="ui-icon entry-icon-image" src="/images/ui-icons/work-lunch.png" mode="aspectFit"></image>
+        </view>
+        <view class="entry-title">上班带饭</view>
+        <view class="entry-desc">明天上班吃点啥</view>
+      </view>
+      <view class="entry-card order-card-entry glass-light" bindtap="goToOrders">
+        <view class="entry-icon order-entry-icon">
+          <image class="ui-icon entry-icon-image" src="/images/ui-icons/my-meal.png" mode="aspectFit"></image>
+        </view>
+        <view class="entry-title">我的饭呢！</view>
+        <view class="entry-desc">咋还没做好</view>
       </view>
     </view>
 
-    <view class="order-entry glass-light" bindtap="goToOrders">
-      <view class="order-icon"><image class="ui-icon order-icon-image" src="/images/icons/icon-order-active.svg" mode="aspectFit"></image></view>
-      <view class="order-copy">
-        <view class="entry-title">我的订单</view>
-        <view class="entry-desc">查看制作进度与历史订单</view>
+    <view class="recommend-section">
+      <view class="recommend-head">
+        <view>
+          <view class="recommend-title">
+            <image class="recommend-title-icon" src="/images/ui-icons/wok-cook.png" mode="aspectFit"></image>
+            <text>小厨推荐</text>
+          </view>
+          <view class="recommend-subtitle">厨师今天想吃</view>
+        </view>
+        <view class="recommend-more" bindtap="goToMenu">查看更多</view>
       </view>
-      <view class="order-arrow">→</view>
+
+      <view class="recommend-row">
+        <view class="recommend-card glass-light" bindtap="goToMenu">
+          <view class="recommend-image-wrap">
+            <image wx:if="{{homeImageAvailable}}" class="recommend-image recommend-image-one" src="{{homeReference}}" mode="widthFix"></image>
+            <image wx:else class="recommend-image-placeholder" src="/images/placeholders/food-placeholder.svg" mode="aspectFit"></image>
+            <view class="recommend-badge recommend-badge-red">招牌</view>
+          </view>
+          <view class="recommend-name">招牌肥牛石锅拌饭</view>
+          <view class="recommend-desc">肥牛鲜嫩 · 锅气十足</view>
+          <view class="recommend-bottom">
+            <text class="recommend-price">¥29.90</text>
+            <view class="recommend-add">+</view>
+          </view>
+        </view>
+
+        <view class="recommend-card glass-light" bindtap="goToMenu">
+          <view class="recommend-image-wrap">
+            <image wx:if="{{homeImageAvailable}}" class="recommend-image recommend-image-two" src="{{homeReference}}" mode="widthFix"></image>
+            <image wx:else class="recommend-image-placeholder" src="/images/placeholders/food-placeholder.svg" mode="aspectFit"></image>
+            <view class="recommend-badge recommend-badge-orange">人气</view>
+          </view>
+          <view class="recommend-name">黑椒牛肉饭</view>
+          <view class="recommend-desc">黑椒浓郁 · 香气扑鼻</view>
+          <view class="recommend-bottom">
+            <text class="recommend-price">¥26.90</text>
+            <view class="recommend-add">+</view>
+          </view>
+        </view>
+
+        <view class="recommend-card glass-light" bindtap="goToMenu">
+          <view class="recommend-image-wrap">
+            <image wx:if="{{homeImageAvailable}}" class="recommend-image recommend-image-three" src="{{homeReference}}" mode="widthFix"></image>
+            <image wx:else class="recommend-image-placeholder" src="/images/placeholders/food-placeholder.svg" mode="aspectFit"></image>
+            <view class="recommend-badge recommend-badge-green">新品</view>
+          </view>
+          <view class="recommend-name">宫保鸡丁饭</view>
+          <view class="recommend-desc">酸甜微辣 · 下饭必点</view>
+          <view class="recommend-bottom">
+            <text class="recommend-price">¥24.90</text>
+            <view class="recommend-add">+</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="recommend-dots">
+        <view class="recommend-dot is-active"></view>
+        <view class="recommend-dot"></view>
+        <view class="recommend-dot"></view>
+      </view>
     </view>
 
     <view class="service-strip glass-light">
-      <view class="service-item"><image class="service-icon-image" src="/images/icons/icon-clock.svg" mode="aspectFit"></image>营业时间 10:30 - 21:30</view>
+      <view class="service-item">
+        <image class="service-icon-image service-icon-fresh" src="/images/ui-icons/fresh-food.png" mode="aspectFit"></image>
+        <view>
+          <view class="service-title">食材新鲜</view>
+          <view class="service-desc">每日新鲜配送</view>
+        </view>
+      </view>
       <view class="service-divider"></view>
-      <view class="service-item"><image class="service-icon-image" src="/images/icons/icon-store.svg" mode="aspectFit"></image>门店现做 · 支持自提</view>
+      <view class="service-item">
+        <image class="service-icon-image service-icon-cook" src="/images/ui-icons/wok-cook.png" mode="aspectFit"></image>
+        <view>
+          <view class="service-title">现炒现做</view>
+          <view class="service-desc">锅气十足</view>
+        </view>
+      </view>
     </view>
 
     <view wx:if="{{showMerchantEntry}}" class="merchant-entry glass-light" bindtap="goToMerchant">
-      <view class="merchant-entry-icon"><image class="merchant-entry-icon-image" src="/images/icons/icon-merchant-orders.svg" mode="aspectFit"></image></view>
+      <view class="merchant-entry-icon">
+        <image class="merchant-entry-icon-image" src="/images/icons/icon-merchant-orders.svg" mode="aspectFit"></image>
+      </view>
       <view class="merchant-entry-copy">
         <view class="merchant-entry-title">商家工作台</view>
         <view class="merchant-entry-desc">管理订单与商品</view>
       </view>
-      <view class="merchant-entry-arrow">→</view>
     </view>
-
   </view>
 
   <view class="premium-tabbar glass-light">
     <view class="tab-item is-active">
-      <view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-home-active.svg" mode="aspectFit"></image></view>
+      <view class="tab-icon">
+        <image class="tab-icon-image" src="/images/ui-icons/tab-home.png" mode="aspectFit"></image>
+      </view>
       <view>首页</view>
     </view>
     <view class="tab-item" bindtap="goToMenu">
-      <view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-bowl.svg" mode="aspectFit"></image></view>
+      <view class="tab-icon">
+        <image class="tab-icon-image" src="/images/ui-icons/tab-menu.png" mode="aspectFit"></image>
+      </view>
       <view>点餐</view>
     </view>
     <view class="tab-item" bindtap="goToOrders">
-      <view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-order.svg" mode="aspectFit"></image></view>
+      <view class="tab-icon">
+        <image class="tab-icon-image" src="/images/ui-icons/tab-order.png" mode="aspectFit"></image>
+      </view>
       <view>订单</view>
     </view>
   </view>

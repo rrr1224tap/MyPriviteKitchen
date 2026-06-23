@@ -4,7 +4,7 @@ Page({
   data: {
     statusBarHeight: 20,
     navigationHeight: 44,
-    homeReference: '/images/mock/home-glass-display.jpg',
+    homeReference: '/images/home/home-hero-bibimbap.jpg',
     homeImageAvailable: true,
     showMerchantEntry: false
   },
