@@ -1,13 +1,13 @@
 page {
   min-height: 100%;
-  background: #211815;
+  background: #fbf3ea;
 }
 
 button {
   margin: 0;
   padding: 0;
-  background: transparent;
   border: 0;
+  background: transparent;
   line-height: 1;
 }
 
@@ -19,11 +19,11 @@ button::after {
   position: relative;
   min-height: 100vh;
   overflow: hidden;
-  color: #f9efe4;
+  color: #2b211b;
   background:
-    radial-gradient(circle at 16% 0%, rgba(230, 59, 74, 0.22), transparent 34%),
-    radial-gradient(circle at 84% 8%, rgba(255, 202, 128, 0.18), transparent 30%),
-    linear-gradient(180deg, #2a1d18 0%, #16100e 52%, #f3e8dc 100%);
+    radial-gradient(circle at 16% 0%, rgba(255, 255, 255, 0.94), transparent 270rpx),
+    radial-gradient(circle at 88% 4%, rgba(255, 214, 162, 0.28), transparent 360rpx),
+    linear-gradient(180deg, #fff7ed 0%, #f7efe6 55%, #fbf6ef 100%);
 }
 
 .background-image-window {
@@ -31,25 +31,25 @@ button::after {
   top: 0;
   left: 0;
   width: 100%;
-  height: 58vh;
-  opacity: 0.24;
-  filter: blur(1px);
+  height: 52vh;
+  opacity: 0.08;
+  filter: blur(8rpx) saturate(1.04);
 }
 
 .background-shade {
   position: fixed;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(20, 13, 10, 0.68) 0%, rgba(26, 18, 15, 0.54) 34%, rgba(243, 232, 220, 0.97) 100%),
-    radial-gradient(circle at 50% 42%, rgba(255, 229, 188, 0.18), transparent 42%);
+    linear-gradient(180deg, rgba(255, 249, 241, 0.92) 0%, rgba(247, 239, 230, 0.86) 46%, rgba(251, 246, 239, 0.98) 100%),
+    radial-gradient(circle at 50% 18%, rgba(255, 206, 145, 0.24), transparent 44%);
 }
 
 .custom-nav {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
   z-index: 20;
+  top: 0;
+  right: 0;
+  left: 0;
   box-sizing: content-box;
   display: flex;
   align-items: center;
@@ -59,8 +59,8 @@ button::after {
 
 .nav-back {
   position: absolute;
-  left: 32rpx;
   bottom: 10rpx;
+  left: 32rpx;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -70,23 +70,26 @@ button::after {
   max-width: 58rpx;
   height: 58rpx;
   padding: 0;
+  border: 1rpx solid rgba(255, 255, 255, 0.88);
   border-radius: 50%;
-  color: #fff6ea;
-  font-size: 46rpx;
-  font-weight: 300;
-  line-height: 1;
-  text-align: center;
+  background: rgba(255, 250, 244, 0.72);
+  box-shadow: 0 12rpx 28rpx rgba(126, 90, 45, 0.12), inset 0 1rpx 0 rgba(255, 255, 255, 0.94);
   pointer-events: auto;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1rpx solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 12rpx 28rpx rgba(0, 0, 0, 0.18);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  backdrop-filter: blur(18px) saturate(145%);
+}
+
+.nav-icon-image {
+  display: block;
+  width: 34rpx;
+  height: 34rpx;
 }
 
 .nav-title {
   margin-bottom: 16rpx;
-  color: #fff3dc;
+  color: #2b211b;
   font-size: 30rpx;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
@@ -101,10 +104,14 @@ button::after {
 }
 
 .glass-panel {
-  background: rgba(255, 255, 255, 0.14);
-  border: 1rpx solid rgba(255, 255, 255, 0.24);
-  box-shadow: 0 18rpx 42rpx rgba(54, 24, 15, 0.18);
-  backdrop-filter: blur(18px);
+  border: 1rpx solid rgba(255, 255, 255, 0.92);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(255, 248, 238, 0.64));
+  box-shadow:
+    0 20rpx 56rpx rgba(126, 90, 45, 0.13),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.95),
+    inset 0 -18rpx 42rpx rgba(255, 226, 191, 0.1);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
 }
 
 .merchant-hero {
@@ -112,43 +119,44 @@ button::after {
   align-items: center;
   justify-content: space-between;
   gap: 24rpx;
-  padding: 28rpx;
+  padding: 30rpx;
   border-radius: 34rpx;
-  background: rgba(62, 39, 30, 0.74);
 }
 
 .hero-kicker {
-  color: rgba(255, 222, 169, 0.86);
+  color: #ef5a32;
   font-size: 20rpx;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 1rpx;
 }
 
 .hero-title {
-  margin-top: 8rpx;
-  color: #fff8ec;
+  margin-top: 10rpx;
+  color: #2b211b;
   font-size: 42rpx;
   font-weight: 900;
 }
 
 .hero-desc {
-  margin-top: 8rpx;
-  color: rgba(255, 246, 230, 0.72);
+  margin-top: 10rpx;
+  color: #7a6a5e;
   font-size: 23rpx;
+  line-height: 1.45;
 }
 
 .hero-badge {
-  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 86rpx;
   height: 86rpx;
+  flex-shrink: 0;
   border-radius: 50%;
+  background: linear-gradient(145deg, #ff9b39 0%, #ff6b2c 100%);
+  box-shadow: 0 14rpx 30rpx rgba(240, 120, 34, 0.22), inset 0 2rpx 4rpx rgba(255, 255, 255, 0.28);
   color: #fff7ed;
   font-size: 24rpx;
   font-weight: 800;
-  background: linear-gradient(135deg, #ff6a72 0%, #e63b4a 100%);
-  box-shadow: 0 14rpx 30rpx rgba(230, 59, 74, 0.3);
 }
 
 .filter-scroll {
@@ -164,27 +172,27 @@ button::after {
 }
 
 .filter-tab {
-  flex-shrink: 0;
-  box-sizing: border-box;
   min-width: 116rpx;
   height: 64rpx;
+  flex-shrink: 0;
+  box-sizing: border-box;
   padding: 0 24rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
   border-radius: 999rpx;
-  color: rgba(255, 246, 230, 0.78);
+  background: rgba(255, 250, 244, 0.72);
+  box-shadow: 0 10rpx 22rpx rgba(126, 90, 45, 0.08), inset 0 1rpx 0 rgba(255, 255, 255, 0.9);
+  color: #7a6a5e;
   font-size: 24rpx;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 64rpx;
   text-align: center;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1rpx solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 10rpx 22rpx rgba(0, 0, 0, 0.08);
 }
 
 .filter-tab.active {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: linear-gradient(145deg, #ff6640 0%, #ef3f38 100%);
+  box-shadow: 0 14rpx 28rpx rgba(226, 49, 37, 0.22), inset 0 2rpx 4rpx rgba(255, 255, 255, 0.28);
   color: #fff7ed;
-  background: linear-gradient(135deg, #ff6a72 0%, #e63b4a 100%);
-  border-color: rgba(255, 255, 255, 0.24);
-  box-shadow: 0 14rpx 28rpx rgba(230, 59, 74, 0.3);
 }
 
 .state-card {
@@ -192,51 +200,55 @@ button::after {
   padding: 88rpx 40rpx;
   border-radius: 34rpx;
   text-align: center;
-  background: rgba(255, 249, 240, 0.8);
-  color: #2c211d;
 }
 
 .state-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 92rpx;
   height: 92rpx;
   margin: 0 auto 22rpx;
-  border-radius: 50%;
-  color: #e63b4a;
-  font-size: 30rpx;
-  font-weight: 800;
-  line-height: 92rpx;
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: inset 0 0 0 1rpx rgba(230, 59, 74, 0.12);
+  border-radius: 32rpx;
+  background: linear-gradient(145deg, rgba(255, 111, 72, 0.14), rgba(255, 255, 255, 0.5));
+}
+
+.state-icon-image {
+  display: block;
+  width: 44rpx;
+  height: 44rpx;
 }
 
 .state-title {
   color: #2a211d;
   font-size: 32rpx;
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .state-desc {
-  margin: 14rpx auto 0;
   max-width: 500rpx;
-  color: rgba(42, 33, 29, 0.58);
+  margin: 14rpx auto 0;
+  color: #7a6a5e;
   font-size: 24rpx;
   line-height: 1.55;
 }
 
 .state-button {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 156rpx;
   height: 64rpx;
   margin-top: 28rpx;
   padding: 0 26rpx;
   border-radius: 999rpx;
+  background: linear-gradient(145deg, #ff6640 0%, #ef3f38 100%);
+  box-shadow: 0 14rpx 28rpx rgba(226, 49, 37, 0.22);
   color: #fff7ed;
   font-size: 24rpx;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 64rpx;
   text-align: center;
-  background: linear-gradient(135deg, #ff6a72 0%, #e63b4a 100%);
-  box-shadow: 0 14rpx 28rpx rgba(230, 59, 74, 0.34);
 }
 
 .order-list {
@@ -248,10 +260,8 @@ button::after {
 
 .order-card {
   padding: 26rpx;
-  border-radius: 30rpx;
-  background: rgba(255, 250, 244, 0.86);
+  border-radius: 32rpx;
   color: #2a211d;
-  box-shadow: 0 18rpx 38rpx rgba(68, 36, 23, 0.12);
 }
 
 .order-card-head,
@@ -265,21 +275,25 @@ button::after {
 .order-no {
   color: #2a211d;
   font-size: 27rpx;
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .order-time {
   margin-top: 8rpx;
-  color: rgba(42, 33, 29, 0.5);
+  color: #8a7668;
   font-size: 22rpx;
 }
 
 .status-tag {
+  min-height: 46rpx;
   flex-shrink: 0;
+  box-sizing: border-box;
   padding: 10rpx 18rpx;
   border-radius: 999rpx;
   font-size: 22rpx;
   font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .status-pending {
@@ -288,13 +302,13 @@ button::after {
 }
 
 .status-accepted {
-  color: #2f72cf;
-  background: #e8f1ff;
+  color: #df4133;
+  background: #ffe9e5;
 }
 
 .status-cooking {
-  color: #e63b4a;
-  background: #ffe8ec;
+  color: #f07822;
+  background: #fff0dd;
 }
 
 .status-finished {
@@ -303,18 +317,18 @@ button::after {
 }
 
 .status-cancelled {
-  color: #777;
-  background: #eeeeee;
+  color: #9a6f6a;
+  background: #f1e8e5;
 }
 
 .order-summary {
   margin-top: 24rpx;
   padding: 22rpx 24rpx;
   border-radius: 22rpx;
-  color: rgba(42, 33, 29, 0.76);
+  background: rgba(255, 255, 255, 0.52);
+  color: #69574c;
   font-size: 24rpx;
   line-height: 1.45;
-  background: rgba(255, 255, 255, 0.58);
 }
 
 .order-remark {
@@ -323,15 +337,15 @@ button::after {
   margin-top: 18rpx;
   padding: 18rpx 22rpx;
   border-radius: 20rpx;
-  color: rgba(42, 33, 29, 0.7);
+  background: rgba(230, 59, 74, 0.08);
+  color: #6d584a;
   font-size: 23rpx;
   line-height: 1.45;
-  background: rgba(230, 59, 74, 0.08);
 }
 
 .remark-label {
   flex-shrink: 0;
-  color: #e63b4a;
+  color: #ef3f38;
   font-weight: 800;
 }
 
@@ -341,7 +355,7 @@ button::after {
 
 .order-count,
 .order-total-label {
-  color: rgba(42, 33, 29, 0.5);
+  color: #8a7668;
   font-size: 23rpx;
 }
 
@@ -351,7 +365,7 @@ button::after {
 }
 
 .order-total {
-  color: #e63b4a;
+  color: #ef3f38;
   font-size: 34rpx;
   font-weight: 900;
 }
@@ -363,39 +377,36 @@ button::after {
   gap: 14rpx;
   margin-top: 24rpx;
   padding-top: 22rpx;
-  border-top: 1rpx solid rgba(42, 33, 29, 0.08);
+  border-top: 1rpx solid rgba(126, 90, 45, 0.12);
 }
 
 .action-button {
   min-width: 188rpx;
   height: 68rpx;
+  box-sizing: border-box;
   padding: 0 30rpx;
   border-radius: 999rpx;
+  background: linear-gradient(145deg, #ff6640 0%, #ef3f38 100%);
+  box-shadow: 0 14rpx 28rpx rgba(226, 49, 37, 0.22);
   color: #fff7ed;
   font-size: 25rpx;
   font-weight: 800;
   line-height: 68rpx;
   text-align: center;
-  background: linear-gradient(135deg, #ff6a72 0%, #e63b4a 100%);
-  box-shadow: 0 14rpx 28rpx rgba(230, 59, 74, 0.3);
 }
 
 .action-button.is-danger {
+  border: 1rpx solid rgba(201, 49, 60, 0.16);
+  background: rgba(255, 250, 244, 0.78);
+  box-shadow: 0 10rpx 22rpx rgba(126, 90, 45, 0.08), inset 0 1rpx 0 rgba(255, 255, 255, 0.9);
   color: #c9313c;
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: inset 0 0 0 1rpx rgba(201, 49, 60, 0.18);
 }
 
-.action-button[disabled] {
-  color: rgba(255, 247, 237, 0.82);
-  background: linear-gradient(135deg, #d8a2a4 0%, #b97b80 100%);
-  box-shadow: none;
-}
-
+.action-button[disabled],
 .action-button.is-submitting {
-  color: rgba(255, 247, 237, 0.82);
-  background: linear-gradient(135deg, #d8a2a4 0%, #b97b80 100%);
+  background: linear-gradient(145deg, #d8a2a4 0%, #b97b80 100%);
   box-shadow: none;
+  color: rgba(255, 247, 237, 0.82);
 }
 
 .merchant-hero > view:first-child,
@@ -436,18 +447,4 @@ button::after {
 
 .order-remark {
   -webkit-line-clamp: 3;
-}
-
-.hero-badge,
-.filter-tab,
-.state-button,
-.status-tag,
-.action-button {
-  box-sizing: border-box;
-}
-
-.status-tag {
-  min-height: 46rpx;
-  line-height: 1.2;
-  text-align: center;
 }
