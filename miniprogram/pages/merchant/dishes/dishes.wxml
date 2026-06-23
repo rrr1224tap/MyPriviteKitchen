@@ -56,9 +56,10 @@
 
       <view wx:elif="{{pageStatus === 'error'}}" class="state-card warm-glass">
         <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image></view>
-        <view class="state-title">餐品加载失败</view>
+        <view class="state-title">{{errorTitle || '餐品加载失败'}}</view>
         <view class="state-desc">{{errorMessage}}</view>
-        <button class="state-button" bindtap="retryLoad">重新加载</button>
+        <button wx:if="{{isPermissionError}}" class="state-button" bindtap="goToUserHome">返回首页</button>
+        <button wx:else class="state-button" bindtap="retryLoad">重新加载</button>
       </view>
 
       <view wx:elif="{{pageStatus === 'empty'}}" class="state-card warm-glass">

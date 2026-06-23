@@ -71,7 +71,15 @@
       <view class="service-item"><image class="service-icon-image" src="/images/icons/icon-store.svg" mode="aspectFit"></image>门店现做 · 支持自提</view>
     </view>
 
-    <view class="merchant-entry" bindtap="goToMerchant">商家工作台</view>
+    <view wx:if="{{showMerchantEntry}}" class="merchant-entry glass-light" bindtap="goToMerchant">
+      <view class="merchant-entry-icon"><image class="merchant-entry-icon-image" src="/images/icons/icon-merchant-orders.svg" mode="aspectFit"></image></view>
+      <view class="merchant-entry-copy">
+        <view class="merchant-entry-title">商家工作台</view>
+        <view class="merchant-entry-desc">管理订单与商品</view>
+      </view>
+      <view class="merchant-entry-arrow">→</view>
+    </view>
+
   </view>
 
   <view class="premium-tabbar glass-light">
@@ -86,10 +94,6 @@
     <view class="tab-item" bindtap="goToOrders">
       <view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-order.svg" mode="aspectFit"></image></view>
       <view>订单</view>
-    </view>
-    <view class="tab-item" bindtap="goToMerchant">
-      <view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-user.svg" mode="aspectFit"></image></view>
-      <view>我的</view>
     </view>
   </view>
 </view>

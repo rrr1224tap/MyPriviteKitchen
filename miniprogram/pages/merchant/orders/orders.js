@@ -69,6 +69,8 @@ const STATUS_CONFLICT_CODES = [
   'STATUS_CONFLICT'
 ]
 const REFRESH_FAILED_MESSAGE = '操作成功，但刷新失败，请手动刷新'
+const MERCHANT_PERMISSION_TITLE = '需要注册小厨身份'
+const MERCHANT_PERMISSION_MESSAGE = '当前账号暂未开通小厨商家身份，请联系管理员注册 / 开通后再进入商家工作台。'
 
 const EMPTY_STATUS_TEXT = {
   all: {
@@ -98,7 +100,7 @@ const EMPTY_STATUS_TEXT = {
 }
 
 const MERCHANT_ORDER_ERROR_TEXT = {
-  FORBIDDEN: '当前账号没有商家权限，请检查商家人员配置',
+  FORBIDDEN: MERCHANT_PERMISSION_MESSAGE,
   UNAUTHORIZED: '登录状态异常，请重新进入小程序',
   INVALID_PARAMS: '订单信息不完整，请刷新后重试',
   NOT_FOUND: '订单不存在或已被删除',
@@ -108,6 +110,14 @@ const MERCHANT_ORDER_ERROR_TEXT = {
   INVALID_STATUS: '订单状态已变化，请刷新后重试',
   STATUS_CONFLICT: '订单状态已变化，请刷新后重试',
   DATABASE_ERROR: '服务暂时不可用，请稍后重试'
+}
+
+function isMerchantPermissionError(errorOrCode) {
+  const code = typeof errorOrCode === 'string'
+    ? errorOrCode
+    : (errorOrCode && errorOrCode.code) || ''
+
+  return code === 'FORBIDDEN'
 }
 
 function normalizeDateValue(value) {
@@ -308,7 +318,9 @@ Page({
     backgroundImage: BACKGROUND_IMAGE,
     backgroundImageAvailable: true,
     pageStatus: 'loading',
+    errorTitle: '',
     errorMessage: '',
+    isPermissionError: false,
     statusFilters: STATUS_FILTERS,
     activeStatus: '',
     orders: [],
@@ -343,7 +355,9 @@ Page({
       (options.showLoading !== false && !hasCurrentOrders)
 
     this.setData({
-      errorMessage: ''
+      errorTitle: '',
+      errorMessage: '',
+      isPermissionError: false
     })
 
     if (showBlockingLoading) {
@@ -388,7 +402,9 @@ Page({
       this.setData({
         orders: [],
         pageStatus: 'error',
-        errorMessage: getMerchantOrderErrorMessage(error)
+        errorTitle: isMerchantPermissionError(error) ? MERCHANT_PERMISSION_TITLE : '订单加载失败',
+        errorMessage: getMerchantOrderErrorMessage(error),
+        isPermissionError: isMerchantPermissionError(error)
       })
       return false
     }
@@ -498,6 +514,12 @@ Page({
 
     wx.redirectTo({
       url: '/pages/merchant/dashboard/dashboard'
+    })
+  },
+
+  goToUserHome() {
+    wx.reLaunch({
+      url: '/pages/common/launch/launch'
     })
   }
 })

@@ -476,10 +476,53 @@
 }
 
 .merchant-entry {
-  padding: 32rpx 0 20rpx;
-  color: #998b81;
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin-top: 22rpx;
+  padding: 20rpx 22rpx;
+  border-radius: 28rpx;
+  background: rgba(255, 252, 247, 0.84);
+}
+
+.merchant-entry-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58rpx;
+  height: 58rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(145deg, #ff6a3d, #e63b4a);
+  box-shadow: 0 10rpx 22rpx rgba(230, 59, 74, 0.22);
+}
+
+.merchant-entry-icon-image {
+  display: block;
+  width: 34rpx;
+  height: 34rpx;
+}
+
+.merchant-entry-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.merchant-entry-title {
+  color: #2a211d;
+  font-size: 25rpx;
+  font-weight: 800;
+}
+
+.merchant-entry-desc {
+  margin-top: 4rpx;
+  color: rgba(42, 33, 29, 0.56);
   font-size: 20rpx;
-  text-align: center;
+}
+
+.merchant-entry-arrow {
+  color: #e63b4a;
+  font-size: 32rpx;
+  font-weight: 800;
 }
 
 .premium-tabbar {

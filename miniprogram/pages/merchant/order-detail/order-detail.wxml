@@ -23,9 +23,12 @@
 
       <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
         <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image></view>
-        <view class="state-title">订单详情加载失败</view>
+        <view class="state-title">{{errorTitle || '订单详情加载失败'}}</view>
         <view class="state-desc">{{errorMessage}}</view>
-        <view class="state-actions">
+        <view wx:if="{{isPermissionError}}" class="state-actions">
+          <button class="state-button" bindtap="goToUserHome">返回首页</button>
+        </view>
+        <view wx:else class="state-actions">
           <button class="state-button is-secondary" bindtap="goBack">返回订单列表</button>
           <button class="state-button" bindtap="retryLoad">重新加载</button>
         </view>

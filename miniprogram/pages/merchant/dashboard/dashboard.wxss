@@ -97,6 +97,44 @@ button::after {
   padding: 0 28rpx calc(56rpx + env(safe-area-inset-bottom));
 }
 
+.state-card {
+  margin-top: 30rpx;
+  padding: 76rpx 38rpx;
+  border-radius: 34rpx;
+  text-align: center;
+  background: rgba(62, 39, 30, 0.74);
+}
+
+.state-title {
+  color: #fff8ec;
+  font-size: 34rpx;
+  font-weight: 900;
+}
+
+.state-desc {
+  margin: 14rpx auto 0;
+  max-width: 520rpx;
+  color: rgba(255, 246, 230, 0.72);
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.state-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 220rpx;
+  height: 72rpx;
+  margin-top: 28rpx;
+  padding: 0 36rpx;
+  border-radius: 999rpx;
+  color: #fffaf4;
+  font-size: 25rpx;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ff6a72 0%, #e63b4a 100%);
+  box-shadow: 0 14rpx 30rpx rgba(230, 59, 74, 0.28);
+}
+
 .glass-panel {
   background: rgba(255, 255, 255, 0.14);
   border: 1rpx solid rgba(255, 255, 255, 0.24);

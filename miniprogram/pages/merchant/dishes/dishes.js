@@ -2,6 +2,8 @@ const { callFunction } = require('../../../utils/cloud')
 const { DEFAULT_MERCHANT_ID } = require('../../../utils/constants')
 
 const BACKGROUND_IMAGE = '/images/mock/home-glass-display.jpg'
+const MERCHANT_PERMISSION_TITLE = '需要注册小厨身份'
+const MERCHANT_PERMISSION_MESSAGE = '当前账号暂未开通小厨商家身份，请联系管理员注册 / 开通后再进入商家工作台。'
 
 const DISH_STATUS_TEXT = {
   on_sale: '上架中',
@@ -178,10 +180,14 @@ function parseTags(value) {
 
 function getFriendlyError(error) {
   if (error && error.code === 'FORBIDDEN') {
-    return '当前账号没有商家权限'
+    return MERCHANT_PERMISSION_MESSAGE
   }
 
   return error && error.message ? error.message : '操作失败，请稍后重试'
+}
+
+function isMerchantPermissionError(error) {
+  return Boolean(error && error.code === 'FORBIDDEN')
 }
 
 function normalizeCategory(category = {}) {
@@ -258,7 +264,9 @@ Page({
     backgroundImage: BACKGROUND_IMAGE,
     backgroundImageAvailable: true,
     pageStatus: 'loading',
+    errorTitle: '',
     errorMessage: '',
+    isPermissionError: false,
     dishes: [],
     categories: [],
     categoryFilters: [{ category_id: '', name: '全部分类' }],
@@ -330,7 +338,9 @@ Page({
   async loadPageData() {
     this.setData({
       pageStatus: 'loading',
-      errorMessage: ''
+      errorTitle: '',
+      errorMessage: '',
+      isPermissionError: false
     })
 
     try {
@@ -364,7 +374,9 @@ Page({
     } catch (error) {
       this.setData({
         pageStatus: 'error',
-        errorMessage: getFriendlyError(error)
+        errorTitle: isMerchantPermissionError(error) ? MERCHANT_PERMISSION_TITLE : '餐品加载失败',
+        errorMessage: getFriendlyError(error),
+        isPermissionError: isMerchantPermissionError(error)
       })
     }
   },
@@ -383,12 +395,16 @@ Page({
       this.setData({
         dishes,
         pageStatus: dishes.length ? 'success' : 'empty',
-        errorMessage: ''
+        errorTitle: '',
+        errorMessage: '',
+        isPermissionError: false
       })
     } catch (error) {
       this.setData({
         pageStatus: 'error',
-        errorMessage: getFriendlyError(error)
+        errorTitle: isMerchantPermissionError(error) ? MERCHANT_PERMISSION_TITLE : '餐品加载失败',
+        errorMessage: getFriendlyError(error),
+        isPermissionError: isMerchantPermissionError(error)
       })
     }
   },
@@ -406,6 +422,12 @@ Page({
 
   retryLoad() {
     this.loadPageData()
+  },
+
+  goToUserHome() {
+    wx.reLaunch({
+      url: '/pages/common/launch/launch'
+    })
   },
 
   handleCategoryFilterTap(event) {

@@ -2,6 +2,8 @@ const { callFunction } = require('../../../utils/cloud')
 const { DEFAULT_MERCHANT_ID } = require('../../../utils/constants')
 
 const BACKGROUND_IMAGE = '/images/mock/home-glass-display.jpg'
+const MERCHANT_PERMISSION_TITLE = '需要注册小厨身份'
+const MERCHANT_PERMISSION_MESSAGE = '当前账号暂未开通小厨商家身份，请联系管理员注册 / 开通后再进入商家工作台。'
 
 const CATEGORY_STATUS_TEXT = {
   active: '启用中',
@@ -50,10 +52,14 @@ function normalizeCategory(category = {}) {
 
 function getFriendlyError(error) {
   if (error && error.code === 'FORBIDDEN') {
-    return '当前账号没有商家权限'
+    return MERCHANT_PERMISSION_MESSAGE
   }
 
   return error && error.message ? error.message : '操作失败，请稍后重试'
+}
+
+function isMerchantPermissionError(error) {
+  return Boolean(error && error.code === 'FORBIDDEN')
 }
 
 Page({
@@ -63,7 +69,9 @@ Page({
     backgroundImage: BACKGROUND_IMAGE,
     backgroundImageAvailable: true,
     pageStatus: 'loading',
+    errorTitle: '',
     errorMessage: '',
+    isPermissionError: false,
     categories: [],
     submitting: false,
     activeCategoryId: ''
@@ -115,7 +123,9 @@ Page({
   async loadCategories() {
     this.setData({
       pageStatus: 'loading',
-      errorMessage: ''
+      errorTitle: '',
+      errorMessage: '',
+      isPermissionError: false
     })
 
     try {
@@ -134,13 +144,21 @@ Page({
     } catch (error) {
       this.setData({
         pageStatus: 'error',
-        errorMessage: getFriendlyError(error)
+        errorTitle: isMerchantPermissionError(error) ? MERCHANT_PERMISSION_TITLE : '分类加载失败',
+        errorMessage: getFriendlyError(error),
+        isPermissionError: isMerchantPermissionError(error)
       })
     }
   },
 
   retryLoad() {
     this.loadCategories()
+  },
+
+  goToUserHome() {
+    wx.reLaunch({
+      url: '/pages/common/launch/launch'
+    })
   },
 
   handleCreateTap() {

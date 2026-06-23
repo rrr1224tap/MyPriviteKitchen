@@ -1,3 +1,5 @@
+const { login, isMerchantStaff } = require('../../../utils/auth')
+
 function getNavigationMetrics() {
   const windowInfo = wx.getWindowInfo
     ? wx.getWindowInfo()
@@ -19,11 +21,35 @@ Page({
     statusBarHeight: 20,
     navigationHeight: 44,
     backgroundImage: '/images/mock/home-glass-display.jpg',
-    backgroundImageAvailable: true
+    backgroundImageAvailable: true,
+    pageStatus: 'checking'
   },
 
   onReady() {
     this.setupNavigation()
+  },
+
+  onShow() {
+    this.checkMerchantAccess()
+  },
+
+  async checkMerchantAccess() {
+    this.setData({
+      pageStatus: 'checking'
+    })
+
+    try {
+      await login()
+
+      this.setData({
+        pageStatus: isMerchantStaff() ? 'success' : 'no_permission'
+      })
+    } catch (error) {
+      console.warn('[merchant-dashboard] check merchant access failed:', error)
+      this.setData({
+        pageStatus: 'no_permission'
+      })
+    }
   },
 
   setupNavigation() {
@@ -49,18 +75,30 @@ Page({
   },
 
   goToOrders() {
+    if (this.data.pageStatus !== 'success') {
+      return
+    }
+
     wx.navigateTo({
       url: '/pages/merchant/orders/orders'
     })
   },
 
   goToCategories() {
+    if (this.data.pageStatus !== 'success') {
+      return
+    }
+
     wx.navigateTo({
       url: '/pages/merchant/categories/categories'
     })
   },
 
   goToDishes() {
+    if (this.data.pageStatus !== 'success') {
+      return
+    }
+
     wx.navigateTo({
       url: '/pages/merchant/dishes/dishes'
     })

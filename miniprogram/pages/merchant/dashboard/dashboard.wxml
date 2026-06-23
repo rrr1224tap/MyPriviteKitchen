@@ -14,6 +14,20 @@
   </view>
 
   <view class="dashboard-content" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+    <view wx:if="{{pageStatus === 'checking'}}" class="state-card glass-panel">
+      <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-clock.svg" mode="aspectFit"></image></view>
+      <view class="state-title">正在确认小厨身份</view>
+      <view class="state-desc">正在检查当前账号是否已开通商家工作台权限</view>
+    </view>
+
+    <view wx:elif="{{pageStatus === 'no_permission'}}" class="state-card glass-panel">
+      <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image></view>
+      <view class="state-title">需要注册小厨身份</view>
+      <view class="state-desc">当前账号暂未开通小厨商家身份，请联系管理员注册 / 开通后再进入商家工作台。</view>
+      <button class="state-button" bindtap="goToUserHome">返回首页</button>
+    </view>
+
+    <block wx:else>
     <view class="merchant-hero glass-panel">
       <view>
         <view class="hero-kicker">MERCHANT DESK</view>
@@ -59,5 +73,6 @@
     </view>
 
     <button class="secondary-button" bindtap="goToUserHome">返回用户首页</button>
+    </block>
   </view>
 </view>

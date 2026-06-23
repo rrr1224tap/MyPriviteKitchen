@@ -146,6 +146,5 @@
     <view class="tab-item" bindtap="goHome"><view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-home.svg" mode="aspectFit"></image></view><view>首页</view></view>
     <view class="tab-item is-active"><view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-bowl-active.svg" mode="aspectFit"></image></view><view>点餐</view></view>
     <view class="tab-item" bindtap="goToOrders"><view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-order.svg" mode="aspectFit"></image></view><view>订单</view></view>
-    <view class="tab-item" bindtap="goToMerchant"><view class="tab-icon"><image class="tab-icon-image" src="/images/icons/icon-user.svg" mode="aspectFit"></image></view><view>我的</view></view>
   </view>
 </view>

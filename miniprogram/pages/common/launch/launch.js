@@ -1,9 +1,12 @@
+const { login, isMerchantStaff } = require('../../../utils/auth')
+
 Page({
   data: {
     statusBarHeight: 20,
     navigationHeight: 44,
     homeReference: '/images/mock/home-glass-display.jpg',
-    homeImageAvailable: true
+    homeImageAvailable: true,
+    showMerchantEntry: false
   },
 
   onLoad() {
@@ -16,6 +19,24 @@ Page({
       statusBarHeight,
       navigationHeight
     })
+  },
+
+  onShow() {
+    this.refreshMerchantEntry()
+  },
+
+  async refreshMerchantEntry() {
+    try {
+      await login()
+      this.setData({
+        showMerchantEntry: isMerchantStaff()
+      })
+    } catch (error) {
+      console.warn('[launch] refresh merchant identity failed:', error)
+      this.setData({
+        showMerchantEntry: false
+      })
+    }
   },
 
   handleHomeImageError() {
@@ -37,6 +58,10 @@ Page({
   },
 
   goToMerchant() {
+    if (!this.data.showMerchantEntry) {
+      return
+    }
+
     wx.navigateTo({
       url: '/pages/merchant/dashboard/dashboard'
     })
