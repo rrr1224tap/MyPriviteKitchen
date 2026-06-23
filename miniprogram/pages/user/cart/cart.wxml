@@ -37,7 +37,7 @@
         <view class="cart-image-window">
           <image
             wx:if="{{item.image_available}}"
-            class="cart-image"
+            class="cart-image {{item.is_placeholder_image ? 'is-placeholder' : ''}}"
             src="{{item.image}}"
             style="{{item.image_style}}"
             mode="{{item.image_mode}}"

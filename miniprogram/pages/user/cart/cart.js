@@ -2,16 +2,11 @@ const { formatMoney } = require('../../../utils/format')
 const { DEFAULT_MERCHANT_ID, STORAGE_KEYS } = require('../../../utils/constants')
 
 const DISCOUNT_CENT = 600
-const FALLBACK_IMAGE = '/images/mock/menu-glass-display.jpg'
+const FALLBACK_IMAGE = '/images/placeholders/food-placeholder.svg'
 const FALLBACK_BACKGROUND = '/images/mock/home-glass-display.jpg'
 const CART_STORAGE_KEY = STORAGE_KEYS.CART_ITEMS || 'cart_items'
 const LEGACY_CART_STORAGE_KEY = 'cart'
-const FALLBACK_IMAGE_STYLES = [
-  'width: 750rpx; left: -192rpx; top: -846rpx;',
-  'width: 750rpx; left: -192rpx; top: -676rpx;',
-  'width: 1300rpx; left: -359rpx; top: -1768rpx;',
-  'width: 750rpx; left: -410rpx; top: -412rpx;'
-]
+const FALLBACK_IMAGE_STYLE = 'width: 100%; height: 100%; left: 0; top: 0;'
 
 const CREATE_ORDER_ERROR_TEXT = {
   DISH_SOLD_OUT: '有餐品已售罄，请重新选择',
@@ -35,7 +30,7 @@ const ORDER_NETWORK_ERROR_TEXT = '网络不太稳定，请稍后重试'
 const ORDER_UNKNOWN_ERROR_TEXT = '下单失败，请稍后重试'
 
 function getFallbackImageStyle(index) {
-  return FALLBACK_IMAGE_STYLES[index % FALLBACK_IMAGE_STYLES.length]
+  return FALLBACK_IMAGE_STYLE
 }
 
 function toSafeInteger(value, fallback = 0) {
@@ -238,8 +233,9 @@ function decorateItems(items) {
       image_style: hasRealImage
         ? 'width: 100%; height: 100%; left: 0; top: 0;'
         : getFallbackImageStyle(index),
-      image_mode: hasRealImage ? 'aspectFill' : 'widthFix',
+      image_mode: hasRealImage ? 'aspectFill' : 'aspectFit',
       image_available: true,
+      is_placeholder_image: !hasRealImage,
       spec_text: buildSpecText(item.selected_specs),
       addon_text: buildAddonText(item.selected_addons),
       price_text: formatMoney(unitPriceCent),
@@ -429,8 +425,9 @@ Page({
         ...item,
         image: FALLBACK_IMAGE,
         image_style: getFallbackImageStyle(index),
-        image_mode: 'widthFix',
-        image_available: true
+        image_mode: 'aspectFit',
+        image_available: true,
+        is_placeholder_image: true
       }
     })
 

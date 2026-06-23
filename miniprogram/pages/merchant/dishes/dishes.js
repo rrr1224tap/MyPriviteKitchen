@@ -2,6 +2,7 @@ const { callFunction } = require('../../../utils/cloud')
 const { DEFAULT_MERCHANT_ID } = require('../../../utils/constants')
 
 const BACKGROUND_IMAGE = '/images/mock/home-glass-display.jpg'
+const FOOD_PLACEHOLDER_IMAGE = '/images/placeholders/food-placeholder.svg'
 const MERCHANT_PERMISSION_TITLE = '需要注册小厨身份'
 const MERCHANT_PERMISSION_MESSAGE = '当前账号暂未开通小厨商家身份，请联系管理员注册 / 开通后再进入商家工作台。'
 
@@ -221,6 +222,7 @@ function normalizeDish(dish = {}, categoryMap = {}) {
     description: dish.description || '',
     detail_description: dish.detail_description || '',
     image_url: dish.image_url || dish.image || '',
+    image_failed: false,
     price_cent: Number.isInteger(dish.price_cent) ? dish.price_cent : 0,
     original_price_cent: Number.isInteger(dish.original_price_cent)
       ? dish.original_price_cent
@@ -262,6 +264,7 @@ Page({
     statusBarHeight: 20,
     navigationHeight: 44,
     backgroundImage: BACKGROUND_IMAGE,
+    foodPlaceholderImage: FOOD_PLACEHOLDER_IMAGE,
     backgroundImageAvailable: true,
     pageStatus: 'loading',
     errorTitle: '',
@@ -282,7 +285,8 @@ Page({
     formData: createEmptyForm(),
     formCategoryOptions: [],
     formCategoryIndex: 0,
-    uploadingImage: false
+    uploadingImage: false,
+    formImageAvailable: true
   },
 
   onReady() {
@@ -306,6 +310,32 @@ Page({
   handleBackgroundImageError() {
     this.setData({
       backgroundImageAvailable: false
+    })
+  },
+
+  handleDishImageError(event) {
+    const dishId = event.currentTarget.dataset.id
+    if (!dishId) {
+      return
+    }
+
+    this.setData({
+      dishes: this.data.dishes.map((dish) => {
+        if (dish.dish_id !== dishId) {
+          return dish
+        }
+
+        return {
+          ...dish,
+          image_failed: true
+        }
+      })
+    })
+  },
+
+  handleFormImageError() {
+    this.setData({
+      formImageAvailable: false
     })
   },
 
@@ -462,6 +492,7 @@ Page({
       formTitle: '新增餐品',
       formDishId: '',
       formCategoryIndex: 0,
+      formImageAvailable: true,
       formData: createEmptyForm(
         firstCategory.category_id,
         firstCategory.name,
@@ -488,6 +519,7 @@ Page({
       formTitle: '编辑餐品',
       formDishId: dish.dish_id,
       formCategoryIndex: categoryIndex,
+      formImageAvailable: true,
       formData: {
         name: dish.name,
         category_id: dish.category_id,
@@ -553,7 +585,8 @@ Page({
       }
 
       this.setData({
-        'formData.image_url': result.fileID
+        'formData.image_url': result.fileID,
+        formImageAvailable: true
       })
       wx.hideLoading()
       wx.showToast({
@@ -589,9 +622,15 @@ Page({
   handleFormInput(event) {
     const field = event.currentTarget.dataset.field
     const value = event.detail.value
-    this.setData({
+    const nextData = {
       [`formData.${field}`]: value
-    })
+    }
+
+    if (field === 'image_url') {
+      nextData.formImageAvailable = true
+    }
+
+    this.setData(nextData)
   },
 
   handleFormSwitchChange(event) {

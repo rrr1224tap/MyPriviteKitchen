@@ -30,7 +30,9 @@
   position: relative;
   height: 480rpx;
   overflow: hidden;
-  background: radial-gradient(circle at 62% 42%, #c98542, #6e3c21 56%, #28160f 100%);
+  background:
+    radial-gradient(circle at 62% 42%, rgba(255, 221, 172, 0.6), transparent 42%),
+    linear-gradient(135deg, #fff5e8 0%, #d99b65 48%, #4c2c1d 100%);
 }
 
 .hero-image-window,
@@ -45,7 +47,15 @@
 
 .hero-image {
   position: absolute;
+  width: 100%;
+  height: 100%;
   max-width: none;
+}
+
+.hero-image.is-placeholder {
+  box-sizing: border-box;
+  padding: 118rpx 255rpx;
+  opacity: 0.96;
 }
 
 .hero-shade {

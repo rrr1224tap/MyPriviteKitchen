@@ -7,7 +7,7 @@
     <view class="hero-image-window">
       <image
         wx:if="{{imageAvailable}}"
-        class="hero-image"
+        class="hero-image {{dish.is_placeholder_image ? 'is-placeholder' : ''}}"
         src="{{dish.image}}"
         style="{{dish.image_style}}"
         mode="{{dish.image_mode}}"

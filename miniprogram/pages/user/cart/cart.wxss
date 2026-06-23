@@ -204,12 +204,22 @@
   flex: none;
   overflow: hidden;
   border-radius: 22rpx;
-  background: radial-gradient(circle at 58% 40%, #dca75f, #93542d 54%, #44271a 100%);
+  background:
+    radial-gradient(circle at 28% 18%, rgba(255, 227, 180, 0.7), transparent 42%),
+    linear-gradient(135deg, rgba(255, 250, 242, 0.96), rgba(247, 221, 202, 0.9));
+  box-shadow: 0 10rpx 22rpx rgba(107, 74, 61, 0.12);
 }
 
 .cart-image {
   position: absolute;
+  width: 100%;
+  height: 100%;
   max-width: none;
+}
+
+.cart-image.is-placeholder {
+  box-sizing: border-box;
+  padding: 34rpx;
 }
 
 .image-gloss {

@@ -76,8 +76,15 @@
           class="dish-card warm-glass {{item.status === 'on_sale' ? '' : 'dish-card-muted'}}"
         >
           <view class="dish-main">
-            <image wx:if="{{item.image_url}}" class="dish-image" src="{{item.image_url}}" mode="aspectFill" />
-            <view wx:else class="dish-image dish-image-fallback"><image class="dish-fallback-icon" src="/images/icons/icon-empty-dish.svg" mode="aspectFit"></image></view>
+            <image
+              wx:if="{{item.image_url && !item.image_failed}}"
+              class="dish-image"
+              src="{{item.image_url}}"
+              mode="aspectFill"
+              data-id="{{item.dish_id}}"
+              binderror="handleDishImageError"
+            />
+            <view wx:else class="dish-image dish-image-fallback"><image class="dish-placeholder-image" src="{{foodPlaceholderImage}}" mode="aspectFit"></image></view>
             <view class="dish-copy">
               <view class="dish-head">
                 <view class="dish-name">{{item.name}}</view>
@@ -181,14 +188,15 @@
           <view class="field-label">餐品主图</view>
           <view class="image-upload-card">
             <image
-              wx:if="{{formData.image_url}}"
+              wx:if="{{formData.image_url && formImageAvailable}}"
               class="image-upload-preview"
               src="{{formData.image_url}}"
               mode="aspectFill"
               bindtap="previewFormImage"
+              binderror="handleFormImageError"
             />
             <view wx:else class="image-upload-placeholder" bindtap="chooseDishImage">
-              <view class="image-upload-mark">图</view>
+              <image class="image-upload-placeholder-image" src="{{foodPlaceholderImage}}" mode="aspectFit"></image>
               <view class="image-upload-title">上传餐品图片</view>
               <view class="image-upload-desc">支持从相册选择或拍照</view>
             </view>

@@ -2,8 +2,8 @@ const { callFunction } = require('../../../utils/cloud')
 const { DEFAULT_MERCHANT_ID, STORAGE_KEYS } = require('../../../utils/constants')
 const { formatMoney } = require('../../../utils/format')
 
-const MENU_REFERENCE = '/images/mock/menu-glass-display.jpg'
 const HOME_REFERENCE = '/images/mock/home-glass-display.jpg'
+const FOOD_PLACEHOLDER_IMAGE = '/images/placeholders/food-placeholder.svg'
 const CART_STORAGE_KEY = STORAGE_KEYS.CART_ITEMS || 'cart_items'
 const BRAND_NAME = '小厨食堂'
 
@@ -114,7 +114,7 @@ function normalizeQuantity(quantity, fallback = 1) {
 }
 
 function getFallbackImageStyle(index) {
-  return FALLBACK_IMAGE_STYLES[index % FALLBACK_IMAGE_STYLES.length]
+  return 'width: 100%; height: 100%; left: 0; top: 0;'
 }
 
 function normalizeStockCount(value) {
@@ -254,11 +254,12 @@ function normalizeDish(dish, categoryId, index) {
     tags: normalizeTags(dish.tags),
     status: dish.status || 'on_sale',
     has_options: dish.has_options === true,
-    display_image: hasRealImage ? imageUrl : MENU_REFERENCE,
+    display_image: hasRealImage ? imageUrl : FOOD_PLACEHOLDER_IMAGE,
     image_style: hasRealImage
       ? 'width: 100%; height: 100%; left: 0; top: 0;'
-      : dish.image_style || getFallbackImageStyle(index),
-    image_mode: hasRealImage ? 'aspectFill' : 'widthFix',
+      : getFallbackImageStyle(index),
+    image_mode: hasRealImage ? 'aspectFill' : 'aspectFit',
+    is_placeholder_image: !hasRealImage,
     ...soldOutState
   }
 }
@@ -460,9 +461,10 @@ Page({
 
       return {
         ...dish,
-        display_image: MENU_REFERENCE,
+        display_image: FOOD_PLACEHOLDER_IMAGE,
         image_style: getFallbackImageStyle(index),
-        image_mode: 'widthFix'
+        image_mode: 'aspectFit',
+        is_placeholder_image: true
       }
     }
 

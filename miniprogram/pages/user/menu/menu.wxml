@@ -94,7 +94,7 @@
         >
           <view class="dish-image-window">
             <image
-              class="dish-image-source"
+              class="dish-image-source {{item.is_placeholder_image ? 'is-placeholder' : ''}}"
               src="{{item.display_image}}"
               style="{{item.image_style}}"
               mode="{{item.image_mode}}"

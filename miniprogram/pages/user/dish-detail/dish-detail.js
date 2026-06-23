@@ -2,8 +2,8 @@ const { callFunction } = require('../../../utils/cloud')
 const { DEFAULT_MERCHANT_ID, STORAGE_KEYS } = require('../../../utils/constants')
 const { formatMoney } = require('../../../utils/format')
 
-const FALLBACK_IMAGE = '/images/mock/home-glass-display.jpg'
-const FALLBACK_IMAGE_STYLE = 'width: 1120rpx; left: -318rpx; top: -126rpx;'
+const FALLBACK_IMAGE = '/images/placeholders/food-placeholder.svg'
+const FALLBACK_IMAGE_STYLE = 'width: 100%; height: 100%; left: 0; top: 0;'
 const FALLBACK_INGREDIENTS = ['肥牛', '米饭', '时令蔬菜', '拌饭酱', '鸡蛋']
 const CART_STORAGE_KEY = STORAGE_KEYS.CART_ITEMS || 'cart_items'
 const DETAIL_ERROR_TEXT = {
@@ -23,7 +23,8 @@ const FALLBACK_DISH = {
   base_price_cent: 2990,
   image: FALLBACK_IMAGE,
   image_style: FALLBACK_IMAGE_STYLE,
-  image_mode: 'widthFix',
+  image_mode: 'aspectFit',
+  is_placeholder_image: true,
   tags: ['招牌推荐', '人气 TOP1', '约12分钟'],
   description: '肥牛现炒，锅巴焦香，拌匀更好吃。现点现做，认真对待每一碗热饭。',
   ingredients: FALLBACK_INGREDIENTS,
@@ -383,8 +384,9 @@ function decorateDish(rawDish, detailData = {}) {
     image_url: imageUrl,
     image_style: hasRealImage
       ? 'width: 100%; height: 100%; left: 0; top: 0;'
-      : dish.image_style || FALLBACK_IMAGE_STYLE,
-    image_mode: hasRealImage ? 'aspectFill' : 'widthFix',
+      : FALLBACK_IMAGE_STYLE,
+    image_mode: hasRealImage ? 'aspectFill' : 'aspectFit',
+    is_placeholder_image: !hasRealImage,
     tags,
     description: dish.detail_description || dish.description || '暂无餐品介绍',
     ingredients: normalizeIngredients(detailData.ingredients, tags),
@@ -615,7 +617,8 @@ Page({
       ...this.data.dish,
       image: FALLBACK_IMAGE,
       image_style: FALLBACK_IMAGE_STYLE,
-      image_mode: 'widthFix'
+      image_mode: 'aspectFit',
+      is_placeholder_image: true
     }
 
     this.setData({

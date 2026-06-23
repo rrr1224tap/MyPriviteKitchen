@@ -302,7 +302,10 @@ textarea {
   height: 150rpx;
   border-radius: 28rpx;
   overflow: hidden;
-  background: linear-gradient(135deg, #f8d6c2 0%, #c9473f 100%);
+  background:
+    radial-gradient(circle at 28% 18%, rgba(255, 227, 180, 0.7), transparent 42%),
+    linear-gradient(135deg, rgba(255, 250, 242, 0.96), rgba(247, 221, 202, 0.9));
+  box-shadow: 0 10rpx 22rpx rgba(107, 74, 61, 0.12);
 }
 
 .dish-image-fallback {
@@ -312,6 +315,11 @@ textarea {
   color: rgba(255, 248, 236, 0.92);
   font-size: 40rpx;
   font-weight: 900;
+}
+
+.dish-placeholder-image {
+  width: 88rpx;
+  height: 88rpx;
 }
 
 .dish-copy {
@@ -583,17 +591,13 @@ textarea {
   border: 1rpx dashed rgba(230, 59, 74, 0.22);
 }
 
-.image-upload-mark {
+.image-upload-placeholder-image {
   width: 78rpx;
   height: 78rpx;
-  border-radius: 50%;
-  color: #e63b4a;
-  font-size: 28rpx;
-  font-weight: 900;
-  line-height: 78rpx;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: 0 10rpx 20rpx rgba(230, 59, 74, 0.12);
+  padding: 16rpx;
+  border-radius: 26rpx;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 10rpx 20rpx rgba(230, 59, 74, 0.1);
 }
 
 .image-upload-title {
