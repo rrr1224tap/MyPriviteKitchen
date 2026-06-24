@@ -1,0 +1,99 @@
+<view class="prep-summary-page">
+  <image
+    wx:if="{{backgroundImageAvailable}}"
+    class="background-image-window"
+    src="{{backgroundImage}}"
+    mode="aspectFill"
+    binderror="handleBackgroundImageError"
+  />
+  <view class="background-shade"></view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="nav-back" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
+    <view class="nav-title">今日备料</view>
+  </view>
+
+  <scroll-view class="prep-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="prep-content" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+      <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
+        <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-clock.svg" mode="aspectFit"></image></view>
+        <view class="state-title">正在生成今日备料</view>
+        <view class="state-desc">正在读取今日订单和餐品食材配置，请稍等</view>
+      </view>
+
+      <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
+        <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image></view>
+        <view class="state-title">{{errorTitle || '备料清单加载失败'}}</view>
+        <view class="state-desc">{{errorMessage}}</view>
+        <button wx:if="{{isPermissionError}}" class="state-button" bindtap="goToUserHome">返回首页</button>
+        <button wx:else class="state-button" bindtap="retryLoad">重新加载</button>
+      </view>
+
+      <block wx:else>
+        <view class="summary-hero glass-panel">
+          <view>
+            <view class="hero-kicker">PREP SUMMARY</view>
+            <view class="hero-title">今日备料</view>
+            <view class="hero-desc">按今日订单自动汇总食材</view>
+          </view>
+          <view class="hero-date">{{summary.date}}</view>
+        </view>
+
+        <view class="summary-grid">
+          <view class="summary-metric glass-panel">
+            <view class="metric-value">{{summary.order_count}}</view>
+            <view class="metric-label">今日订单</view>
+          </view>
+          <view class="summary-metric glass-panel">
+            <view class="metric-value">{{summary.item_count}}</view>
+            <view class="metric-label">菜品份数</view>
+          </view>
+          <view class="summary-metric glass-panel">
+            <view class="metric-value">{{summary.ingredient_count}}</view>
+            <view class="metric-label">食材种类</view>
+          </view>
+        </view>
+
+        <view class="action-panel glass-panel">
+          <button class="action-button is-secondary {{refreshing ? 'is-disabled' : ''}}" bindtap="handleRefresh" disabled="{{refreshing}}">
+            <block wx:if="{{refreshing}}">刷新中...</block>
+            <block wx:else>刷新</block>
+          </button>
+          <button class="action-button" bindtap="handleCopySummary">复制采购清单</button>
+        </view>
+
+        <view wx:if="{{pageStatus === 'empty_orders'}}" class="state-card glass-panel is-inline">
+          <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-order.svg" mode="aspectFit"></image></view>
+          <view class="state-title">今天还没有需要备料的订单</view>
+          <view class="state-desc">有新的非取消订单后，这里会自动汇总对应餐品的食材</view>
+        </view>
+
+        <view wx:elif="{{pageStatus === 'empty_ingredients'}}" class="state-card glass-panel is-inline">
+          <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-dish.svg" mode="aspectFit"></image></view>
+          <view class="state-title">今日订单中的餐品还没有配置食材</view>
+          <view class="state-desc">可以到餐品管理中给菜品补充食材配置</view>
+          <button class="state-button" bindtap="goToDishes">去配置餐品</button>
+        </view>
+
+        <view wx:else class="group-list">
+          <view class="ingredient-group glass-panel" wx:for="{{summary.groups}}" wx:key="category">
+            <view class="group-title">{{item.category}}</view>
+            <view class="ingredient-row" wx:for="{{item.items}}" wx:for-item="ingredient" wx:key="name">
+              <view class="ingredient-main">
+                <view class="ingredient-name">{{ingredient.name}}</view>
+                <view class="ingredient-source">
+                  <block wx:for="{{ingredient.sources}}" wx:for-item="source" wx:key="dish_id">
+                    <text>{{source.dish_name}} x{{source.quantity}}</text>
+                    <text wx:if="{{index < ingredient.sources.length - 1}}">，</text>
+                  </block>
+                </view>
+                <view wx:if="{{ingredient.note}}" class="ingredient-note">{{ingredient.note}}</view>
+              </view>
+              <view class="ingredient-amount">{{ingredient.display_amount}}</view>
+            </view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+</view>

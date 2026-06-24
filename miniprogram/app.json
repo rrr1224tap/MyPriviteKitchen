@@ -10,6 +10,7 @@
     "pages/merchant/dashboard/dashboard",
     "pages/merchant/orders/orders",
     "pages/merchant/order-detail/order-detail",
+    "pages/merchant/prep-summary/prep-summary",
     "pages/merchant/categories/categories",
     "pages/merchant/dishes/dishes"
   ],

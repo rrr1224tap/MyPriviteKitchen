@@ -84,6 +84,16 @@ Page({
     })
   },
 
+  goToPrepSummary() {
+    if (this.data.pageStatus !== 'success') {
+      return
+    }
+
+    wx.navigateTo({
+      url: '/pages/merchant/prep-summary/prep-summary'
+    })
+  },
+
   goToCategories() {
     if (this.data.pageStatus !== 'success') {
       return

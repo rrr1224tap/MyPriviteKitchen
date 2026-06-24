@@ -46,6 +46,15 @@
       <view class="entry-arrow">→</view>
     </view>
 
+    <view class="entry-card warm-glass" bindtap="goToPrepSummary">
+      <view class="entry-icon"><image class="entry-icon-image" src="/images/icons/icon-dish.svg" mode="aspectFit"></image></view>
+      <view class="entry-copy">
+        <view class="entry-title">今日备料</view>
+        <view class="entry-desc">按今日订单自动汇总食材</view>
+      </view>
+      <view class="entry-arrow">→</view>
+    </view>
+
     <view class="entry-card warm-glass" bindtap="goToCategories">
       <view class="entry-icon"><image class="entry-icon-image" src="/images/icons/icon-category.svg" mode="aspectFit"></image></view>
       <view class="entry-copy">

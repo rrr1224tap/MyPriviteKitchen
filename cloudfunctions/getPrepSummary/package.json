@@ -1,0 +1,13 @@
+{
+  "name": "get-prep-summary",
+  "version": "1.0.0",
+  "description": "Get merchant daily prep summary for ordering miniprogram",
+  "main": "index.js",
+  "scripts": {
+    "test": "node getPrepSummary.test.js"
+  },
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  },
+  "devDependencies": {}
+}
