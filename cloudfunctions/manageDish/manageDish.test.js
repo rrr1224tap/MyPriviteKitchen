@@ -49,6 +49,18 @@ function createValidAddonGroups(overrides = {}) {
   ]
 }
 
+function createValidTutorials(count = 1, overrides = {}) {
+  return Array.from({ length: count }, (_, index) => ({
+    title: `做法参考 ${index + 1}`,
+    platform: index % 2 === 0 ? 'douyin' : 'xiaohongshu',
+    url: `https://example.com/tutorial-${index + 1}`,
+    note: `备注 ${index + 1}`,
+    enabled: true,
+    sort_order: index + 1,
+    ...overrides
+  }))
+}
+
 function createDependencies(options = {}) {
   const state = {
     openid: options.openid || 'staff_openid',
@@ -228,6 +240,7 @@ test('active merchant staff can list dishes for their merchant only', async () =
   assert.equal(result.data.list[0].sold_out, false)
   assert.deepEqual(result.data.list[0].spec_groups, [])
   assert.deepEqual(result.data.list[0].addon_groups, [])
+  assert.deepEqual(result.data.list[0].tutorials, [])
   assert.equal(result.data.list[0].has_options, false)
 })
 
@@ -271,11 +284,13 @@ test('create adds an on_sale dish with database price in cents', async () => {
   assert.equal(result.data.dish.sold_out, false)
   assert.deepEqual(result.data.dish.spec_groups, [])
   assert.deepEqual(result.data.dish.addon_groups, [])
+  assert.deepEqual(result.data.dish.tutorials, [])
   assert.equal(result.data.dish.has_options, false)
   assert.equal(state.dishes.some((dish) => dish.dish_id === 'dish_new_1'), true)
   const createdDish = state.dishes.find((dish) => dish.dish_id === 'dish_new_1')
   assert.deepEqual(createdDish.spec_groups, [])
   assert.deepEqual(createdDish.addon_groups, [])
+  assert.deepEqual(createdDish.tutorials, [])
 })
 
 test('create saves valid spec_groups and addon_groups', async () => {
@@ -303,6 +318,115 @@ test('create saves valid spec_groups and addon_groups', async () => {
   assert.equal(result.data.dish.has_options, true)
   assert.deepEqual(createdDish.spec_groups, specGroups)
   assert.deepEqual(createdDish.addon_groups, addonGroups)
+})
+
+test('create saves one tutorial reference', async () => {
+  const { state, deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+  const tutorials = createValidTutorials(1)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '带教程餐品',
+      price_cent: 2990,
+      tutorials
+    }
+  })
+
+  const createdDish = state.dishes.find((dish) => dish.dish_id === 'dish_new_1')
+  assert.equal(result.success, true)
+  assert.equal(result.data.dish.tutorials.length, 1)
+  assert.equal(result.data.dish.tutorials[0].platform, 'douyin')
+  assert.deepEqual(createdDish.tutorials, result.data.dish.tutorials)
+})
+
+test('create saves up to three tutorial references', async () => {
+  const { state, deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+  const tutorials = createValidTutorials(3)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '三条教程餐品',
+      price_cent: 2990,
+      tutorials
+    }
+  })
+
+  const createdDish = state.dishes.find((dish) => dish.dish_id === 'dish_new_1')
+  assert.equal(result.success, true)
+  assert.equal(result.data.dish.tutorials.length, 3)
+  assert.equal(createdDish.tutorials.length, 3)
+})
+
+test('create filters empty tutorials and fills default title', async () => {
+  const { state, deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '默认标题教程餐品',
+      price_cent: 2990,
+      tutorials: [
+        { title: '', platform: 'bilibili', url: 'BV123', note: '', enabled: true },
+        { title: '', platform: 'douyin', url: '', note: '', enabled: true }
+      ]
+    }
+  })
+
+  const createdDish = state.dishes.find((dish) => dish.dish_id === 'dish_new_1')
+  assert.equal(result.success, true)
+  assert.equal(result.data.dish.tutorials.length, 1)
+  assert.equal(result.data.dish.tutorials[0].title, '做法参考 1')
+  assert.equal(result.data.dish.tutorials[0].platform, 'bilibili')
+  assert.deepEqual(createdDish.tutorials, result.data.dish.tutorials)
+})
+
+test('create fails when tutorials is not an array', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '教程字段错误餐品',
+      price_cent: 1990,
+      tutorials: {}
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+})
+
+test('create fails when tutorials exceed three meaningful entries', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '教程过多餐品',
+      price_cent: 1990,
+      tutorials: createValidTutorials(4)
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
 })
 
 test('create accepts stock fields when values are valid', async () => {
@@ -465,6 +589,80 @@ test('update changes a dish that belongs to the requested merchant', async () =>
   assert.equal(result.data.dish.name, '本店招牌肥牛拌饭')
   assert.equal(result.data.dish.price_cent, 3190)
   assert.deepEqual(result.data.dish.tags, ['招牌推荐'])
+})
+
+test('update can modify tutorial title and platform', async () => {
+  const { state, deps } = createDependencies({
+    dishes: [
+      {
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        category_id: 'category_001',
+        name: '已有教程餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        sort_order: 1,
+        tutorials: createValidTutorials(1)
+      }
+    ]
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    data: {
+      tutorials: [
+        {
+          title: '新版做法',
+          platform: 'bilibili',
+          url: 'BV999',
+          note: '重点看火候',
+          enabled: true,
+          sort_order: 1
+        }
+      ]
+    }
+  })
+
+  const dish = state.dishes.find((item) => item.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.equal(result.data.dish.tutorials[0].title, '新版做法')
+  assert.equal(result.data.dish.tutorials[0].platform, 'bilibili')
+  assert.deepEqual(dish.tutorials, result.data.dish.tutorials)
+})
+
+test('update can delete tutorials by saving an empty list', async () => {
+  const { state, deps } = createDependencies({
+    dishes: [
+      {
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        category_id: 'category_001',
+        name: '可删除教程餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        sort_order: 1,
+        tutorials: createValidTutorials(2)
+      }
+    ]
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    data: {
+      tutorials: []
+    }
+  })
+
+  const dish = state.dishes.find((item) => item.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.deepEqual(result.data.dish.tutorials, [])
+  assert.deepEqual(dish.tutorials, [])
 })
 
 test('update saves valid spec_groups and addon_groups', async () => {

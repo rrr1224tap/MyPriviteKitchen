@@ -84,6 +84,12 @@ const PICKUP_TYPE_TEXT = {
   dine_in: '堂食',
   delivery: '外卖配送'
 }
+const TUTORIAL_PLATFORM_TEXT = {
+  douyin: '抖音',
+  xiaohongshu: '小红书',
+  bilibili: 'B站',
+  other: '其他'
+}
 
 function normalizeDateValue(value) {
   if (value && typeof value === 'object' && value.$date) {
@@ -130,6 +136,30 @@ function normalizeSelectedAddons(selectedAddons) {
   return Array.isArray(selectedAddons) ? selectedAddons : []
 }
 
+function normalizeTutorials(tutorials) {
+  if (!Array.isArray(tutorials)) {
+    return []
+  }
+
+  return tutorials
+    .filter((item) => item && typeof item === 'object' && item.enabled !== false)
+    .map((item, index) => {
+      const platform = item.platform || 'other'
+      const title = item.title || `做法参考 ${index + 1}`
+      const url = item.url || ''
+      return {
+        title,
+        platform,
+        platform_text: TUTORIAL_PLATFORM_TEXT[platform] || TUTORIAL_PLATFORM_TEXT.other,
+        url,
+        note: item.note || '',
+        has_copy: Boolean(url)
+      }
+    })
+    .filter((item) => item.title || item.url || item.note)
+    .slice(0, 3)
+}
+
 function formatSelectedSpecs(item = {}) {
   return normalizeSelectedSpecs(item.selected_specs)
     .map((spec) => spec.option_name || spec.name || '')
@@ -157,6 +187,7 @@ function formatOrderItem(item = {}) {
   const subtotalCent = Number(item.subtotal_cent) || unitPriceCent * quantity
   const specText = formatSelectedSpecs(item)
   const addonText = formatSelectedAddons(item)
+  const tutorials = normalizeTutorials(item.tutorials)
 
   return {
     ...item,
@@ -168,7 +199,9 @@ function formatOrderItem(item = {}) {
     spec_text: specText ? `规格：${specText}` : '',
     addon_text: addonText ? `加料：${addonText}` : '',
     unit_price_text: formatMoney(unitPriceCent),
-    subtotal_text: formatMoney(subtotalCent)
+    subtotal_text: formatMoney(subtotalCent),
+    tutorials,
+    has_tutorials: tutorials.length > 0
   }
 }
 
@@ -492,6 +525,33 @@ Page({
 
     wx.redirectTo({
       url: '/pages/merchant/orders/orders'
+    })
+  },
+
+  handleCopyTutorial(event) {
+    const url = event.currentTarget.dataset.url || ''
+    if (!url) {
+      wx.showToast({
+        title: '暂无可复制内容',
+        icon: 'none'
+      })
+      return
+    }
+
+    wx.setClipboardData({
+      data: url,
+      success: () => {
+        wx.showToast({
+          title: '已复制，请打开对应平台查看',
+          icon: 'none'
+        })
+      },
+      fail: () => {
+        wx.showToast({
+          title: '复制失败，请重试',
+          icon: 'none'
+        })
+      }
     })
   },
 

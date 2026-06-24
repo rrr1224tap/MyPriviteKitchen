@@ -1,5 +1,7 @@
 const VALID_ACTIONS = ['list', 'create', 'update', 'onSale', 'offSale', 'sort']
 const VALID_DISH_STATUSES = ['on_sale', 'off_sale']
+const VALID_TUTORIAL_PLATFORMS = ['douyin', 'xiaohongshu', 'bilibili', 'other']
+const MAX_TUTORIAL_COUNT = 3
 
 function success(message, data = {}) {
   return {
@@ -43,6 +45,7 @@ const DISH_DATA_FIELDS = [
   'sold_out',
   'spec_groups',
   'addon_groups',
+  'tutorials',
   'sort_order'
 ]
 
@@ -104,6 +107,45 @@ function normalizeBooleanDefault(value, defaultValue) {
 
 function normalizeOptionGroupList(value) {
   return Array.isArray(value) ? value : []
+}
+
+function normalizeTutorialPlatform(value) {
+  const platform = normalizeString(value)
+  return VALID_TUTORIAL_PLATFORMS.includes(platform) ? platform : 'other'
+}
+
+function normalizeTutorialList(value) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item, index) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return null
+      }
+
+      const title = normalizeString(item.title)
+      const url = normalizeString(item.url)
+      const note = normalizeString(item.note)
+
+      if (!title && !url && !note) {
+        return null
+      }
+
+      return {
+        title: title || `做法参考 ${index + 1}`,
+        platform: normalizeTutorialPlatform(item.platform),
+        url,
+        note,
+        enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+        sort_order: isNonNegativeNumber(item.sort_order)
+          ? Number(item.sort_order)
+          : index + 1
+      }
+    })
+    .filter(Boolean)
+    .slice(0, MAX_TUTORIAL_COUNT)
 }
 
 function hasOptions(dish = {}) {
@@ -220,6 +262,52 @@ function validateOptionGroups(specGroups = [], addonGroups = []) {
     validateOptionGroupList(addonGroups, 'addon', usedGroupIds)
 }
 
+function validateTutorialList(value) {
+  if (!Array.isArray(value)) {
+    return failure('VALIDATION_ERROR', '做法参考必须是数组')
+  }
+
+  const meaningfulTutorials = value.filter((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return false
+    }
+
+    return Boolean(
+      normalizeString(item.title) ||
+      normalizeString(item.url) ||
+      normalizeString(item.note)
+    )
+  })
+
+  if (meaningfulTutorials.length > MAX_TUTORIAL_COUNT) {
+    return failure('VALIDATION_ERROR', '做法参考最多配置 3 条')
+  }
+
+  for (const item of meaningfulTutorials) {
+    if (item.platform !== undefined && !VALID_TUTORIAL_PLATFORMS.includes(normalizeString(item.platform))) {
+      return failure('VALIDATION_ERROR', '做法参考平台类型不合法')
+    }
+
+    if (normalizeString(item.title).length > 30) {
+      return failure('VALIDATION_ERROR', '做法参考标题不能超过 30 字')
+    }
+
+    if (normalizeString(item.url).length > 500) {
+      return failure('VALIDATION_ERROR', '做法参考链接或口令不能超过 500 字')
+    }
+
+    if (normalizeString(item.note).length > 80) {
+      return failure('VALIDATION_ERROR', '做法参考备注不能超过 80 字')
+    }
+
+    if (item.enabled !== undefined && typeof item.enabled !== 'boolean') {
+      return failure('VALIDATION_ERROR', '做法参考启用状态必须是布尔值')
+    }
+  }
+
+  return null
+}
+
 function isActiveMerchantStaff(staff, merchantId, openid) {
   return Boolean(
     staff &&
@@ -264,6 +352,7 @@ function formatDish(dish = {}) {
     sold_out: normalizeBooleanDefault(dish.sold_out, false),
     spec_groups: normalizeOptionGroupList(dish.spec_groups),
     addon_groups: normalizeOptionGroupList(dish.addon_groups),
+    tutorials: normalizeTutorialList(dish.tutorials),
     has_options: hasOptions(dish),
     sort_order: Number(dish.sort_order) || 0,
     created_at: dish.created_at || null,
@@ -359,6 +448,7 @@ function buildDishCreateData(deps, merchantId, data, now, dishId, sortOrder) {
     sold_out: hasOwn(data, 'sold_out') ? data.sold_out : false,
     spec_groups: hasOwn(data, 'spec_groups') ? data.spec_groups : [],
     addon_groups: hasOwn(data, 'addon_groups') ? data.addon_groups : [],
+    tutorials: hasOwn(data, 'tutorials') ? normalizeTutorialList(data.tutorials) : [],
     sort_order: sortOrder,
     created_at: now,
     updated_at: now
@@ -425,6 +515,10 @@ function applyDishUpdateData(updateData, data) {
     updateData.addon_groups = data.addon_groups
   }
 
+  if (hasOwn(data, 'tutorials')) {
+    updateData.tutorials = normalizeTutorialList(data.tutorials)
+  }
+
   if (data.sort_order !== undefined) {
     updateData.sort_order = normalizeSortOrder(data.sort_order)
   }
@@ -479,6 +573,13 @@ function validateDishData(data, options = {}) {
 
   if (hasOwn(data, 'sold_out') && typeof data.sold_out !== 'boolean') {
     return failure('VALIDATION_ERROR', '售罄开关必须是布尔值')
+  }
+
+  if (hasOwn(data, 'tutorials')) {
+    const tutorialError = validateTutorialList(data.tutorials)
+    if (tutorialError) {
+      return tutorialError
+    }
   }
 
   if (hasOwn(data, 'spec_groups') || hasOwn(data, 'addon_groups')) {

@@ -119,6 +119,51 @@ const ORDER_ITEMS = [
   }
 ]
 
+const DISHES = [
+  {
+    dish_id: 'dish_001',
+    merchant_id: 'merchant_001',
+    name: '招牌肥牛石锅拌饭',
+    tutorials: [
+      {
+        title: '韩式牛肉拌饭做法',
+        platform: 'douyin',
+        url: 'douyin-token-001',
+        note: '重点看酱料比例',
+        enabled: true,
+        sort_order: 1
+      },
+      {
+        title: '停用教程',
+        platform: 'other',
+        url: 'hidden',
+        note: '',
+        enabled: false,
+        sort_order: 2
+      }
+    ]
+  },
+  {
+    dish_id: 'dish_002',
+    merchant_id: 'merchant_001',
+    name: '经典肉酱砂锅米线'
+  },
+  {
+    dish_id: 'dish_003',
+    merchant_id: 'merchant_002',
+    name: '其他商家餐品',
+    tutorials: [
+      {
+        title: '其他商家教程',
+        platform: 'douyin',
+        url: 'forbidden',
+        enabled: true,
+        sort_order: 1
+      }
+    ]
+  }
+]
+
 const STAFF = [
   {
     merchant_id: 'merchant_001',
@@ -155,6 +200,8 @@ function createDependencies(overrides = {}) {
       ORDER_ITEMS.filter(
         (item) => item.order_id === orderId && item.merchant_id === merchantId
       ),
+    findDishesByIds: async (dishIds, merchantId) =>
+      DISHES.filter((dish) => dish.merchant_id === merchantId && dishIds.includes(dish.dish_id)),
     logError: () => {},
     ...overrides
   }
@@ -202,6 +249,11 @@ test('active merchant staff can view own merchant order detail', async () => {
   ])
   assert.deepEqual(result.data.items[1].selected_specs, [])
   assert.deepEqual(result.data.items[1].selected_addons, [])
+  assert.equal(result.data.items[0].tutorials.length, 1)
+  assert.equal(result.data.items[0].tutorials[0].title, '韩式牛肉拌饭做法')
+  assert.equal(result.data.items[0].tutorials[0].platform, 'douyin')
+  assert.equal(result.data.items[0].tutorials[0].url, 'douyin-token-001')
+  assert.deepEqual(result.data.items[1].tutorials, [])
 })
 
 test('unauthorized user cannot view merchant order detail', async () => {
@@ -282,6 +334,23 @@ test('order without items still returns order main info', async () => {
   assert.equal(result.success, true)
   assert.equal(result.data.order.order_id, 'order_empty_items')
   assert.deepEqual(result.data.items, [])
+})
+
+test('merchant order detail remains compatible when dish tutorials are unavailable', async () => {
+  const handler = createGetMerchantOrderDetailHandler(
+    createDependencies({
+      findDishesByIds: undefined
+    })
+  )
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    order_id: 'order_001'
+  })
+
+  assert.equal(result.success, true)
+  assert.deepEqual(result.data.items[0].tutorials, [])
+  assert.deepEqual(result.data.items[1].tutorials, [])
 })
 
 test('missing openid returns unauthorized', async () => {

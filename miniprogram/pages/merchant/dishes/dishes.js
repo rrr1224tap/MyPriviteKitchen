@@ -17,6 +17,19 @@ const STATUS_FILTERS = [
   { label: '下架', value: 'off_sale' }
 ]
 
+const MAX_TUTORIAL_COUNT = 3
+const TUTORIAL_PLATFORM_OPTIONS = [
+  { label: '抖音', value: 'douyin' },
+  { label: '小红书', value: 'xiaohongshu' },
+  { label: 'B站', value: 'bilibili' },
+  { label: '其他', value: 'other' }
+]
+
+function createLocalId(prefix) {
+  const random = Math.random().toString(36).slice(2, 8)
+  return `${prefix}_${Date.now()}_${random}`
+}
+
 function getNavigationMetrics() {
   const windowInfo = wx.getWindowInfo
     ? wx.getWindowInfo()
@@ -168,6 +181,90 @@ function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function normalizeTutorialPlatform(value) {
+  const platform = normalizeString(value)
+  return TUTORIAL_PLATFORM_OPTIONS.some((option) => option.value === platform)
+    ? platform
+    : 'other'
+}
+
+function getTutorialPlatformIndex(platform) {
+  const value = normalizeTutorialPlatform(platform)
+  const index = TUTORIAL_PLATFORM_OPTIONS.findIndex((option) => option.value === value)
+  return index >= 0 ? index : TUTORIAL_PLATFORM_OPTIONS.length - 1
+}
+
+function createTutorialItem(item = {}, index = 0) {
+  const platform = normalizeTutorialPlatform(item.platform)
+  const platformIndex = getTutorialPlatformIndex(platform)
+  return {
+    title: normalizeString(item.title),
+    platform,
+    platform_index: platformIndex,
+    platform_text: TUTORIAL_PLATFORM_OPTIONS[platformIndex].label,
+    url: normalizeString(item.url),
+    note: normalizeString(item.note),
+    enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+    sort_order: Number(item.sort_order) || index + 1
+  }
+}
+
+function normalizeTutorials(value) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item, index) => createTutorialItem(item, index))
+    .filter((item) => item.title || item.url || item.note)
+    .slice(0, MAX_TUTORIAL_COUNT)
+}
+
+function normalizeSelectCount(value, fallback) {
+  const numberValue = Number(value)
+  return Number.isInteger(numberValue) && numberValue >= 0 ? numberValue : fallback
+}
+
+function getOptionGroupField(type) {
+  return type === 'addon' ? 'addon_groups' : 'spec_groups'
+}
+
+function createOptionItem(item = {}, index = 0, type = 'spec') {
+  const priceText = normalizeString(item.price_delta_yuan)
+  return {
+    option_id: normalizeString(item.option_id) || createLocalId(`${type}_option`),
+    name: normalizeString(item.name),
+    price_delta_yuan: priceText || centsToYuan(item.price_delta_cent),
+    enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+    sort_order: Number(item.sort_order) || index + 1
+  }
+}
+
+function createOptionGroup(type = 'spec', index = 0, group = {}) {
+  const isSpec = type === 'spec'
+  const options = Array.isArray(group.options)
+    ? group.options.map((option, optionIndex) => createOptionItem(option, optionIndex, type))
+    : []
+
+  return {
+    group_id: normalizeString(group.group_id) || createLocalId(`${type}_group`),
+    name: normalizeString(group.name),
+    required: typeof group.required === 'boolean' ? group.required : isSpec,
+    min_select: normalizeSelectCount(group.min_select, isSpec ? 1 : 0),
+    max_select: normalizeSelectCount(group.max_select, isSpec ? 1 : 3),
+    sort_order: Number(group.sort_order) || index + 1,
+    options
+  }
+}
+
+function normalizeOptionGroups(groups, type = 'spec') {
+  if (!Array.isArray(groups)) {
+    return []
+  }
+
+  return groups.map((group, index) => createOptionGroup(type, index, group))
+}
+
 function normalizeTagsText(tags) {
   return Array.isArray(tags) ? tags.filter(Boolean).join('，') : ''
 }
@@ -236,6 +333,9 @@ function normalizeDish(dish = {}, categoryMap = {}) {
     status,
     status_text: DISH_STATUS_TEXT[status] || '未知状态',
     status_class: `status-${status}`,
+    spec_groups: normalizeOptionGroups(dish.spec_groups, 'spec'),
+    addon_groups: normalizeOptionGroups(dish.addon_groups, 'addon'),
+    tutorials: normalizeTutorials(dish.tutorials),
     ...stockDisplay,
     sort_order: Number(dish.sort_order) || 0
   }
@@ -255,6 +355,9 @@ function createEmptyForm(categoryId = '', categoryName = '', sortOrder = 1) {
     stock_enabled: false,
     stock_count: '0',
     sold_out: false,
+    spec_groups: [],
+    addon_groups: [],
+    tutorials: [],
     sort_order: String(sortOrder)
   }
 }
@@ -283,6 +386,7 @@ Page({
     formTitle: '新增餐品',
     formDishId: '',
     formData: createEmptyForm(),
+    tutorialPlatformOptions: TUTORIAL_PLATFORM_OPTIONS,
     formCategoryOptions: [],
     formCategoryIndex: 0,
     uploadingImage: false,
@@ -533,6 +637,9 @@ Page({
         stock_enabled: dish.stock_enabled,
         stock_count: String(dish.stock_count),
         sold_out: dish.sold_out,
+        spec_groups: normalizeOptionGroups(dish.spec_groups, 'spec'),
+        addon_groups: normalizeOptionGroups(dish.addon_groups, 'addon'),
+        tutorials: normalizeTutorials(dish.tutorials),
         sort_order: String(dish.sort_order)
       }
     })
@@ -655,6 +762,331 @@ Page({
     })
   },
 
+  getFormOptionGroups(type) {
+    const field = getOptionGroupField(type)
+    return Array.isArray(this.data.formData[field])
+      ? this.data.formData[field].map((group) => ({
+        ...group,
+        options: Array.isArray(group.options) ? group.options.slice() : []
+      }))
+      : []
+  },
+
+  handleAddOptionGroup(event) {
+    const type = event.currentTarget.dataset.type === 'addon' ? 'addon' : 'spec'
+    const field = getOptionGroupField(type)
+    const groups = this.getFormOptionGroups(type)
+    groups.push(createOptionGroup(type, groups.length))
+    this.setData({
+      [`formData.${field}`]: groups
+    })
+  },
+
+  handleRemoveOptionGroup(event) {
+    const type = event.currentTarget.dataset.type === 'addon' ? 'addon' : 'spec'
+    const field = getOptionGroupField(type)
+    const groupIndex = Number(event.currentTarget.dataset.groupIndex)
+    const groups = this.getFormOptionGroups(type)
+
+    if (groupIndex < 0 || groupIndex >= groups.length) {
+      return
+    }
+
+    groups.splice(groupIndex, 1)
+    this.setData({
+      [`formData.${field}`]: groups.map((group, index) => createOptionGroup(type, index, {
+        ...group,
+        sort_order: index + 1
+      }))
+    })
+  },
+
+  handleOptionGroupInput(event) {
+    const type = event.currentTarget.dataset.type === 'addon' ? 'addon' : 'spec'
+    const field = getOptionGroupField(type)
+    const groupIndex = Number(event.currentTarget.dataset.groupIndex)
+    const inputField = event.currentTarget.dataset.field
+    const groups = this.getFormOptionGroups(type)
+
+    if (!groups[groupIndex] || !inputField) {
+      return
+    }
+
+    groups[groupIndex] = createOptionGroup(type, groupIndex, {
+      ...groups[groupIndex],
+      [inputField]: event.detail.value
+    })
+    this.setData({
+      [`formData.${field}`]: groups
+    })
+  },
+
+  handleAddOption(event) {
+    const type = event.currentTarget.dataset.type === 'addon' ? 'addon' : 'spec'
+    const field = getOptionGroupField(type)
+    const groupIndex = Number(event.currentTarget.dataset.groupIndex)
+    const groups = this.getFormOptionGroups(type)
+
+    if (!groups[groupIndex]) {
+      return
+    }
+
+    const options = Array.isArray(groups[groupIndex].options)
+      ? groups[groupIndex].options.slice()
+      : []
+    options.push(createOptionItem({}, options.length, type))
+    groups[groupIndex] = createOptionGroup(type, groupIndex, {
+      ...groups[groupIndex],
+      options
+    })
+    this.setData({
+      [`formData.${field}`]: groups
+    })
+  },
+
+  handleRemoveOption(event) {
+    const type = event.currentTarget.dataset.type === 'addon' ? 'addon' : 'spec'
+    const field = getOptionGroupField(type)
+    const groupIndex = Number(event.currentTarget.dataset.groupIndex)
+    const optionIndex = Number(event.currentTarget.dataset.optionIndex)
+    const groups = this.getFormOptionGroups(type)
+
+    if (!groups[groupIndex] || optionIndex < 0 || optionIndex >= groups[groupIndex].options.length) {
+      return
+    }
+
+    const options = groups[groupIndex].options.slice()
+    options.splice(optionIndex, 1)
+    groups[groupIndex] = createOptionGroup(type, groupIndex, {
+      ...groups[groupIndex],
+      options: options.map((option, index) => createOptionItem(option, index, type))
+    })
+    this.setData({
+      [`formData.${field}`]: groups
+    })
+  },
+
+  handleOptionInput(event) {
+    const type = event.currentTarget.dataset.type === 'addon' ? 'addon' : 'spec'
+    const field = getOptionGroupField(type)
+    const groupIndex = Number(event.currentTarget.dataset.groupIndex)
+    const optionIndex = Number(event.currentTarget.dataset.optionIndex)
+    const inputField = event.currentTarget.dataset.field
+    const groups = this.getFormOptionGroups(type)
+
+    if (!groups[groupIndex] || !groups[groupIndex].options[optionIndex] || !inputField) {
+      return
+    }
+
+    const options = groups[groupIndex].options.slice()
+    options[optionIndex] = createOptionItem({
+      ...options[optionIndex],
+      [inputField]: event.detail.value
+    }, optionIndex, type)
+    groups[groupIndex] = createOptionGroup(type, groupIndex, {
+      ...groups[groupIndex],
+      options
+    })
+    this.setData({
+      [`formData.${field}`]: groups
+    })
+  },
+
+  handleOptionSwitchChange(event) {
+    const type = event.currentTarget.dataset.type === 'addon' ? 'addon' : 'spec'
+    const field = getOptionGroupField(type)
+    const groupIndex = Number(event.currentTarget.dataset.groupIndex)
+    const optionIndex = Number(event.currentTarget.dataset.optionIndex)
+    const groups = this.getFormOptionGroups(type)
+
+    if (!groups[groupIndex] || !groups[groupIndex].options[optionIndex]) {
+      return
+    }
+
+    const options = groups[groupIndex].options.slice()
+    options[optionIndex] = createOptionItem({
+      ...options[optionIndex],
+      enabled: event.detail.value
+    }, optionIndex, type)
+    groups[groupIndex] = createOptionGroup(type, groupIndex, {
+      ...groups[groupIndex],
+      options
+    })
+    this.setData({
+      [`formData.${field}`]: groups
+    })
+  },
+
+  handleAddTutorial() {
+    const tutorials = Array.isArray(this.data.formData.tutorials)
+      ? this.data.formData.tutorials.slice()
+      : []
+
+    if (tutorials.length >= MAX_TUTORIAL_COUNT) {
+      wx.showToast({
+        title: '做法参考最多 3 条',
+        icon: 'none'
+      })
+      return
+    }
+
+    tutorials.push(createTutorialItem({}, tutorials.length))
+    this.setData({
+      'formData.tutorials': tutorials
+    })
+  },
+
+  handleRemoveTutorial(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const tutorials = Array.isArray(this.data.formData.tutorials)
+      ? this.data.formData.tutorials.slice()
+      : []
+
+    if (index < 0 || index >= tutorials.length) {
+      return
+    }
+
+    tutorials.splice(index, 1)
+    this.setData({
+      'formData.tutorials': tutorials.map((item, nextIndex) => createTutorialItem({
+        ...item,
+        sort_order: nextIndex + 1
+      }, nextIndex))
+    })
+  },
+
+  handleTutorialInput(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const field = event.currentTarget.dataset.field
+    const tutorials = Array.isArray(this.data.formData.tutorials)
+      ? this.data.formData.tutorials.slice()
+      : []
+
+    if (!tutorials[index] || !field) {
+      return
+    }
+
+    tutorials[index] = createTutorialItem({
+      ...tutorials[index],
+      [field]: event.detail.value
+    }, index)
+
+    this.setData({
+      'formData.tutorials': tutorials
+    })
+  },
+
+  handleTutorialPlatformChange(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const optionIndex = Number(event.detail.value)
+    const option = TUTORIAL_PLATFORM_OPTIONS[optionIndex]
+    const tutorials = Array.isArray(this.data.formData.tutorials)
+      ? this.data.formData.tutorials.slice()
+      : []
+
+    if (!tutorials[index] || !option) {
+      return
+    }
+
+    tutorials[index] = createTutorialItem({
+      ...tutorials[index],
+      platform: option.value
+    }, index)
+
+    this.setData({
+      'formData.tutorials': tutorials
+    })
+  },
+
+  handleTutorialSwitchChange(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const tutorials = Array.isArray(this.data.formData.tutorials)
+      ? this.data.formData.tutorials.slice()
+      : []
+
+    if (!tutorials[index]) {
+      return
+    }
+
+    tutorials[index] = createTutorialItem({
+      ...tutorials[index],
+      enabled: event.detail.value
+    }, index)
+
+    this.setData({
+      'formData.tutorials': tutorials
+    })
+  },
+
+  normalizeFormTutorials(tutorials) {
+    return normalizeTutorials(tutorials).map((item, index) => ({
+      title: item.title || `做法参考 ${index + 1}`,
+      platform: item.platform,
+      url: item.url,
+      note: item.note,
+      enabled: item.enabled,
+      sort_order: index + 1
+    }))
+  },
+
+  normalizeFormOptionGroups(groups, type = 'spec') {
+    const isSpec = type === 'spec'
+    const normalizedGroups = normalizeOptionGroups(groups, type)
+    const result = []
+
+    for (const group of normalizedGroups) {
+      const groupName = normalizeString(group.name)
+      const optionPayload = []
+
+      for (const option of group.options) {
+        const optionName = normalizeString(option.name)
+        const priceText = normalizeString(option.price_delta_yuan)
+        const priceCent = yuanToCent(priceText, { allowEmpty: true })
+
+        if (priceCent === null) {
+          return { error: isSpec ? '请输入正确的规格加价' : '请输入正确的加料加价' }
+        }
+
+        if (!optionName && priceCent === 0) {
+          continue
+        }
+
+        if (!optionName) {
+          return { error: isSpec ? '请输入规格项名称' : '请输入加料项名称' }
+        }
+
+        optionPayload.push({
+          option_id: option.option_id,
+          name: optionName,
+          price_delta_cent: priceCent,
+          enabled: Boolean(option.enabled),
+          sort_order: optionPayload.length + 1
+        })
+      }
+
+      if (!groupName && !optionPayload.length) {
+        continue
+      }
+
+      if (!groupName) {
+        return { error: isSpec ? '请输入规格组名称' : '请输入加料组名称' }
+      }
+
+      const maxSelect = isSpec ? 1 : normalizeSelectCount(group.max_select, 3)
+      result.push({
+        group_id: group.group_id,
+        name: groupName,
+        required: isSpec,
+        min_select: isSpec ? 1 : 0,
+        max_select: isSpec ? 1 : maxSelect,
+        sort_order: result.length + 1,
+        options: optionPayload
+      })
+    }
+
+    return { data: result }
+  },
+
   async submitForm() {
     if (this.data.submitting) {
       return
@@ -751,6 +1183,16 @@ Page({
       return { error: '排序必须是非负整数' }
     }
 
+    const specGroups = this.normalizeFormOptionGroups(formData.spec_groups, 'spec')
+    if (specGroups.error) {
+      return specGroups
+    }
+
+    const addonGroups = this.normalizeFormOptionGroups(formData.addon_groups, 'addon')
+    if (addonGroups.error) {
+      return addonGroups
+    }
+
     return {
       data: {
         category_id: categoryId,
@@ -764,6 +1206,9 @@ Page({
         stock_enabled: Boolean(formData.stock_enabled),
         stock_count: stockCount,
         sold_out: Boolean(formData.sold_out),
+        spec_groups: specGroups.data,
+        addon_groups: addonGroups.data,
+        tutorials: this.normalizeFormTutorials(formData.tutorials),
         sort_order: sortOrder
       }
     }

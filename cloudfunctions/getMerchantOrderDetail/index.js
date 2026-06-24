@@ -8,6 +8,7 @@ cloud.init({
 })
 
 const db = cloud.database()
+const _ = db.command
 
 async function findOne(collectionName, where) {
   const result = await db.collection(collectionName).where(where).limit(1).get()
@@ -45,6 +46,23 @@ async function findOrderItemsByOrderId(orderId, merchantId) {
   return result.data || []
 }
 
+async function findDishesByIds(dishIds, merchantId) {
+  if (!Array.isArray(dishIds) || !dishIds.length) {
+    return []
+  }
+
+  const result = await db
+    .collection('dishes')
+    .where({
+      merchant_id: merchantId,
+      dish_id: _.in(dishIds)
+    })
+    .limit(1000)
+    .get()
+
+  return result.data || []
+}
+
 exports.main = createGetMerchantOrderDetailHandler({
   getOpenid: () => {
     const wxContext = cloud.getWXContext()
@@ -53,5 +71,6 @@ exports.main = createGetMerchantOrderDetailHandler({
   findMerchantStaff,
   findOrderById,
   findOrderItemsByOrderId,
+  findDishesByIds,
   logError: console.error
 })

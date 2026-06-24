@@ -280,6 +280,362 @@
             />
           </view>
         </view>
+
+        <view class="option-panel">
+          <view class="option-panel-head">
+            <view>
+              <view class="field-label">规格配置</view>
+              <view class="option-panel-desc">用于标准份、大份等规格选择，第一阶段按单选规格保存</view>
+            </view>
+            <button
+              class="option-add-button"
+              data-type="spec"
+              bindtap="handleAddOptionGroup"
+            >添加规格</button>
+          </view>
+
+          <view wx:if="{{!formData.spec_groups.length}}" class="option-empty">
+            暂无规格配置，可先保存为空
+          </view>
+
+          <view
+            wx:for="{{formData.spec_groups}}"
+            wx:for-item="group"
+            wx:for-index="groupIndex"
+            wx:key="group_id"
+            class="option-group-card"
+          >
+            <view class="option-group-head">
+              <view class="option-group-title">规格组 {{groupIndex + 1}}</view>
+              <button
+                class="option-remove-button"
+                data-type="spec"
+                data-group-index="{{groupIndex}}"
+                bindtap="handleRemoveOptionGroup"
+              >删除</button>
+            </view>
+
+            <view class="form-field">
+              <view class="field-label">规格组名称</view>
+              <input
+                class="field-input"
+                value="{{group.name}}"
+                data-type="spec"
+                data-group-index="{{groupIndex}}"
+                data-field="name"
+                bindinput="handleOptionGroupInput"
+                placeholder="例如：份量"
+              />
+            </view>
+
+            <view
+              wx:for="{{group.options}}"
+              wx:for-item="option"
+              wx:for-index="optionIndex"
+              wx:key="option_id"
+              class="option-item-card"
+            >
+              <view class="option-item-head">
+                <view class="option-item-title">规格项 {{optionIndex + 1}}</view>
+                <button
+                  class="option-remove-button small"
+                  data-type="spec"
+                  data-group-index="{{groupIndex}}"
+                  data-option-index="{{optionIndex}}"
+                  bindtap="handleRemoveOption"
+                >删除</button>
+              </view>
+
+              <view class="form-grid">
+                <view class="form-field">
+                  <view class="field-label">规格名称</view>
+                  <input
+                    class="field-input"
+                    value="{{option.name}}"
+                    data-type="spec"
+                    data-group-index="{{groupIndex}}"
+                    data-option-index="{{optionIndex}}"
+                    data-field="name"
+                    bindinput="handleOptionInput"
+                    placeholder="例如：大份"
+                  />
+                </view>
+
+                <view class="form-field">
+                  <view class="field-label">加价（元）</view>
+                  <input
+                    class="field-input"
+                    type="digit"
+                    value="{{option.price_delta_yuan}}"
+                    data-type="spec"
+                    data-group-index="{{groupIndex}}"
+                    data-option-index="{{optionIndex}}"
+                    data-field="price_delta_yuan"
+                    bindinput="handleOptionInput"
+                    placeholder="0.00"
+                  />
+                </view>
+              </view>
+
+              <view class="switch-row option-switch-row">
+                <view>
+                  <view class="switch-title">启用该规格项</view>
+                  <view class="switch-desc">关闭后用户端不会展示该规格项</view>
+                </view>
+                <switch
+                  checked="{{option.enabled}}"
+                  color="#43A047"
+                  data-type="spec"
+                  data-group-index="{{groupIndex}}"
+                  data-option-index="{{optionIndex}}"
+                  bindchange="handleOptionSwitchChange"
+                />
+              </view>
+            </view>
+
+            <button
+              class="option-add-sub-button"
+              data-type="spec"
+              data-group-index="{{groupIndex}}"
+              bindtap="handleAddOption"
+            >添加规格项</button>
+          </view>
+        </view>
+
+        <view class="option-panel">
+          <view class="option-panel-head">
+            <view>
+              <view class="field-label">加料配置</view>
+              <view class="option-panel-desc">用于加蛋、加肥牛等可选加料，不影响原有规格配置</view>
+            </view>
+            <button
+              class="option-add-button"
+              data-type="addon"
+              bindtap="handleAddOptionGroup"
+            >添加加料</button>
+          </view>
+
+          <view wx:if="{{!formData.addon_groups.length}}" class="option-empty">
+            暂无加料配置，可先保存为空
+          </view>
+
+          <view
+            wx:for="{{formData.addon_groups}}"
+            wx:for-item="group"
+            wx:for-index="groupIndex"
+            wx:key="group_id"
+            class="option-group-card"
+          >
+            <view class="option-group-head">
+              <view class="option-group-title">加料组 {{groupIndex + 1}}</view>
+              <button
+                class="option-remove-button"
+                data-type="addon"
+                data-group-index="{{groupIndex}}"
+                bindtap="handleRemoveOptionGroup"
+              >删除</button>
+            </view>
+
+            <view class="form-grid">
+              <view class="form-field">
+                <view class="field-label">加料组名称</view>
+                <input
+                  class="field-input"
+                  value="{{group.name}}"
+                  data-type="addon"
+                  data-group-index="{{groupIndex}}"
+                  data-field="name"
+                  bindinput="handleOptionGroupInput"
+                  placeholder="例如：加料"
+                />
+              </view>
+
+              <view class="form-field">
+                <view class="field-label">最多可选</view>
+                <input
+                  class="field-input"
+                  type="number"
+                  value="{{group.max_select}}"
+                  data-type="addon"
+                  data-group-index="{{groupIndex}}"
+                  data-field="max_select"
+                  bindinput="handleOptionGroupInput"
+                  placeholder="3"
+                />
+              </view>
+            </view>
+
+            <view
+              wx:for="{{group.options}}"
+              wx:for-item="option"
+              wx:for-index="optionIndex"
+              wx:key="option_id"
+              class="option-item-card"
+            >
+              <view class="option-item-head">
+                <view class="option-item-title">加料项 {{optionIndex + 1}}</view>
+                <button
+                  class="option-remove-button small"
+                  data-type="addon"
+                  data-group-index="{{groupIndex}}"
+                  data-option-index="{{optionIndex}}"
+                  bindtap="handleRemoveOption"
+                >删除</button>
+              </view>
+
+              <view class="form-grid">
+                <view class="form-field">
+                  <view class="field-label">加料名称</view>
+                  <input
+                    class="field-input"
+                    value="{{option.name}}"
+                    data-type="addon"
+                    data-group-index="{{groupIndex}}"
+                    data-option-index="{{optionIndex}}"
+                    data-field="name"
+                    bindinput="handleOptionInput"
+                    placeholder="例如：加蛋"
+                  />
+                </view>
+
+                <view class="form-field">
+                  <view class="field-label">加价（元）</view>
+                  <input
+                    class="field-input"
+                    type="digit"
+                    value="{{option.price_delta_yuan}}"
+                    data-type="addon"
+                    data-group-index="{{groupIndex}}"
+                    data-option-index="{{optionIndex}}"
+                    data-field="price_delta_yuan"
+                    bindinput="handleOptionInput"
+                    placeholder="2.00"
+                  />
+                </view>
+              </view>
+
+              <view class="switch-row option-switch-row">
+                <view>
+                  <view class="switch-title">启用该加料项</view>
+                  <view class="switch-desc">关闭后用户端不会展示该加料项</view>
+                </view>
+                <switch
+                  checked="{{option.enabled}}"
+                  color="#43A047"
+                  data-type="addon"
+                  data-group-index="{{groupIndex}}"
+                  data-option-index="{{optionIndex}}"
+                  bindchange="handleOptionSwitchChange"
+                />
+              </view>
+            </view>
+
+            <button
+              class="option-add-sub-button"
+              data-type="addon"
+              data-group-index="{{groupIndex}}"
+              bindtap="handleAddOption"
+            >添加加料项</button>
+          </view>
+        </view>
+
+        <view class="tutorial-panel">
+          <view class="tutorial-panel-head">
+            <view>
+              <view class="field-label">做法参考</view>
+              <view class="tutorial-panel-desc">最多 3 条，仅商家端备料和做菜时查看</view>
+            </view>
+            <button
+              class="tutorial-add-button"
+              bindtap="handleAddTutorial"
+              disabled="{{formData.tutorials.length >= 3}}"
+            >添加</button>
+          </view>
+
+          <view wx:if="{{!formData.tutorials.length}}" class="tutorial-empty">
+            暂无做法参考，可先保存为空
+          </view>
+
+          <view
+            wx:for="{{formData.tutorials}}"
+            wx:key="sort_order"
+            class="tutorial-card"
+          >
+            <view class="tutorial-card-head">
+              <view class="tutorial-card-title">做法参考 {{index + 1}}</view>
+              <button
+                class="tutorial-remove-button"
+                data-index="{{index}}"
+                bindtap="handleRemoveTutorial"
+              >删除</button>
+            </view>
+
+            <view class="form-field">
+              <view class="field-label">教程标题</view>
+              <input
+                class="field-input"
+                value="{{item.title}}"
+                maxlength="30"
+                data-index="{{index}}"
+                data-field="title"
+                bindinput="handleTutorialInput"
+                placeholder="例如：韩式牛肉拌饭做法"
+              />
+            </view>
+
+            <view class="form-field">
+              <view class="field-label">平台类型</view>
+              <picker
+                range="{{tutorialPlatformOptions}}"
+                range-key="label"
+                value="{{item.platform_index}}"
+                data-index="{{index}}"
+                bindchange="handleTutorialPlatformChange"
+              >
+                <view class="field-picker">{{item.platform_text || '其他'}}</view>
+              </picker>
+            </view>
+
+            <view class="form-field">
+              <view class="field-label">链接 / 口令</view>
+              <textarea
+                class="field-textarea tutorial-textarea"
+                value="{{item.url}}"
+                maxlength="500"
+                data-index="{{index}}"
+                data-field="url"
+                bindinput="handleTutorialInput"
+                placeholder="可粘贴抖音口令、分享链接或文字路径"
+              ></textarea>
+            </view>
+
+            <view class="form-field">
+              <view class="field-label">备注</view>
+              <textarea
+                class="field-textarea"
+                value="{{item.note}}"
+                maxlength="80"
+                data-index="{{index}}"
+                data-field="note"
+                bindinput="handleTutorialInput"
+                placeholder="例如：重点看酱料比例"
+              ></textarea>
+            </view>
+
+            <view class="switch-row tutorial-switch-row">
+              <view>
+                <view class="switch-title">启用该参考</view>
+                <view class="switch-desc">关闭后订单详情中不会展示</view>
+              </view>
+              <switch
+                checked="{{item.enabled}}"
+                color="#43A047"
+                data-index="{{index}}"
+                bindchange="handleTutorialSwitchChange"
+              />
+            </view>
+          </view>
+        </view>
       </scroll-view>
 
       <view class="form-actions">

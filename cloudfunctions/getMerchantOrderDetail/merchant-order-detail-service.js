@@ -24,6 +24,9 @@ function asList(value) {
   return Array.isArray(value) ? value : []
 }
 
+const VALID_TUTORIAL_PLATFORMS = ['douyin', 'xiaohongshu', 'bilibili', 'other']
+const MAX_TUTORIAL_COUNT = 3
+
 function isSafeAmount(value) {
   return Number.isInteger(value) && value >= 0
 }
@@ -43,6 +46,61 @@ function isActiveMerchantStaff(staff = {}, merchantId, openid) {
     staff.openid === openid &&
     staff.status === 'active'
   )
+}
+
+function normalizeTutorialPlatform(value) {
+  const platform = normalizeText(value)
+  return VALID_TUTORIAL_PLATFORMS.includes(platform) ? platform : 'other'
+}
+
+function normalizeTutorialList(value, enabledOnly = false) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item, index) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return null
+      }
+
+      const title = normalizeText(item.title)
+      const url = normalizeText(item.url)
+      const note = normalizeText(item.note)
+
+      if (!title && !url && !note) {
+        return null
+      }
+
+      const enabled = typeof item.enabled === 'boolean' ? item.enabled : true
+      if (enabledOnly && !enabled) {
+        return null
+      }
+
+      return {
+        title: title || `做法参考 ${index + 1}`,
+        platform: normalizeTutorialPlatform(item.platform),
+        url,
+        note,
+        enabled,
+        sort_order: Number.isFinite(Number(item.sort_order))
+          ? Number(item.sort_order)
+          : index + 1
+      }
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.sort_order - right.sort_order)
+    .slice(0, MAX_TUTORIAL_COUNT)
+}
+
+function buildTutorialMap(dishes = []) {
+  return asList(dishes).reduce((map, dish) => {
+    const dishId = dish && (dish.dish_id || dish._id || '')
+    if (dishId) {
+      map[dishId] = normalizeTutorialList(dish.tutorials, true)
+    }
+    return map
+  }, {})
 }
 
 function formatOrder(order = {}) {
@@ -71,7 +129,7 @@ function formatOrder(order = {}) {
   }
 }
 
-function formatOrderItem(item = {}) {
+function formatOrderItem(item = {}, tutorialMap = {}) {
   const unitPriceCent = Number(item.unit_price_cent || item.price_cent)
   const basePriceCent = Number(item.base_price_cent)
   const specDeltaCent = Number(item.spec_delta_cent)
@@ -98,6 +156,7 @@ function formatOrderItem(item = {}) {
     subtotal_cent: isSafeAmount(subtotalCent) ? subtotalCent : 0,
     selected_specs: Array.isArray(item.selected_specs) ? item.selected_specs : [],
     selected_addons: Array.isArray(item.selected_addons) ? item.selected_addons : [],
+    tutorials: tutorialMap[item.dish_id] || [],
     created_at: item.created_at || null
   }
 }
@@ -142,12 +201,21 @@ function createGetMerchantOrderDetailHandler(dependencies) {
         resolvedOrderId,
         merchantId
       )
+      const merchantItems = asList(items)
+        .filter((item) => !item.merchant_id || item.merchant_id === merchantId)
+      const dishIds = Array.from(new Set(
+        merchantItems
+          .map((item) => normalizeText(item.dish_id))
+          .filter(Boolean)
+      ))
+      const dishes = typeof dependencies.findDishesByIds === 'function' && dishIds.length
+        ? await dependencies.findDishesByIds(dishIds, merchantId)
+        : []
+      const tutorialMap = buildTutorialMap(dishes)
 
       return success('获取商家订单详情成功', {
         order: formatOrder(order),
-        items: asList(items)
-          .filter((item) => !item.merchant_id || item.merchant_id === merchantId)
-          .map(formatOrderItem)
+        items: merchantItems.map((item) => formatOrderItem(item, tutorialMap))
       })
     } catch (error) {
       if (typeof dependencies.logError === 'function') {

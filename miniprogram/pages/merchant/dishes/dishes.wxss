@@ -717,6 +717,197 @@ textarea {
   margin-top: 18rpx;
 }
 
+.option-panel {
+  margin-top: 20rpx;
+  padding: 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.78);
+  border-radius: 26rpx;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.68), 0 10rpx 24rpx rgba(126, 90, 45, 0.06);
+}
+
+.option-panel-head,
+.option-group-head,
+.option-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.option-panel-desc {
+  margin-top: 8rpx;
+  color: rgba(42, 33, 29, 0.48);
+  font-size: 21rpx;
+  line-height: 1.4;
+}
+
+.option-add-button,
+.option-remove-button,
+.option-add-sub-button {
+  flex: none;
+  height: 56rpx;
+  padding: 0 22rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 900;
+  line-height: 56rpx;
+  text-align: center;
+}
+
+.option-add-button,
+.option-add-sub-button {
+  color: #fff7ed;
+  background: linear-gradient(145deg, #ff6640 0%, #ef3f38 100%);
+  box-shadow: 0 12rpx 24rpx rgba(226, 49, 37, 0.18);
+}
+
+.option-add-sub-button {
+  width: 100%;
+  margin-top: 18rpx;
+}
+
+.option-remove-button {
+  min-width: 96rpx;
+  color: #c9313c;
+  background: rgba(255, 250, 244, 0.78);
+  border: 1rpx solid rgba(201, 49, 60, 0.16);
+}
+
+.option-remove-button.small {
+  min-width: 84rpx;
+  height: 50rpx;
+  padding: 0 18rpx;
+  font-size: 21rpx;
+  line-height: 50rpx;
+}
+
+.option-empty {
+  margin-top: 18rpx;
+  padding: 24rpx;
+  border-radius: 22rpx;
+  color: rgba(42, 33, 29, 0.52);
+  font-size: 23rpx;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.option-group-card {
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.82);
+  border-radius: 24rpx;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(255, 248, 238, 0.56));
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.88), 0 8rpx 20rpx rgba(126, 90, 45, 0.06);
+}
+
+.option-group-title,
+.option-item-title {
+  color: #2a211d;
+  font-size: 25rpx;
+  font-weight: 900;
+}
+
+.option-item-card {
+  margin-top: 18rpx;
+  padding: 16rpx;
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.54);
+  border: 1rpx solid rgba(255, 255, 255, 0.72);
+}
+
+.option-switch-row {
+  margin-top: 16rpx;
+}
+
+.tutorial-panel {
+  margin-top: 20rpx;
+  padding: 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.78);
+  border-radius: 26rpx;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.68), 0 10rpx 24rpx rgba(126, 90, 45, 0.06);
+}
+
+.tutorial-panel-head,
+.tutorial-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.tutorial-panel-desc {
+  margin-top: 8rpx;
+  color: rgba(42, 33, 29, 0.48);
+  font-size: 21rpx;
+  line-height: 1.4;
+}
+
+.tutorial-add-button,
+.tutorial-remove-button {
+  flex: none;
+  min-width: 112rpx;
+  height: 56rpx;
+  padding: 0 22rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 900;
+  line-height: 56rpx;
+  text-align: center;
+}
+
+.tutorial-add-button {
+  color: #fff7ed;
+  background: linear-gradient(145deg, #ff6640 0%, #ef3f38 100%);
+  box-shadow: 0 12rpx 24rpx rgba(226, 49, 37, 0.18);
+}
+
+.tutorial-add-button[disabled] {
+  color: rgba(107, 74, 61, 0.42);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: none;
+}
+
+.tutorial-empty {
+  margin-top: 18rpx;
+  padding: 24rpx;
+  border-radius: 22rpx;
+  color: rgba(42, 33, 29, 0.52);
+  font-size: 23rpx;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.tutorial-card {
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.82);
+  border-radius: 24rpx;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(255, 248, 238, 0.56));
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.88), 0 8rpx 20rpx rgba(126, 90, 45, 0.06);
+}
+
+.tutorial-card-title {
+  color: #2a211d;
+  font-size: 25rpx;
+  font-weight: 900;
+}
+
+.tutorial-remove-button {
+  color: #c9313c;
+  background: rgba(255, 250, 244, 0.78);
+  border: 1rpx solid rgba(201, 49, 60, 0.16);
+}
+
+.tutorial-textarea {
+  min-height: 150rpx;
+}
+
+.tutorial-switch-row {
+  margin-top: 18rpx;
+}
+
 .form-actions {
   display: flex;
   gap: 18rpx;

@@ -81,6 +81,28 @@
               <view class="dish-quantity">x{{item.quantity}}</view>
               <view class="dish-subtotal">{{item.subtotal_text}}</view>
             </view>
+            <view wx:if="{{item.has_tutorials}}" class="tutorial-section">
+              <view class="tutorial-title">做法参考</view>
+              <view
+                wx:for="{{item.tutorials}}"
+                wx:for-item="tutorial"
+                wx:for-index="tutorialIndex"
+                wx:key="sort_order"
+                class="tutorial-item"
+              >
+                <view class="tutorial-head">
+                  <view class="tutorial-name">{{tutorial.title}}</view>
+                  <view class="tutorial-platform">{{tutorial.platform_text}}</view>
+                </view>
+                <view wx:if="{{tutorial.note}}" class="tutorial-note">{{tutorial.note}}</view>
+                <button
+                  wx:if="{{tutorial.has_copy}}"
+                  class="tutorial-copy-button"
+                  data-url="{{tutorial.url}}"
+                  bindtap="handleCopyTutorial"
+                >复制链接/口令</button>
+              </view>
+            </view>
           </view>
 
           <view wx:if="{{!items.length}}" class="empty-items">
