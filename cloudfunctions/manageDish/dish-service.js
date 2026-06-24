@@ -46,6 +46,7 @@ const DISH_DATA_FIELDS = [
   'spec_groups',
   'addon_groups',
   'tutorials',
+  'ingredients',
   'sort_order'
 ]
 
@@ -146,6 +147,46 @@ function normalizeTutorialList(value) {
     })
     .filter(Boolean)
     .slice(0, MAX_TUTORIAL_COUNT)
+}
+
+function normalizeIngredientAmount(value) {
+  const amount = Number(value)
+  return Number.isFinite(amount) && amount >= 0 ? amount : 0
+}
+
+function normalizeIngredientList(value) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item, index) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return null
+      }
+
+      const name = normalizeString(item.name)
+      if (!name) {
+        return null
+      }
+
+      return {
+        name,
+        amount: normalizeIngredientAmount(item.amount),
+        unit: normalizeString(item.unit),
+        category: normalizeString(item.category) || '其他',
+        note: normalizeString(item.note),
+        enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+        sort_order: isNonNegativeNumber(item.sort_order)
+          ? Number(item.sort_order)
+          : index + 1
+      }
+    })
+    .filter(Boolean)
+    .map((item, index) => ({
+      ...item,
+      sort_order: index + 1
+    }))
 }
 
 function hasOptions(dish = {}) {
@@ -308,6 +349,45 @@ function validateTutorialList(value) {
   return null
 }
 
+function validateIngredientList(value) {
+  if (!Array.isArray(value)) {
+    return failure('VALIDATION_ERROR', '食材配置必须是数组')
+  }
+
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return failure('VALIDATION_ERROR', '食材配置不合法')
+    }
+
+    const name = normalizeString(item.name)
+    if (!name) {
+      continue
+    }
+
+    if (name.length > 30) {
+      return failure('VALIDATION_ERROR', '食材名称不能超过 30 字')
+    }
+
+    if (normalizeString(item.unit).length > 10) {
+      return failure('VALIDATION_ERROR', '食材单位不能超过 10 字')
+    }
+
+    if (normalizeString(item.category).length > 12) {
+      return failure('VALIDATION_ERROR', '食材分类不能超过 12 字')
+    }
+
+    if (normalizeString(item.note).length > 80) {
+      return failure('VALIDATION_ERROR', '食材备注不能超过 80 字')
+    }
+
+    if (item.enabled !== undefined && typeof item.enabled !== 'boolean') {
+      return failure('VALIDATION_ERROR', '食材启用状态必须是布尔值')
+    }
+  }
+
+  return null
+}
+
 function isActiveMerchantStaff(staff, merchantId, openid) {
   return Boolean(
     staff &&
@@ -353,6 +433,7 @@ function formatDish(dish = {}) {
     spec_groups: normalizeOptionGroupList(dish.spec_groups),
     addon_groups: normalizeOptionGroupList(dish.addon_groups),
     tutorials: normalizeTutorialList(dish.tutorials),
+    ingredients: normalizeIngredientList(dish.ingredients),
     has_options: hasOptions(dish),
     sort_order: Number(dish.sort_order) || 0,
     created_at: dish.created_at || null,
@@ -449,6 +530,7 @@ function buildDishCreateData(deps, merchantId, data, now, dishId, sortOrder) {
     spec_groups: hasOwn(data, 'spec_groups') ? data.spec_groups : [],
     addon_groups: hasOwn(data, 'addon_groups') ? data.addon_groups : [],
     tutorials: hasOwn(data, 'tutorials') ? normalizeTutorialList(data.tutorials) : [],
+    ingredients: hasOwn(data, 'ingredients') ? normalizeIngredientList(data.ingredients) : [],
     sort_order: sortOrder,
     created_at: now,
     updated_at: now
@@ -519,6 +601,10 @@ function applyDishUpdateData(updateData, data) {
     updateData.tutorials = normalizeTutorialList(data.tutorials)
   }
 
+  if (hasOwn(data, 'ingredients')) {
+    updateData.ingredients = normalizeIngredientList(data.ingredients)
+  }
+
   if (data.sort_order !== undefined) {
     updateData.sort_order = normalizeSortOrder(data.sort_order)
   }
@@ -579,6 +665,13 @@ function validateDishData(data, options = {}) {
     const tutorialError = validateTutorialList(data.tutorials)
     if (tutorialError) {
       return tutorialError
+    }
+  }
+
+  if (hasOwn(data, 'ingredients')) {
+    const ingredientError = validateIngredientList(data.ingredients)
+    if (ingredientError) {
+      return ingredientError
     }
   }
 

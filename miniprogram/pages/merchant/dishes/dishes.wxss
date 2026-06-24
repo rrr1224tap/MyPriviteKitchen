@@ -820,6 +820,84 @@ textarea {
   margin-top: 16rpx;
 }
 
+.ingredient-panel {
+  margin-top: 20rpx;
+  padding: 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.78);
+  border-radius: 26rpx;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.68), 0 10rpx 24rpx rgba(126, 90, 45, 0.06);
+}
+
+.ingredient-panel-head,
+.ingredient-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.ingredient-panel-desc {
+  margin-top: 8rpx;
+  color: rgba(42, 33, 29, 0.48);
+  font-size: 21rpx;
+  line-height: 1.4;
+}
+
+.ingredient-add-button,
+.ingredient-remove-button {
+  flex: none;
+  min-width: 112rpx;
+  height: 56rpx;
+  padding: 0 22rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 900;
+  line-height: 56rpx;
+  text-align: center;
+}
+
+.ingredient-add-button {
+  color: #fff7ed;
+  background: linear-gradient(145deg, #ff6640 0%, #ef3f38 100%);
+  box-shadow: 0 12rpx 24rpx rgba(226, 49, 37, 0.18);
+}
+
+.ingredient-remove-button {
+  color: #c9313c;
+  background: rgba(255, 250, 244, 0.78);
+  border: 1rpx solid rgba(201, 49, 60, 0.16);
+}
+
+.ingredient-empty {
+  margin-top: 18rpx;
+  padding: 24rpx;
+  border-radius: 22rpx;
+  color: rgba(42, 33, 29, 0.52);
+  font-size: 23rpx;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.ingredient-card {
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.82);
+  border-radius: 24rpx;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(255, 248, 238, 0.56));
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.88), 0 8rpx 20rpx rgba(126, 90, 45, 0.06);
+}
+
+.ingredient-card-title {
+  color: #2a211d;
+  font-size: 25rpx;
+  font-weight: 900;
+}
+
+.ingredient-switch-row {
+  margin-top: 18rpx;
+}
+
 .tutorial-panel {
   margin-top: 20rpx;
   padding: 20rpx;

@@ -61,6 +61,19 @@ function createValidTutorials(count = 1, overrides = {}) {
   }))
 }
 
+function createValidIngredients(count = 1, overrides = {}) {
+  return Array.from({ length: count }, (_, index) => ({
+    name: index === 0 ? '牛肉片' : `食材 ${index + 1}`,
+    amount: index === 0 ? 150 : index + 1,
+    unit: index === 0 ? 'g' : '份',
+    category: index === 0 ? '肉类' : '其他',
+    note: index === 0 ? '可用肥牛卷替代' : '',
+    enabled: true,
+    sort_order: index + 1,
+    ...overrides
+  }))
+}
+
 function createDependencies(options = {}) {
   const state = {
     openid: options.openid || 'staff_openid',
@@ -241,6 +254,7 @@ test('active merchant staff can list dishes for their merchant only', async () =
   assert.deepEqual(result.data.list[0].spec_groups, [])
   assert.deepEqual(result.data.list[0].addon_groups, [])
   assert.deepEqual(result.data.list[0].tutorials, [])
+  assert.deepEqual(result.data.list[0].ingredients, [])
   assert.equal(result.data.list[0].has_options, false)
 })
 
@@ -285,12 +299,14 @@ test('create adds an on_sale dish with database price in cents', async () => {
   assert.deepEqual(result.data.dish.spec_groups, [])
   assert.deepEqual(result.data.dish.addon_groups, [])
   assert.deepEqual(result.data.dish.tutorials, [])
+  assert.deepEqual(result.data.dish.ingredients, [])
   assert.equal(result.data.dish.has_options, false)
   assert.equal(state.dishes.some((dish) => dish.dish_id === 'dish_new_1'), true)
   const createdDish = state.dishes.find((dish) => dish.dish_id === 'dish_new_1')
   assert.deepEqual(createdDish.spec_groups, [])
   assert.deepEqual(createdDish.addon_groups, [])
   assert.deepEqual(createdDish.tutorials, [])
+  assert.deepEqual(createdDish.ingredients, [])
 })
 
 test('create saves valid spec_groups and addon_groups', async () => {
@@ -363,6 +379,97 @@ test('create saves up to three tutorial references', async () => {
   assert.equal(result.success, true)
   assert.equal(result.data.dish.tutorials.length, 3)
   assert.equal(createdDish.tutorials.length, 3)
+})
+
+test('create saves dish ingredients without affecting options or tutorials', async () => {
+  const { state, deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+  const specGroups = createValidSpecGroups()
+  const addonGroups = createValidAddonGroups()
+  const tutorials = createValidTutorials(1)
+  const ingredients = createValidIngredients(2)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '带食材配置餐品',
+      price_cent: 2990,
+      spec_groups: specGroups,
+      addon_groups: addonGroups,
+      tutorials,
+      ingredients
+    }
+  })
+
+  const createdDish = state.dishes.find((dish) => dish.dish_id === 'dish_new_1')
+  assert.equal(result.success, true)
+  assert.deepEqual(result.data.dish.ingredients, ingredients)
+  assert.deepEqual(result.data.dish.spec_groups, specGroups)
+  assert.deepEqual(result.data.dish.addon_groups, addonGroups)
+  assert.equal(result.data.dish.tutorials.length, 1)
+  assert.deepEqual(createdDish.ingredients, ingredients)
+})
+
+test('create filters empty ingredients and normalizes optional ingredient fields', async () => {
+  const { state, deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '过滤空食材餐品',
+      price_cent: 2990,
+      ingredients: [
+        {},
+        {
+          name: '  鸡蛋  ',
+          amount: '1.5',
+          unit: ' 个 ',
+          category: '',
+          note: '  可不加  ',
+          enabled: false
+        }
+      ]
+    }
+  })
+
+  const createdDish = state.dishes.find((dish) => dish.dish_id === 'dish_new_1')
+  assert.equal(result.success, true)
+  assert.deepEqual(result.data.dish.ingredients, [
+    {
+      name: '鸡蛋',
+      amount: 1.5,
+      unit: '个',
+      category: '其他',
+      note: '可不加',
+      enabled: false,
+      sort_order: 1
+    }
+  ])
+  assert.deepEqual(createdDish.ingredients, result.data.dish.ingredients)
+})
+
+test('create fails when ingredients is not an array', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'create',
+    data: {
+      category_id: 'category_001',
+      name: '错误食材餐品',
+      price_cent: 2990,
+      ingredients: {}
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
 })
 
 test('create filters empty tutorials and fills default title', async () => {
@@ -663,6 +770,49 @@ test('update can delete tutorials by saving an empty list', async () => {
   assert.equal(result.success, true)
   assert.deepEqual(result.data.dish.tutorials, [])
   assert.deepEqual(dish.tutorials, [])
+})
+
+test('update can modify and delete ingredients', async () => {
+  const { state, deps } = createDependencies({
+    dishes: [
+      {
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        category_id: 'category_001',
+        name: '已有食材餐品',
+        price_cent: 2990,
+        status: 'on_sale',
+        sort_order: 1,
+        ingredients: createValidIngredients(2)
+      }
+    ]
+  })
+  const handler = createManageDishHandler(deps)
+  const nextIngredients = [
+    {
+      name: '牛肉片',
+      amount: 180,
+      unit: 'g',
+      category: '肉类',
+      note: '加量',
+      enabled: true,
+      sort_order: 1
+    }
+  ]
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'update',
+    dish_id: 'dish_001',
+    data: {
+      ingredients: nextIngredients
+    }
+  })
+
+  const dish = state.dishes.find((item) => item.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.deepEqual(result.data.dish.ingredients, nextIngredients)
+  assert.deepEqual(dish.ingredients, nextIngredients)
 })
 
 test('update saves valid spec_groups and addon_groups', async () => {

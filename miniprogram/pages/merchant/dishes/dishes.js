@@ -265,6 +265,42 @@ function normalizeOptionGroups(groups, type = 'spec') {
   return groups.map((group, index) => createOptionGroup(type, index, group))
 }
 
+function normalizeIngredientAmount(value) {
+  const text = String(value === undefined || value === null ? '' : value).trim()
+  if (!text) {
+    return ''
+  }
+
+  const numberValue = Number(text)
+  return Number.isFinite(numberValue) && numberValue >= 0 ? String(numberValue) : '0'
+}
+
+function createIngredientItem(item = {}, index = 0) {
+  return {
+    name: normalizeString(item.name),
+    amount: normalizeIngredientAmount(item.amount),
+    unit: normalizeString(item.unit),
+    category: normalizeString(item.category) || '其他',
+    note: normalizeString(item.note),
+    enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+    sort_order: Number(item.sort_order) || index + 1
+  }
+}
+
+function normalizeIngredients(value) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item, index) => createIngredientItem(item, index))
+    .filter((item) => item.name)
+    .map((item, index) => ({
+      ...item,
+      sort_order: index + 1
+    }))
+}
+
 function normalizeTagsText(tags) {
   return Array.isArray(tags) ? tags.filter(Boolean).join('，') : ''
 }
@@ -336,6 +372,7 @@ function normalizeDish(dish = {}, categoryMap = {}) {
     spec_groups: normalizeOptionGroups(dish.spec_groups, 'spec'),
     addon_groups: normalizeOptionGroups(dish.addon_groups, 'addon'),
     tutorials: normalizeTutorials(dish.tutorials),
+    ingredients: normalizeIngredients(dish.ingredients),
     ...stockDisplay,
     sort_order: Number(dish.sort_order) || 0
   }
@@ -358,6 +395,7 @@ function createEmptyForm(categoryId = '', categoryName = '', sortOrder = 1) {
     spec_groups: [],
     addon_groups: [],
     tutorials: [],
+    ingredients: [],
     sort_order: String(sortOrder)
   }
 }
@@ -640,6 +678,7 @@ Page({
         spec_groups: normalizeOptionGroups(dish.spec_groups, 'spec'),
         addon_groups: normalizeOptionGroups(dish.addon_groups, 'addon'),
         tutorials: normalizeTutorials(dish.tutorials),
+        ingredients: normalizeIngredients(dish.ingredients),
         sort_order: String(dish.sort_order)
       }
     })
@@ -917,6 +956,77 @@ Page({
     })
   },
 
+  handleAddIngredient() {
+    const ingredients = Array.isArray(this.data.formData.ingredients)
+      ? this.data.formData.ingredients.slice()
+      : []
+
+    ingredients.push(createIngredientItem({}, ingredients.length))
+    this.setData({
+      'formData.ingredients': ingredients
+    })
+  },
+
+  handleRemoveIngredient(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const ingredients = Array.isArray(this.data.formData.ingredients)
+      ? this.data.formData.ingredients.slice()
+      : []
+
+    if (index < 0 || index >= ingredients.length) {
+      return
+    }
+
+    ingredients.splice(index, 1)
+    this.setData({
+      'formData.ingredients': ingredients.map((item, nextIndex) => createIngredientItem({
+        ...item,
+        sort_order: nextIndex + 1
+      }, nextIndex))
+    })
+  },
+
+  handleIngredientInput(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const field = event.currentTarget.dataset.field
+    const ingredients = Array.isArray(this.data.formData.ingredients)
+      ? this.data.formData.ingredients.slice()
+      : []
+
+    if (!ingredients[index] || !field) {
+      return
+    }
+
+    ingredients[index] = createIngredientItem({
+      ...ingredients[index],
+      [field]: event.detail.value
+    }, index)
+
+    this.setData({
+      'formData.ingredients': ingredients
+    })
+  },
+
+  handleIngredientSwitchChange(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const ingredients = Array.isArray(this.data.formData.ingredients)
+      ? this.data.formData.ingredients.slice()
+      : []
+
+    if (!ingredients[index]) {
+      return
+    }
+
+    ingredients[index] = createIngredientItem({
+      ...ingredients[index],
+      enabled: event.detail.value
+    }, index)
+
+    this.setData({
+      'formData.ingredients': ingredients
+    })
+  },
+
   handleAddTutorial() {
     const tutorials = Array.isArray(this.data.formData.tutorials)
       ? this.data.formData.tutorials.slice()
@@ -1023,6 +1133,18 @@ Page({
       title: item.title || `做法参考 ${index + 1}`,
       platform: item.platform,
       url: item.url,
+      note: item.note,
+      enabled: item.enabled,
+      sort_order: index + 1
+    }))
+  },
+
+  normalizeFormIngredients(ingredients) {
+    return normalizeIngredients(ingredients).map((item, index) => ({
+      name: item.name,
+      amount: Number(item.amount) || 0,
+      unit: item.unit,
+      category: item.category || '其他',
       note: item.note,
       enabled: item.enabled,
       sort_order: index + 1
@@ -1208,6 +1330,7 @@ Page({
         sold_out: Boolean(formData.sold_out),
         spec_groups: specGroups.data,
         addon_groups: addonGroups.data,
+        ingredients: this.normalizeFormIngredients(formData.ingredients),
         tutorials: this.normalizeFormTutorials(formData.tutorials),
         sort_order: sortOrder
       }

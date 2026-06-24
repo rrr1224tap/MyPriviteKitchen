@@ -539,6 +539,118 @@
           </view>
         </view>
 
+        <view class="ingredient-panel">
+          <view class="ingredient-panel-head">
+            <view>
+              <view class="field-label">食材配置</view>
+              <view class="ingredient-panel-desc">用于后续备料汇总，普通用户不可见</view>
+            </view>
+            <button
+              class="ingredient-add-button"
+              bindtap="handleAddIngredient"
+            >添加食材</button>
+          </view>
+
+          <view wx:if="{{!formData.ingredients.length}}" class="ingredient-empty">
+            暂无食材配置，可先保存为空
+          </view>
+
+          <view
+            wx:for="{{formData.ingredients}}"
+            wx:key="sort_order"
+            class="ingredient-card"
+          >
+            <view class="ingredient-card-head">
+              <view class="ingredient-card-title">食材 {{index + 1}}</view>
+              <button
+                class="ingredient-remove-button"
+                data-index="{{index}}"
+                bindtap="handleRemoveIngredient"
+              >删除</button>
+            </view>
+
+            <view class="form-field">
+              <view class="field-label">食材名称</view>
+              <input
+                class="field-input"
+                value="{{item.name}}"
+                maxlength="30"
+                data-index="{{index}}"
+                data-field="name"
+                bindinput="handleIngredientInput"
+                placeholder="例如：牛肉片"
+              />
+            </view>
+
+            <view class="form-grid">
+              <view class="form-field">
+                <view class="field-label">每份用量</view>
+                <input
+                  class="field-input"
+                  type="digit"
+                  value="{{item.amount}}"
+                  data-index="{{index}}"
+                  data-field="amount"
+                  bindinput="handleIngredientInput"
+                  placeholder="150"
+                />
+              </view>
+
+              <view class="form-field">
+                <view class="field-label">单位</view>
+                <input
+                  class="field-input"
+                  value="{{item.unit}}"
+                  maxlength="10"
+                  data-index="{{index}}"
+                  data-field="unit"
+                  bindinput="handleIngredientInput"
+                  placeholder="g"
+                />
+              </view>
+            </view>
+
+            <view class="form-field">
+              <view class="field-label">食材分类</view>
+              <input
+                class="field-input"
+                value="{{item.category}}"
+                maxlength="12"
+                data-index="{{index}}"
+                data-field="category"
+                bindinput="handleIngredientInput"
+                placeholder="例如：肉类"
+              />
+            </view>
+
+            <view class="form-field">
+              <view class="field-label">备注</view>
+              <textarea
+                class="field-textarea"
+                value="{{item.note}}"
+                maxlength="80"
+                data-index="{{index}}"
+                data-field="note"
+                bindinput="handleIngredientInput"
+                placeholder="例如：可用肥牛卷替代"
+              ></textarea>
+            </view>
+
+            <view class="switch-row ingredient-switch-row">
+              <view>
+                <view class="switch-title">启用该食材</view>
+                <view class="switch-desc">关闭后后续备料汇总不会统计该食材</view>
+              </view>
+              <switch
+                checked="{{item.enabled}}"
+                color="#43A047"
+                data-index="{{index}}"
+                bindchange="handleIngredientSwitchChange"
+              />
+            </view>
+          </view>
+        </view>
+
         <view class="tutorial-panel">
           <view class="tutorial-panel-head">
             <view>
