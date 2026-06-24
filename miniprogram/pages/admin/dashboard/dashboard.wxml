@@ -63,7 +63,13 @@
 
       <view class="section-title">后台模块</view>
       <view class="module-grid">
-        <view wx:for="{{modules}}" wx:key="title" class="module-card warm-glass">
+        <view
+          wx:for="{{modules}}"
+          wx:key="title"
+          class="module-card warm-glass {{item.action ? 'is-clickable' : 'is-disabled'}}"
+          data-action="{{item.action}}"
+          bindtap="handleModuleTap"
+        >
           <view class="module-tag">{{item.tag}}</view>
           <view class="module-title">{{item.title}}</view>
           <view class="module-desc">{{item.desc}}</view>

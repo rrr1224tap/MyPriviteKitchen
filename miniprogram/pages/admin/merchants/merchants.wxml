@@ -1,0 +1,154 @@
+<view class="admin-merchants-page">
+  <view class="background-shade"></view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="nav-back" bindtap="goBack">
+      <image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image>
+    </view>
+    <view class="nav-title">商户管理</view>
+  </view>
+
+  <view class="merchant-content" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+    <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
+      <view class="state-mark">
+        <image class="state-icon-image" src="/images/icons/icon-clock.svg" mode="aspectFit"></image>
+      </view>
+      <view class="state-title">正在加载商户</view>
+      <view class="state-desc">请稍候，正在读取系统商户列表。</view>
+    </view>
+
+    <view wx:elif="{{pageStatus === 'no_permission'}}" class="state-card glass-panel">
+      <view class="state-mark is-warning">
+        <image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image>
+      </view>
+      <view class="state-title">没有系统管理权限</view>
+      <view class="state-desc">当前账号不是超级管理员，无法管理商户。</view>
+      <button class="primary-button state-button" bindtap="goHome">返回首页</button>
+    </view>
+
+    <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
+      <view class="state-mark is-warning">
+        <image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image>
+      </view>
+      <view class="state-title">商户加载失败</view>
+      <view class="state-desc">{{errorMessage}}</view>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+      <button class="secondary-button state-secondary" bindtap="goHome">返回首页</button>
+    </view>
+
+    <block wx:else>
+      <view class="page-hero glass-panel">
+        <view>
+          <view class="hero-kicker">SYSTEM MERCHANTS</view>
+          <view class="hero-title">商户管理</view>
+          <view class="hero-desc">维护商户基础信息。第一版只建立商户档案，不影响当前默认商户点餐链路。</view>
+        </view>
+        <button class="primary-button hero-button" bindtap="openCreateForm">新增商户</button>
+      </view>
+
+      <view wx:if="{{refreshing}}" class="refresh-tip">正在刷新商户列表...</view>
+
+      <view wx:if="{{pageStatus === 'empty'}}" class="empty-card glass-panel">
+        <view class="state-mark">
+          <image class="state-icon-image" src="/images/icons/icon-store.svg" mode="aspectFit"></image>
+        </view>
+        <view class="state-title">还没有商户，请先创建一个商户</view>
+        <button class="primary-button state-button" bindtap="openCreateForm">新增商户</button>
+      </view>
+
+      <view wx:else class="merchant-list">
+        <view wx:for="{{merchants}}" wx:key="merchant_id" class="merchant-card warm-glass">
+          <view class="merchant-card-header">
+            <view class="merchant-title-wrap">
+              <view class="merchant-name">{{item.name}}</view>
+              <view class="merchant-id">{{item.merchant_id}}</view>
+            </view>
+            <view class="status-tag {{item.status_class}}">{{item.status_text}}</view>
+          </view>
+
+          <view class="merchant-meta">
+            <view class="meta-row">
+              <view class="meta-label">短名称</view>
+              <view class="meta-value">{{item.short_name || '未填写'}}</view>
+            </view>
+            <view class="meta-row">
+              <view class="meta-label">负责人</view>
+              <view class="meta-value">{{item.owner_display}}</view>
+            </view>
+            <view class="meta-row">
+              <view class="meta-label">更新时间</view>
+              <view class="meta-value">{{item.updated_at_text}}</view>
+            </view>
+          </view>
+
+          <view wx:if="{{item.notice}}" class="merchant-notice">{{item.notice}}</view>
+
+          <view class="merchant-actions">
+            <button class="secondary-button action-button" data-id="{{item.merchant_id}}" bindtap="openEditForm">编辑</button>
+            <button
+              class="ghost-button action-button {{item.status === 'disabled' ? 'is-enable' : 'is-disable'}}"
+              data-id="{{item.merchant_id}}"
+              data-status="{{item.status}}"
+              disabled="{{operatingMerchantId === item.merchant_id}}"
+              bindtap="handleToggleStatus"
+            >
+              {{operatingMerchantId === item.merchant_id ? '处理中...' : (item.status === 'disabled' ? '启用' : '禁用')}}
+            </button>
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <view wx:if="{{formVisible}}" class="form-mask" catchtap="closeForm">
+    <view class="merchant-form glass-panel" catchtap="noop">
+      <view class="form-header">
+        <view>
+          <view class="form-kicker">{{formMode === 'edit' ? 'EDIT MERCHANT' : 'NEW MERCHANT'}}</view>
+          <view class="form-title">{{formTitle}}</view>
+        </view>
+        <button class="form-close" bindtap="closeForm">×</button>
+      </view>
+
+      <view class="form-field">
+        <view class="field-label">商户 ID</view>
+        <input
+          class="field-input {{formMode === 'edit' ? 'is-readonly' : ''}}"
+          value="{{formData.merchant_id}}"
+          placeholder="例如 private_kitchen"
+          disabled="{{formMode === 'edit'}}"
+          data-field="merchant_id"
+          bindinput="handleInput"
+        />
+        <view class="field-help">仅支持小写英文、数字、下划线和短横线。</view>
+      </view>
+
+      <view class="form-field">
+        <view class="field-label">商户名称</view>
+        <input class="field-input" value="{{formData.name}}" placeholder="例如 小厨食堂" data-field="name" bindinput="handleInput" />
+      </view>
+
+      <view class="form-field">
+        <view class="field-label">短名称</view>
+        <input class="field-input" value="{{formData.short_name}}" placeholder="不填时默认使用商户名称" data-field="short_name" bindinput="handleInput" />
+      </view>
+
+      <view class="form-field">
+        <view class="field-label">负责人 OpenID</view>
+        <input class="field-input" value="{{formData.owner_openid}}" placeholder="可选" data-field="owner_openid" bindinput="handleInput" />
+      </view>
+
+      <view class="form-field">
+        <view class="field-label">备注</view>
+        <textarea class="field-textarea" value="{{formData.notice}}" placeholder="可选，用于记录商户备注" data-field="notice" bindinput="handleInput"></textarea>
+      </view>
+
+      <view class="form-actions">
+        <button class="secondary-button form-button" bindtap="closeForm">取消</button>
+        <button class="primary-button form-button" disabled="{{saving}}" bindtap="submitForm">
+          {{saving ? '保存中...' : '保存'}}
+        </button>
+      </view>
+    </view>
+  </view>
+</view>

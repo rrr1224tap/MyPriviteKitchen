@@ -38,8 +38,9 @@ Page({
     modules: [
       {
         title: '商户管理',
-        desc: '后续用于维护商户基础信息',
-        tag: '待开放'
+        desc: '维护商户基础信息',
+        tag: '已开放',
+        action: 'merchants'
       },
       {
         title: '商户成员',
@@ -121,6 +122,21 @@ Page({
   goMerchantDashboard() {
     wx.redirectTo({
       url: '/pages/merchant/dashboard/dashboard'
+    })
+  },
+
+  handleModuleTap(event) {
+    const action = event.currentTarget.dataset.action
+    if (action === 'merchants') {
+      wx.navigateTo({
+        url: '/pages/admin/merchants/merchants'
+      })
+      return
+    }
+
+    wx.showToast({
+      title: '暂未开放',
+      icon: 'none'
     })
   }
 })

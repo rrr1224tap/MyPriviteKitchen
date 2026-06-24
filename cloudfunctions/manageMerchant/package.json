@@ -1,0 +1,9 @@
+{
+  "name": "manageMerchant",
+  "version": "1.0.0",
+  "description": "Manage merchants for ordering mini program system admin",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}
