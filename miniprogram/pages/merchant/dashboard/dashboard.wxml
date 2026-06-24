@@ -73,6 +73,15 @@
       <view class="entry-arrow">→</view>
     </view>
 
+    <view wx:if="{{isSuperAdmin}}" class="entry-card warm-glass admin-entry-card" bindtap="goToAdminDashboard">
+      <view class="entry-icon admin-entry-icon"><image class="entry-icon-image" src="/images/icons/icon-store.svg" mode="aspectFit"></image></view>
+      <view class="entry-copy">
+        <view class="entry-title">系统管理</view>
+        <view class="entry-desc">超级管理员后台入口，商户与系统能力后续开放</view>
+      </view>
+      <view class="entry-arrow">→</view>
+    </view>
+
     <view class="tips-panel glass-panel">
       <view class="section-kicker">CHECKLIST</view>
       <view class="section-title">联调提醒</view>

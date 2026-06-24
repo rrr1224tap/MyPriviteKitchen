@@ -22,7 +22,8 @@ Page({
     navigationHeight: 44,
     backgroundImage: '/images/mock/home-glass-display.jpg',
     backgroundImageAvailable: true,
-    pageStatus: 'checking'
+    pageStatus: 'checking',
+    isSuperAdmin: false
   },
 
   onReady() {
@@ -35,21 +36,52 @@ Page({
 
   async checkMerchantAccess() {
     this.setData({
-      pageStatus: 'checking'
+      pageStatus: 'checking',
+      isSuperAdmin: false
     })
 
     try {
       await login()
+      const hasMerchantAccess = isMerchantStaff()
 
+      if (!hasMerchantAccess) {
+        this.setData({
+          pageStatus: 'no_permission',
+          isSuperAdmin: false
+        })
+        return
+      }
+
+      const adminProfile = await this.loadAdminProfile()
       this.setData({
-        pageStatus: isMerchantStaff() ? 'success' : 'no_permission'
+        pageStatus: 'success',
+        isSuperAdmin: Boolean(adminProfile && adminProfile.is_super_admin)
       })
     } catch (error) {
       console.warn('[merchant-dashboard] check merchant access failed:', error)
       this.setData({
-        pageStatus: 'no_permission'
+        pageStatus: 'no_permission',
+        isSuperAdmin: false
       })
     }
+  },
+
+  async loadAdminProfile() {
+    try {
+      const result = await wx.cloud.callFunction({
+        name: 'getAdminProfile',
+        data: {}
+      })
+      const response = result && result.result
+
+      if (response && response.success === true) {
+        return response.data || null
+      }
+    } catch (error) {
+      console.warn('[merchant-dashboard] load admin profile failed:', error)
+    }
+
+    return null
   },
 
   setupNavigation() {
@@ -111,6 +143,16 @@ Page({
 
     wx.navigateTo({
       url: '/pages/merchant/dishes/dishes'
+    })
+  },
+
+  goToAdminDashboard() {
+    if (this.data.pageStatus !== 'success' || !this.data.isSuperAdmin) {
+      return
+    }
+
+    wx.navigateTo({
+      url: '/pages/admin/dashboard/dashboard'
     })
   },
 

@@ -1,0 +1,13 @@
+{
+  "name": "get-admin-profile",
+  "version": "1.0.0",
+  "description": "Get system admin identity profile for ordering miniprogram",
+  "main": "index.js",
+  "scripts": {
+    "test": "node getAdminProfile.test.js"
+  },
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  },
+  "devDependencies": {}
+}

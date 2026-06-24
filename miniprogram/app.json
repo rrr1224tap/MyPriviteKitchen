@@ -8,6 +8,7 @@
     "pages/user/order-list/order-list",
     "pages/user/order-detail/order-detail",
     "pages/merchant/dashboard/dashboard",
+    "pages/admin/dashboard/dashboard",
     "pages/merchant/orders/orders",
     "pages/merchant/order-detail/order-detail",
     "pages/merchant/prep-summary/prep-summary",

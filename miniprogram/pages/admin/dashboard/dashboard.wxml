@@ -1,0 +1,79 @@
+<view class="admin-dashboard-page">
+  <view class="background-shade"></view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="nav-back" bindtap="goBack">
+      <image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image>
+    </view>
+    <view class="nav-title">系统管理</view>
+  </view>
+
+  <view class="admin-content" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+    <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
+      <view class="state-mark">
+        <image class="state-icon-image" src="/images/icons/icon-clock.svg" mode="aspectFit"></image>
+      </view>
+      <view class="state-title">正在确认系统管理身份</view>
+      <view class="state-desc">请稍候，正在检查当前账号是否具备超级管理员权限。</view>
+    </view>
+
+    <view wx:elif="{{pageStatus === 'no_permission'}}" class="state-card glass-panel">
+      <view class="state-mark is-warning">
+        <image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image>
+      </view>
+      <view class="state-title">没有系统管理权限</view>
+      <view class="state-desc">当前账号不是超级管理员，无法进入系统管理后台。</view>
+      <button class="state-button" bindtap="goHome">返回首页</button>
+    </view>
+
+    <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
+      <view class="state-mark is-warning">
+        <image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image>
+      </view>
+      <view class="state-title">身份加载失败</view>
+      <view class="state-desc">{{errorMessage}}</view>
+      <button class="state-button" bindtap="loadAdminProfile">重新加载</button>
+      <button class="secondary-button state-secondary" bindtap="goHome">返回首页</button>
+    </view>
+
+    <block wx:else>
+      <view class="admin-hero glass-panel">
+        <view>
+          <view class="hero-kicker">SYSTEM ADMIN</view>
+          <view class="hero-title">系统管理</view>
+          <view class="hero-desc">超级管理员身份已确认，后续系统级管理能力将在这里逐步开放。</view>
+        </view>
+        <view class="hero-badge">v0.4-A</view>
+      </view>
+
+      <view class="profile-card warm-glass">
+        <view class="profile-row">
+          <view class="profile-label">当前身份</view>
+          <view class="profile-value">super admin</view>
+        </view>
+        <view class="profile-row">
+          <view class="profile-label">OpenID</view>
+          <view class="profile-value">{{profile.masked_openid}}</view>
+        </view>
+        <view class="profile-row">
+          <view class="profile-label">版本</view>
+          <view class="profile-value">Private Kitchen v0.4-A</view>
+        </view>
+      </view>
+
+      <view class="section-title">后台模块</view>
+      <view class="module-grid">
+        <view wx:for="{{modules}}" wx:key="title" class="module-card warm-glass">
+          <view class="module-tag">{{item.tag}}</view>
+          <view class="module-title">{{item.title}}</view>
+          <view class="module-desc">{{item.desc}}</view>
+        </view>
+      </view>
+
+      <view class="action-row">
+        <button class="secondary-button" bindtap="goHome">返回首页</button>
+        <button class="state-button action-primary" bindtap="goMerchantDashboard">返回商家工作台</button>
+      </view>
+    </block>
+  </view>
+</view>
