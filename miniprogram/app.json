@@ -9,6 +9,7 @@
     "pages/user/order-detail/order-detail",
     "pages/merchant/dashboard/dashboard",
     "pages/admin/dashboard/dashboard",
+    "pages/admin/data-health/data-health",
     "pages/admin/merchants/merchants",
     "pages/admin/merchant-staff/merchant-staff",
     "pages/merchant/orders/orders",

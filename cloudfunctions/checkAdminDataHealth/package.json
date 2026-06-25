@@ -1,0 +1,9 @@
+{
+  "name": "check-admin-data-health",
+  "version": "1.0.0",
+  "description": "Check admin data health and run safe lightweight fixes",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

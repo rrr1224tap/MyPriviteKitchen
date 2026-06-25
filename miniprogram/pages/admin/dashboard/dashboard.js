@@ -170,6 +170,12 @@ Page({
         action: 'merchants'
       },
       {
+        title: '数据检查',
+        desc: '检查关键数据是否完整',
+        tag: '已开放',
+        action: 'dataHealth'
+      },
+      {
         title: '商户成员',
         desc: '后续用于管理商家人员身份',
         tag: '待开放'
@@ -329,6 +335,13 @@ Page({
     if (action === 'merchants') {
       wx.navigateTo({
         url: '/pages/admin/merchants/merchants'
+      })
+      return
+    }
+
+    if (action === 'dataHealth') {
+      wx.navigateTo({
+        url: '/pages/admin/data-health/data-health'
       })
       return
     }

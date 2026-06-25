@@ -1,0 +1,129 @@
+<view class="data-health-page">
+  <view class="background-shade"></view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="nav-back" bindtap="goBack">
+      <image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image>
+    </view>
+    <view class="nav-title">数据检查</view>
+  </view>
+
+  <view class="health-content" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+    <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
+      <view class="state-mark">
+        <image class="state-icon-image" src="/images/icons/icon-clock.svg" mode="aspectFit"></image>
+      </view>
+      <view class="state-title">正在检查关键数据</view>
+      <view class="state-desc">请稍候，正在读取商户、成员、邀请码、餐品、分类和订单数据。</view>
+    </view>
+
+    <view wx:elif="{{pageStatus === 'no_permission'}}" class="state-card glass-panel">
+      <view class="state-mark is-warning">
+        <image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image>
+      </view>
+      <view class="state-title">没有系统管理权限</view>
+      <view class="state-desc">当前账号不是超级管理员，无法查看数据检查结果。</view>
+      <button class="primary-button state-button" bindtap="goHome">返回首页</button>
+    </view>
+
+    <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
+      <view class="state-mark is-warning">
+        <image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image>
+      </view>
+      <view class="state-title">数据检查失败</view>
+      <view class="state-desc">{{errorMessage}}</view>
+      <button class="primary-button state-button" bindtap="retryLoad">重新检查</button>
+      <button class="secondary-button state-secondary" bindtap="goHome">返回首页</button>
+    </view>
+
+    <block wx:else>
+      <view class="page-hero glass-panel">
+        <view>
+          <view class="hero-kicker">DATA HEALTH</view>
+          <view class="hero-title">数据检查</view>
+          <view class="hero-desc">检查关键数据是否完整。默认只读，只有明确确认后才执行轻量修复。</view>
+        </view>
+        <button class="primary-button hero-button" bindtap="retryLoad">刷新</button>
+      </view>
+
+      <view wx:if="{{refreshing}}" class="refresh-tip">正在刷新数据检查结果...</view>
+
+      <view class="summary-grid">
+        <view class="summary-card warm-glass theme-red">
+          <view class="summary-title">问题总数</view>
+          <view class="summary-value">{{summary.total_issues}}</view>
+          <view class="summary-desc">错误 {{summary.error_count}} / 提醒 {{summary.warning_count}}</view>
+        </view>
+        <view class="summary-card warm-glass theme-orange">
+          <view class="summary-title">可轻量修复</view>
+          <view class="summary-value">{{summary.fixable_count}}</view>
+          <view class="summary-desc">仅限缺失 merchant_id</view>
+        </view>
+      </view>
+
+      <view class="health-meta">最近检查：{{generatedAtText}}</view>
+
+      <view wx:if="{{summary.total_issues === 0}}" class="good-card warm-glass">
+        <view class="good-title">数据状态良好</view>
+        <view class="good-desc">暂未发现需要处理的关键数据问题。</view>
+      </view>
+
+      <view wx:if="{{fixableActions.length > 0}}" class="fix-panel warm-glass">
+        <view class="panel-heading">轻量修复</view>
+        <view class="panel-desc">只允许补齐餐品 / 分类缺失的默认商户 ID，不会覆盖已有 merchant_id。</view>
+        <view class="fix-action-list">
+          <view wx:for="{{fixableActions}}" wx:key="action" class="fix-action">
+            <view>
+              <view class="fix-title">{{item.title}}</view>
+              <view class="fix-desc">待处理 {{item.count}} 条</view>
+            </view>
+            <button
+              class="secondary-button fix-button"
+              data-action="{{item.action}}"
+              disabled="{{operatingAction !== ''}}"
+              bindtap="handleFix"
+            >
+              {{operatingAction === item.action ? '修复中...' : '执行修复'}}
+            </button>
+          </view>
+        </view>
+      </view>
+
+      <view class="section-list">
+        <view wx:for="{{sections}}" wx:key="key" class="section-card warm-glass">
+          <view class="section-header">
+            <view>
+              <view class="section-title">{{item.title}}</view>
+              <view class="section-subtitle">发现 {{item.issue_count}} 条风险数据</view>
+            </view>
+            <view class="section-status {{item.status_class}}">{{item.status_text}}</view>
+          </view>
+
+          <view wx:if="{{item.issues.length === 0}}" class="section-empty">该部分暂未发现问题。</view>
+
+          <view wx:else class="issue-list">
+            <view wx:for="{{item.issues}}" wx:for-item="issue" wx:key="code" class="issue-item">
+              <view class="issue-main">
+                <view class="issue-title-row">
+                  <view class="issue-level {{issue.level_class}}">{{issue.level_text}}</view>
+                  <view class="issue-title">{{issue.title}}</view>
+                </view>
+                <view class="issue-desc">{{issue.description}}</view>
+                <view class="issue-code">{{issue.code}} · {{issue.count}} 条</view>
+              </view>
+              <button
+                wx:if="{{issue.show_fix_button}}"
+                class="secondary-button issue-fix-button"
+                data-action="{{issue.action}}"
+                disabled="{{operatingAction !== ''}}"
+                bindtap="handleFix"
+              >
+                修复
+              </button>
+            </view>
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>
