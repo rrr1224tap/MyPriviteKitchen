@@ -85,6 +85,7 @@
 
           <view class="merchant-actions">
             <button class="secondary-button action-button" data-id="{{item.merchant_id}}" bindtap="openEditForm">编辑</button>
+            <button class="secondary-button action-button" data-id="{{item.merchant_id}}" data-name="{{item.name}}" bindtap="goToStaff">成员 / 邀请</button>
             <button
               class="ghost-button action-button {{item.status === 'disabled' ? 'is-enable' : 'is-disable'}}"
               data-id="{{item.merchant_id}}"

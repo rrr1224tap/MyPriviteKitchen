@@ -10,9 +10,11 @@
     "pages/merchant/dashboard/dashboard",
     "pages/admin/dashboard/dashboard",
     "pages/admin/merchants/merchants",
+    "pages/admin/merchant-staff/merchant-staff",
     "pages/merchant/orders/orders",
     "pages/merchant/order-detail/order-detail",
     "pages/merchant/prep-summary/prep-summary",
+    "pages/merchant/invite-redeem/invite-redeem",
     "pages/merchant/categories/categories",
     "pages/merchant/dishes/dishes"
   ],

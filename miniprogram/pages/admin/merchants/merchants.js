@@ -299,6 +299,18 @@ Page({
     })
   },
 
+  goToStaff(event) {
+    const merchantId = event.currentTarget.dataset.id
+    const merchantName = event.currentTarget.dataset.name || ''
+    if (!merchantId) {
+      return
+    }
+
+    wx.navigateTo({
+      url: `/pages/admin/merchant-staff/merchant-staff?merchant_id=${encodeURIComponent(merchantId)}&name=${encodeURIComponent(merchantName)}`
+    })
+  },
+
   async updateMerchantStatus(action, merchantId) {
     if (this.data.operatingMerchantId) {
       return

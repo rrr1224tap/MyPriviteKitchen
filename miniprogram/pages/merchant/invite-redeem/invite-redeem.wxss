@@ -1,0 +1,214 @@
+page {
+  min-height: 100%;
+  background: #fbf3ea;
+}
+
+button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: 1;
+}
+
+button::after {
+  border: 0;
+}
+
+.invite-redeem-page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  color: #2b211b;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(255, 255, 255, 0.98), transparent 280rpx),
+    radial-gradient(circle at 86% 12%, rgba(255, 205, 142, 0.26), transparent 360rpx),
+    linear-gradient(180deg, #fff7ed 0%, #f7efe6 58%, #fbf6ef 100%);
+}
+
+.background-shade {
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 249, 241, 0.86) 0%, rgba(247, 239, 230, 0.84) 52%, rgba(251, 246, 239, 0.98) 100%),
+    radial-gradient(circle at 50% 20%, rgba(255, 216, 166, 0.24), transparent 46%);
+}
+
+.custom-nav {
+  position: fixed;
+  z-index: 20;
+  top: 0;
+  right: 0;
+  left: 0;
+  box-sizing: content-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.nav-title {
+  margin-bottom: 16rpx;
+  color: #2b211b;
+  font-size: 30rpx;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.redeem-content {
+  position: relative;
+  z-index: 2;
+  padding: 0 30rpx calc(56rpx + env(safe-area-inset-bottom));
+}
+
+.glass-panel,
+.warm-glass {
+  border: 1rpx solid rgba(255, 255, 255, 0.92);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(255, 248, 238, 0.64));
+  box-shadow:
+    0 20rpx 56rpx rgba(126, 90, 45, 0.13),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.95),
+    inset 0 -18rpx 42rpx rgba(255, 226, 191, 0.1);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
+}
+
+.redeem-hero {
+  padding: 34rpx;
+  border-radius: 36rpx;
+}
+
+.hero-kicker {
+  color: #ef5a32;
+  font-size: 20rpx;
+  font-weight: 800;
+  letter-spacing: 1rpx;
+}
+
+.hero-title {
+  margin-top: 10rpx;
+  color: #2b211b;
+  font-size: 44rpx;
+  font-weight: 900;
+}
+
+.hero-desc {
+  margin-top: 12rpx;
+  color: #7a6a5e;
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.redeem-card,
+.success-card {
+  margin-top: 28rpx;
+  padding: 32rpx;
+  border-radius: 34rpx;
+}
+
+.field-label {
+  margin-bottom: 14rpx;
+  color: #2b211b;
+  font-size: 25rpx;
+  font-weight: 900;
+}
+
+.code-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 88rpx;
+  padding: 0 26rpx;
+  border: 1rpx solid rgba(126, 90, 45, 0.1);
+  border-radius: 26rpx;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.92);
+  color: #2b211b;
+  font-size: 28rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+}
+
+.input-placeholder {
+  color: #b09d8d;
+  font-size: 25rpx;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.primary-button,
+.secondary-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 78rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  font-weight: 900;
+}
+
+.primary-button {
+  background: linear-gradient(145deg, #ff6640 0%, #f2382a 52%, #e92425 100%);
+  box-shadow: 0 14rpx 30rpx rgba(226, 49, 37, 0.22), inset 0 2rpx 4rpx rgba(255, 255, 255, 0.28);
+  color: #fffaf4;
+}
+
+.primary-button[disabled] {
+  opacity: 0.68;
+}
+
+.secondary-button {
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(255, 248, 238, 0.72));
+  box-shadow: 0 14rpx 32rpx rgba(126, 90, 45, 0.11), inset 0 1rpx 0 rgba(255, 255, 255, 0.94);
+  color: #ef3f38;
+}
+
+.redeem-button {
+  margin-top: 24rpx;
+}
+
+.redeem-tip {
+  margin-top: 18rpx;
+  color: #8c7a6d;
+  font-size: 22rpx;
+  line-height: 1.55;
+}
+
+.success-card {
+  text-align: center;
+}
+
+.success-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 92rpx;
+  height: 92rpx;
+  margin: 0 auto 22rpx;
+  border-radius: 32rpx;
+  background: rgba(67, 160, 71, 0.14);
+  color: #43a047;
+  font-size: 48rpx;
+  font-weight: 900;
+}
+
+.success-title {
+  color: #2b211b;
+  font-size: 34rpx;
+  font-weight: 900;
+}
+
+.success-desc {
+  margin-top: 14rpx;
+  color: #7a6a5e;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.success-button {
+  margin-top: 30rpx;
+}
+
+.home-button {
+  margin-top: 22rpx;
+}

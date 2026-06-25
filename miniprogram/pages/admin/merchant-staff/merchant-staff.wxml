@@ -1,0 +1,121 @@
+<view class="staff-page">
+  <view class="background-shade"></view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="nav-back" bindtap="goBack">
+      <image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image>
+    </view>
+    <view class="nav-title">成员 / 邀请</view>
+  </view>
+
+  <view class="staff-content" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
+    <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
+      <view class="state-title">正在加载成员信息</view>
+      <view class="state-desc">请稍候，正在读取商户成员和邀请码。</view>
+    </view>
+
+    <view wx:elif="{{pageStatus === 'no_permission'}}" class="state-card glass-panel">
+      <view class="state-title">没有系统管理权限</view>
+      <view class="state-desc">当前账号不是超级管理员，无法管理商户成员。</view>
+      <button class="primary-button state-button" bindtap="goHome">返回首页</button>
+    </view>
+
+    <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
+      <view class="state-title">加载失败</view>
+      <view class="state-desc">{{errorMessage}}</view>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+
+    <block wx:else>
+      <view class="hero-card glass-panel">
+        <view>
+          <view class="hero-kicker">MERCHANT STAFF</view>
+          <view class="hero-title">{{merchantName || merchantId}}</view>
+          <view class="hero-desc">{{merchantId}}</view>
+        </view>
+      </view>
+
+      <view class="invite-form warm-glass">
+        <view class="section-head">
+          <view>
+            <view class="section-title">生成邀请码</view>
+            <view class="section-desc">邀请码一次使用后失效，默认 7 天过期。</view>
+          </view>
+        </view>
+
+        <radio-group class="role-options" bindchange="handleRoleChange">
+          <label class="role-option {{inviteRole === 'staff' ? 'is-active' : ''}}">
+            <radio value="staff" checked="{{inviteRole === 'staff'}}" color="#ef3f38" />
+            <text>员工</text>
+          </label>
+          <label class="role-option {{inviteRole === 'owner' ? 'is-active' : ''}}">
+            <radio value="owner" checked="{{inviteRole === 'owner'}}" color="#ef3f38" />
+            <text>负责人</text>
+          </label>
+        </radio-group>
+
+        <view class="days-row">
+          <view class="field-label">有效期（天）</view>
+          <input class="days-input" type="number" value="{{inviteDays}}" bindinput="handleDaysInput" />
+        </view>
+
+        <button class="primary-button create-button" disabled="{{creatingInvite}}" bindtap="createInvite">
+          {{creatingInvite ? '生成中...' : '生成邀请码'}}
+        </button>
+      </view>
+
+      <view class="section-title block-title">成员列表</view>
+      <view wx:if="{{!staffList.length}}" class="empty-card glass-panel">暂无成员</view>
+      <view wx:else class="card-list">
+        <view wx:for="{{staffList}}" wx:key="_id" class="info-card warm-glass">
+          <view class="card-head">
+            <view>
+              <view class="main-text">{{item.openid_display}}</view>
+              <view class="sub-text">{{item.role_text}} · {{item.created_at_text}}</view>
+            </view>
+            <view class="status-tag {{item.status_class}}">{{item.status_text}}</view>
+          </view>
+          <view wx:if="{{item.remark}}" class="note-text">{{item.remark}}</view>
+          <view class="card-actions">
+            <button
+              class="secondary-button action-button"
+              data-id="{{item._id}}"
+              data-status="{{item.status}}"
+              disabled="{{operatingId === item._id}}"
+              bindtap="handleStaffToggle"
+            >
+              {{operatingId === item._id ? '处理中...' : (item.status === 'disabled' ? '启用成员' : '禁用成员')}}
+            </button>
+          </view>
+        </view>
+      </view>
+
+      <view class="section-title block-title">邀请码列表</view>
+      <view wx:if="{{!inviteList.length}}" class="empty-card glass-panel">暂无邀请码</view>
+      <view wx:else class="card-list">
+        <view wx:for="{{inviteList}}" wx:key="code" class="info-card warm-glass">
+          <view class="card-head">
+            <view>
+              <view class="main-text code-text">{{item.code}}</view>
+              <view class="sub-text">{{item.role_text}} · 过期：{{item.expires_at_text}}</view>
+            </view>
+            <view class="status-tag {{item.status_class}}">{{item.status_text}}</view>
+          </view>
+          <view class="sub-text">使用人：{{item.used_by_display}}</view>
+          <view class="card-actions">
+            <button class="secondary-button action-button" data-code="{{item.code}}" bindtap="copyInvite">复制</button>
+            <button
+              wx:if="{{item.status === 'unused'}}"
+              class="ghost-button action-button"
+              data-code="{{item.code}}"
+              disabled="{{operatingId === item.code}}"
+              bindtap="disableInvite"
+            >
+              {{operatingId === item.code ? '处理中...' : '禁用'}}
+            </button>
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

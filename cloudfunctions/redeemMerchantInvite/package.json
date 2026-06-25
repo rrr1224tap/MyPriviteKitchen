@@ -1,0 +1,9 @@
+{
+  "name": "redeemMerchantInvite",
+  "version": "1.0.0",
+  "description": "Redeem merchant invite code for current user",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

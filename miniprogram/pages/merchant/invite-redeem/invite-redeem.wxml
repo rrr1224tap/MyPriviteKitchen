@@ -1,0 +1,44 @@
+<view class="invite-redeem-page">
+  <view class="background-shade"></view>
+
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
+    <view class="nav-title">商户身份绑定</view>
+  </view>
+
+  <view class="redeem-content" style="padding-top: {{statusBarHeight + navigationHeight + 28}}px;">
+    <view class="redeem-hero glass-panel">
+      <view class="hero-kicker">MERCHANT INVITE</view>
+      <view class="hero-title">输入邀请码</view>
+      <view class="hero-desc">绑定成功后，当前微信账号将获得对应商户的后台身份。</view>
+    </view>
+
+    <view wx:if="{{!success}}" class="redeem-card warm-glass">
+      <view class="field-label">商户邀请码</view>
+      <input
+        class="code-input"
+        value="{{code}}"
+        maxlength="16"
+        placeholder="请输入管理员提供的邀请码"
+        placeholder-class="input-placeholder"
+        bindinput="handleCodeInput"
+      />
+      <button class="primary-button redeem-button" disabled="{{submitting}}" bindtap="redeemInvite">
+        {{submitting ? '绑定中...' : '绑定商户身份'}}
+      </button>
+      <view class="redeem-tip">邀请码只能使用一次，过期或已禁用的邀请码无法绑定。</view>
+    </view>
+
+    <view wx:else class="success-card glass-panel">
+      <view class="success-mark">✓</view>
+      <view class="success-title">商户身份绑定成功</view>
+      <view class="success-desc">
+        <text wx:if="{{merchantName}}">{{merchantName}}</text>
+        <text wx:else>{{merchantId}}</text>
+        <text wx:if="{{roleText}}"> · {{roleText}}</text>
+      </view>
+      <button class="primary-button success-button" bindtap="goToMerchantDashboard">进入商家工作台</button>
+    </view>
+
+    <button class="secondary-button home-button" bindtap="goHome">返回首页</button>
+  </view>
+</view>
