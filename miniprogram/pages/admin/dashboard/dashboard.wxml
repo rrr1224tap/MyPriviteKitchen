@@ -43,7 +43,7 @@
           <view class="hero-title">系统管理</view>
           <view class="hero-desc">超级管理员身份已确认，后续系统级管理能力将在这里逐步开放。</view>
         </view>
-        <view class="hero-badge">v0.4-A</view>
+        <view class="hero-badge">v0.4-D</view>
       </view>
 
       <view class="profile-card warm-glass">
@@ -57,9 +57,75 @@
         </view>
         <view class="profile-row">
           <view class="profile-label">版本</view>
-          <view class="profile-value">Private Kitchen v0.4-A</view>
+          <view class="profile-value">Private Kitchen v0.4-D</view>
         </view>
       </view>
+
+      <view class="section-header">
+        <view>
+          <view class="section-title is-compact">数据概览</view>
+          <view class="section-subtitle">只读统计，不会修改业务数据</view>
+        </view>
+        <button class="refresh-button" bindtap="refreshOverview">刷新</button>
+      </view>
+
+      <view wx:if="{{overviewStatus === 'loading'}}" class="overview-state warm-glass">
+        <view class="overview-state-title">正在加载后台数据概览</view>
+        <view class="overview-state-desc">请稍候，正在读取商户、餐品、订单和备料相关数据。</view>
+      </view>
+
+      <view wx:elif="{{overviewStatus === 'error'}}" class="overview-state warm-glass">
+        <view class="overview-state-title">数据概览加载失败</view>
+        <view class="overview-state-desc">{{overviewErrorMessage}}</view>
+        <button class="mini-button" bindtap="refreshOverview">重新加载</button>
+      </view>
+
+      <block wx:else>
+        <view class="overview-grid">
+          <view
+            wx:for="{{overviewCards}}"
+            wx:key="title"
+            class="overview-card warm-glass theme-{{item.theme}}"
+          >
+            <view class="overview-card-title">{{item.title}}</view>
+            <view class="overview-card-value">{{item.value}}</view>
+            <view class="overview-card-desc">{{item.desc}}</view>
+          </view>
+        </view>
+
+        <view class="overview-meta">最近更新：{{overviewUpdatedAt}}</view>
+
+        <view class="warning-panel warm-glass">
+          <view class="panel-heading">风险提醒</view>
+          <view wx:if="{{warnings.length === 0}}" class="panel-empty">暂无需要特别关注的数据。</view>
+          <view wx:else class="warning-list">
+            <view wx:for="{{warnings}}" wx:key="id" class="warning-item">
+              <view class="warning-main">
+                <view class="warning-title">{{item.title}}</view>
+                <view class="warning-desc">{{item.desc}}</view>
+              </view>
+              <view class="warning-count">{{item.count}}</view>
+            </view>
+          </view>
+        </view>
+
+        <view class="recent-panel warm-glass">
+          <view class="panel-heading">最近订单</view>
+          <view wx:if="{{recentOrders.length === 0}}" class="panel-empty">暂无最近订单。</view>
+          <view wx:else class="recent-list">
+            <view wx:for="{{recentOrders}}" wx:key="id" class="recent-item">
+              <view class="recent-main">
+                <view class="recent-no">{{item.order_no}}</view>
+                <view class="recent-time">{{item.created_at_text}} · {{item.item_count}} 件</view>
+              </view>
+              <view class="recent-side">
+                <view class="recent-status">{{item.status_text}}</view>
+                <view class="recent-amount">{{item.total_amount_text}}</view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
 
       <view class="section-title">后台模块</view>
       <view class="module-grid">
