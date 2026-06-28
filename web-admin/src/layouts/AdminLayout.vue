@@ -1,25 +1,26 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
+const route = useRoute()
 const router = useRouter()
 
 const navItems = [
-  { label: '概览', path: '/', active: true },
-  { label: '商户管理' },
-  { label: '成员邀请' },
-  { label: '餐品管理' },
-  { label: '订单管理' },
-  { label: '今日备料' },
-  { label: '数据检查' }
+  { label: '概览', path: '/', key: 'dashboard' },
+  { label: '商户管理', path: '/merchants', key: 'merchants' },
+  { label: '成员邀请', path: '/merchants/xiaochu/staff', key: 'staff' },
+  { label: '餐品管理', path: '/dishes', key: 'dishes' },
+  { label: '分类管理', path: '/categories', key: 'categories' },
+  { label: '订单管理', path: '/orders', key: 'orders' },
+  { label: '今日备料', path: '/prep-summary', key: 'prep-summary' },
+  { label: '数据检查', path: '/data-health', key: 'data-health' },
+  { label: '系统设置', path: '/settings', key: 'settings' }
 ]
 
-function handleNav(item: { label: string; path?: string }) {
-  if (item.path) {
-    router.push(item.path)
-    return
-  }
+const activePath = computed(() => route.path)
 
-  window.alert('该模块将在后续版本接入')
+function handleNav(path: string) {
+  router.push(path)
 }
 
 function logout() {
@@ -41,11 +42,11 @@ function logout() {
       <nav class="side-nav" aria-label="后台导航">
         <button
           v-for="item in navItems"
-          :key="item.label"
+          :key="item.key"
           class="side-nav__item"
-          :class="{ 'is-active': item.active }"
+          :class="{ 'is-active': activePath === item.path || (item.path !== '/' && activePath.startsWith(item.path)) }"
           type="button"
-          @click="handleNav(item)"
+          @click="handleNav(item.path)"
         >
           <span>{{ item.label }}</span>
           <span class="side-nav__dot"></span>

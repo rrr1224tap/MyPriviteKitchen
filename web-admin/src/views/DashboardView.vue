@@ -1,21 +1,24 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import ModuleCard from '../components/ModuleCard.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
+const router = useRouter()
+
 const stats = [
   { title: '今日订单', value: 12, caption: '含待处理与制作中订单', tone: 'brand' as const },
-  { title: '启用商户', value: 1, caption: '当前私厨主体', tone: 'green' as const },
+  { title: '启用商户', value: 1, caption: '当前私厨经营主体', tone: 'green' as const },
   { title: '商户成员', value: 3, caption: '含管理员与协作成员', tone: 'orange' as const },
   { title: '待处理提醒', value: 4, caption: '数据与备料提醒', tone: 'muted' as const }
 ]
 
 const modules = [
-  { title: '商户管理', description: '维护商户基础信息与启用状态', tag: '后台' },
-  { title: '成员邀请', description: '生成邀请码并管理成员身份', tag: '权限' },
-  { title: '餐品管理', description: '维护菜品、规格、加料与食材', tag: '菜单' },
-  { title: '今日备料', description: '按今日订单汇总采购清单', tag: '私厨' },
-  { title: '数据检查', description: '检查关键数据完整性与轻量修复', tag: '安全' }
+  { title: '商户管理', description: '维护商户基础信息与启用状态', tag: '后台', path: '/merchants' },
+  { title: '成员邀请', description: '生成邀请码并管理成员身份', tag: '权限', path: '/merchants/xiaochu/staff' },
+  { title: '餐品管理', description: '维护菜品、规格、加料与食材', tag: '菜单', path: '/dishes' },
+  { title: '今日备料', description: '按今日订单汇总采购清单', tag: '私厨', path: '/prep-summary' },
+  { title: '数据检查', description: '检查关键数据完整性与轻量修复', tag: '安全', path: '/data-health' }
 ]
 
 const warnings = [
@@ -31,8 +34,8 @@ const recentOrders = [
   { no: '20260628005', dish: '黑椒牛肉饭', status: '待接单', amount: '¥28.90' }
 ]
 
-function showComingSoon() {
-  window.alert('该模块将在后续版本接入')
+function openModule(path: string) {
+  router.push(path)
 }
 </script>
 
@@ -40,9 +43,9 @@ function showComingSoon() {
   <section class="dashboard-view">
     <div class="dashboard-hero glass-card">
       <div>
-        <div class="dashboard-hero__kicker">Private Kitchen Web Admin v0.5-A</div>
+        <div class="dashboard-hero__kicker">Private Kitchen Web Admin v0.5-A2</div>
         <h1>欢迎回来，小厨管理员</h1>
-        <p>当前为静态框架，真实数据将在后续版本接入</p>
+        <p>当前为静态页面原型，真实数据将在后续版本接入</p>
       </div>
       <StatusBadge label="本地预览" tone="orange" />
     </div>
@@ -63,7 +66,7 @@ function showComingSoon() {
         <div class="section-heading">
           <div>
             <h2>后台模块</h2>
-            <p>第一版仅保留静态入口</p>
+            <p>第一版仅保留静态入口，用于原型预览和截图</p>
           </div>
         </div>
         <div class="module-grid">
@@ -73,7 +76,7 @@ function showComingSoon() {
             :title="item.title"
             :description="item.description"
             :tag="item.tag"
-            @select="showComingSoon"
+            @select="openModule(item.path)"
           />
         </div>
       </div>
