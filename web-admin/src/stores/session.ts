@@ -31,6 +31,7 @@ export function getSession(): AdminSession | null {
   try {
     const parsed = JSON.parse(rawSession) as Partial<AdminSession>
     if (!parsed.token || !parsed.role || !parsed.expires_at) {
+      clearSession()
       return null
     }
 
@@ -61,8 +62,14 @@ export function hasValidLocalSession() {
 
   const expiresAt = new Date(session.expires_at).getTime()
   if (!Number.isFinite(expiresAt)) {
+    clearSession()
     return false
   }
 
-  return expiresAt > Date.now()
+  if (expiresAt <= Date.now()) {
+    clearSession()
+    return false
+  }
+
+  return true
 }

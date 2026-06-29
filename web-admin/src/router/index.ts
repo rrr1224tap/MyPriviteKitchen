@@ -10,6 +10,7 @@ import MerchantStaffView from '../views/MerchantStaffView.vue'
 import OrdersView from '../views/OrdersView.vue'
 import PrepSummaryView from '../views/PrepSummaryView.vue'
 import SettingsView from '../views/SettingsView.vue'
+import { clearSession, hasValidLocalSession } from '../stores/session'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -71,6 +72,22 @@ const router = createRouter({
       ]
     }
   ]
+})
+
+router.beforeEach((to) => {
+  const isLoginRoute = to.name === 'login'
+  const hasSession = hasValidLocalSession()
+
+  if (isLoginRoute) {
+    return hasSession ? { path: '/' } : true
+  }
+
+  if (hasSession) {
+    return true
+  }
+
+  clearSession()
+  return { path: '/login' }
 })
 
 export default router
