@@ -235,9 +235,31 @@ button {
   box-shadow: 0 0 0 4px rgba(239, 63, 56, 0.08);
 }
 
+.form-field input:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.form-error {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(216, 90, 66, 0.16);
+  border-radius: 16px;
+  color: #a24d42;
+  background: rgba(216, 90, 66, 0.1);
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.5;
+}
+
 .login-card__button {
   width: 100%;
   margin-top: 24px;
+}
+
+.login-card__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.78;
 }
 
 .hint-text {

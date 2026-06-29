@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { logoutWebAdmin } from '../services/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,6 +25,7 @@ function handleNav(path: string) {
 }
 
 function logout() {
+  logoutWebAdmin()
   router.push('/login')
 }
 </script>
