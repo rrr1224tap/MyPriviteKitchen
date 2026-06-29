@@ -4,6 +4,9 @@ const { test } = require('node:test')
 const {
   createGetAdminOverviewHandler
 } = require('./admin-overview-service')
+const {
+  createSignedToken
+} = require('../webAdminAuth/web-admin-auth-service')
 
 const FIXED_NOW = new Date('2026-06-25T10:30:00.000Z')
 const YESTERDAY = new Date('2026-06-24T10:00:00.000Z')
@@ -27,6 +30,7 @@ function createDeps(overrides = {}) {
     deps: {
       getOpenid: () => overrides.openid === undefined ? 'admin_openid' : overrides.openid,
       getSuperAdminOpenids: () => overrides.superAdminOpenids === undefined ? 'admin_openid' : overrides.superAdminOpenids,
+      getTokenSecret: () => overrides.tokenSecret === undefined ? process.env.WEB_ADMIN_TOKEN_SECRET : overrides.tokenSecret,
       now: () => overrides.now || FIXED_NOW,
       findMerchants: async () => data.merchants,
       findStaff: async () => data.staff,
@@ -48,11 +52,21 @@ function createDeps(overrides = {}) {
 async function getOverview(overrides = {}) {
   const { deps, calls } = createDeps(overrides)
   const handler = createGetAdminOverviewHandler(deps)
-  const result = await handler({})
+  const result = await handler(overrides.event || {})
   return {
     result,
     calls
   }
+}
+
+function createWebToken(options = {}) {
+  return createSignedToken({
+    role: options.role || 'super_admin',
+    now: options.now || FIXED_NOW,
+    ttlMinutes: options.ttlMinutes || 60,
+    nonce: options.nonce || 'test_nonce',
+    secret: options.secret || 'test_secret'
+  }).token
 }
 
 test('super admin can get stable empty overview', async () => {
@@ -101,6 +115,90 @@ test('missing openid returns unauthorized', async () => {
 
   assert.equal(result.success, false)
   assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web valid admin token can get overview without openid', async () => {
+  const { result } = await getOverview({
+    openid: '',
+    tokenSecret: 'test_secret',
+    event: {
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.data.merchants.total, 0)
+})
+
+test('web empty token cannot get overview without openid', async () => {
+  const { result } = await getOverview({
+    openid: '',
+    tokenSecret: 'test_secret',
+    event: {
+      admin_token: ''
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web tampered token cannot get overview', async () => {
+  const { result } = await getOverview({
+    openid: '',
+    tokenSecret: 'test_secret',
+    event: {
+      admin_token: `${createWebToken()}x`
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web expired token cannot get overview', async () => {
+  const { result } = await getOverview({
+    openid: '',
+    tokenSecret: 'test_secret',
+    event: {
+      admin_token: createWebToken({
+        now: new Date('2026-06-25T08:00:00.000Z'),
+        ttlMinutes: 30
+      })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'TOKEN_EXPIRED')
+})
+
+test('web non super admin token cannot get overview', async () => {
+  const { result } = await getOverview({
+    openid: '',
+    tokenSecret: 'test_secret',
+    event: {
+      admin_token: createWebToken({
+        role: 'viewer'
+      })
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web token check fails when token secret is missing', async () => {
+  const { result } = await getOverview({
+    openid: '',
+    tokenSecret: '',
+    event: {
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'SERVER_CONFIG_ERROR')
 })
 
 test('counts merchants by active and disabled status', async () => {

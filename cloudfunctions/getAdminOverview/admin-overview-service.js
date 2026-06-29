@@ -1,3 +1,7 @@
+const {
+  verifyWebAdminToken
+} = require('./web-admin-token-helper')
+
 function success(message, data = {}) {
   return {
     success: true,
@@ -12,6 +16,10 @@ function failure(code, message) {
     success: false,
     code,
     message,
+    error: {
+      code,
+      message
+    },
     data: null
   }
 }
@@ -330,11 +338,41 @@ function buildDependencies(dependencies = {}) {
     findDishes: dependencies.findDishes,
     findCategories: dependencies.findCategories,
     findOrders: dependencies.findOrders,
+    getTokenSecret: dependencies.getTokenSecret,
     logger: dependencies.logger || console
   }
 }
 
-function assertSuperAdmin(deps) {
+function isWebAdminRequest(event = {}) {
+  return Boolean(event && Object.prototype.hasOwnProperty.call(event, 'admin_token'))
+}
+
+function assertWebAdmin(event, deps) {
+  const verifyResult = verifyWebAdminToken(event.admin_token, {
+    secret: deps.getTokenSecret ? deps.getTokenSecret() : process.env.WEB_ADMIN_TOKEN_SECRET,
+    now: deps.now()
+  })
+
+  if (!verifyResult.ok) {
+    const message = verifyResult.code === 'TOKEN_EXPIRED'
+      ? '登录状态已过期'
+      : '登录状态无效或已过期'
+    return {
+      error: failure(verifyResult.code, message)
+    }
+  }
+
+  return {
+    is_web_admin: true,
+    role: verifyResult.role
+  }
+}
+
+function assertSuperAdmin(event, deps) {
+  if (isWebAdminRequest(event)) {
+    return assertWebAdmin(event, deps)
+  }
+
   const openid = normalizeText(deps.getOpenid ? deps.getOpenid() : '')
   if (!openid) {
     return {
@@ -363,9 +401,9 @@ function ensureList(value) {
 function createGetAdminOverviewHandler(dependencies = {}) {
   const deps = buildDependencies(dependencies)
 
-  return async function getAdminOverview() {
+  return async function getAdminOverview(event = {}) {
     try {
-      const adminResult = assertSuperAdmin(deps)
+      const adminResult = assertSuperAdmin(event, deps)
       if (adminResult.error) {
         return adminResult.error
       }

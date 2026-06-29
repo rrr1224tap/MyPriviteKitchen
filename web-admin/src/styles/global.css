@@ -797,6 +797,13 @@ button {
   gap: 22px;
 }
 
+.dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
 .section-heading {
   display: flex;
   align-items: flex-start;

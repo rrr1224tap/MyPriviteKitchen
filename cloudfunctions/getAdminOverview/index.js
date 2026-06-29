@@ -24,7 +24,7 @@ async function getCollectionList(name, options = {}) {
   return result.data || []
 }
 
-exports.main = async () => {
+exports.main = async (event = {}) => {
   const wxContext = cloud.getWXContext()
   const handler = createGetAdminOverviewHandler({
     getOpenid: () => wxContext.OPENID,
@@ -45,5 +45,5 @@ exports.main = async () => {
     logger: console
   })
 
-  return handler()
+  return handler(event)
 }
