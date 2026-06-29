@@ -1,7 +1,7 @@
 <script setup lang="ts">
 withDefaults(defineProps<{
   label: string
-  tone?: 'brand' | 'orange' | 'green' | 'muted'
+  tone?: 'brand' | 'orange' | 'green' | 'muted' | 'danger'
 }>(), {
   tone: 'brand'
 })

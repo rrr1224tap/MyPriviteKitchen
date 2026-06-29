@@ -7,18 +7,18 @@ import StatusBadge from '../components/StatusBadge.vue'
 const router = useRouter()
 
 const stats = [
-  { title: '今日订单', value: 12, caption: '含待处理与制作中订单', tone: 'brand' as const },
-  { title: '启用商户', value: 1, caption: '当前私厨经营主体', tone: 'green' as const },
-  { title: '商户成员', value: 3, caption: '含管理员与协作成员', tone: 'orange' as const },
-  { title: '待处理提醒', value: 4, caption: '数据与备料提醒', tone: 'muted' as const }
+  { title: '今日订单', value: 12, caption: '含待处理与制作中订单', tone: 'brand' as const, icon: '单' },
+  { title: '启用商户', value: 1, caption: '当前私厨经营主体', tone: 'green' as const, icon: '商' },
+  { title: '商户成员', value: 3, caption: '含管理员与协作成员', tone: 'orange' as const, icon: '员' },
+  { title: '待处理提醒', value: 4, caption: '数据与备料提醒', tone: 'muted' as const, icon: '醒' }
 ]
 
 const modules = [
-  { title: '商户管理', description: '维护商户基础信息与启用状态', tag: '后台', path: '/merchants' },
-  { title: '成员邀请', description: '生成邀请码并管理成员身份', tag: '权限', path: '/merchants/xiaochu/staff' },
-  { title: '餐品管理', description: '维护菜品、规格、加料与食材', tag: '菜单', path: '/dishes' },
-  { title: '今日备料', description: '按今日订单汇总采购清单', tag: '私厨', path: '/prep-summary' },
-  { title: '数据检查', description: '检查关键数据完整性与轻量修复', tag: '安全', path: '/data-health' }
+  { title: '商户管理', description: '维护商户基础信息与启用状态', tag: '后台', path: '/merchants', icon: '商' },
+  { title: '成员邀请', description: '生成邀请码并管理成员身份', tag: '权限', path: '/merchants/xiaochu/staff', icon: '员' },
+  { title: '餐品管理', description: '维护菜品、规格、加料与食材', tag: '菜单', path: '/dishes', icon: '餐' },
+  { title: '今日备料', description: '按今日订单汇总采购清单', tag: '私厨', path: '/prep-summary', icon: '备' },
+  { title: '数据检查', description: '检查关键数据完整性与轻量修复', tag: '安全', path: '/data-health', icon: '检' }
 ]
 
 const warnings = [
@@ -36,6 +36,13 @@ const recentOrders = [
 
 function openModule(path: string) {
   router.push(path)
+}
+
+function orderTone(status: string) {
+  if (status === '已完成') return 'green'
+  if (status === '制作中') return 'orange'
+  if (status === '已接单') return 'muted'
+  return 'brand'
 }
 </script>
 
@@ -58,6 +65,7 @@ function openModule(path: string) {
         :value="item.value"
         :caption="item.caption"
         :tone="item.tone"
+        :icon="item.icon"
       />
     </section>
 
@@ -76,6 +84,7 @@ function openModule(path: string) {
             :title="item.title"
             :description="item.description"
             :tag="item.tag"
+            :icon="item.icon"
             @select="openModule(item.path)"
           />
         </div>
@@ -111,7 +120,7 @@ function openModule(path: string) {
                 <div class="order-row__dish">{{ order.dish }}</div>
               </div>
               <div class="order-row__side">
-                <StatusBadge :label="order.status" tone="brand" />
+                <StatusBadge :label="order.status" :tone="orderTone(order.status)" />
                 <div class="order-row__amount">{{ order.amount }}</div>
               </div>
             </article>

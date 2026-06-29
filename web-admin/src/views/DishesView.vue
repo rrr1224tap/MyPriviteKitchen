@@ -30,10 +30,10 @@ function showMockTip() {
     </PageHeader>
 
     <section class="stat-grid">
-      <StatCard title="餐品总数" :value="24" caption="当前 mock 菜品数量" />
-      <StatCard title="上架餐品" :value="18" caption="用户端可见" tone="green" />
-      <StatCard title="缺食材" :value="2" caption="影响今日备料" tone="orange" />
-      <StatCard title="缺做法" :value="3" caption="影响商家制作参考" tone="muted" />
+      <StatCard title="餐品总数" :value="24" caption="当前 mock 菜品数量" icon="餐" />
+      <StatCard title="上架餐品" :value="18" caption="用户端可见" tone="green" icon="架" />
+      <StatCard title="缺食材" :value="2" caption="影响今日备料" tone="orange" icon="材" />
+      <StatCard title="缺做法" :value="3" caption="影响商家制作参考" tone="muted" icon="法" />
     </section>
 
     <section class="content-grid">

@@ -44,10 +44,10 @@ function copyInvite() {
     </PageHeader>
 
     <section class="stat-grid">
-      <StatCard title="成员数量" :value="3" caption="含 owner 与 staff" />
-      <StatCard title="启用成员" :value="2" caption="可进入商家工作台" tone="green" />
-      <StatCard title="可用邀请码" :value="1" caption="尚未使用且未过期" tone="orange" />
-      <StatCard title="异常邀请" :value="2" caption="已禁用或已过期" tone="muted" />
+      <StatCard title="成员数量" :value="3" caption="含 owner 与 staff" icon="员" />
+      <StatCard title="启用成员" :value="2" caption="可进入商家工作台" tone="green" icon="启" />
+      <StatCard title="可用邀请码" :value="1" caption="尚未使用且未过期" tone="orange" icon="邀" />
+      <StatCard title="异常邀请" :value="2" caption="已禁用或已过期" tone="muted" icon="醒" />
     </section>
 
     <section class="content-grid">

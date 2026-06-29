@@ -36,10 +36,10 @@ function copyShoppingList() {
     </PageHeader>
 
     <section class="stat-grid">
-      <StatCard title="今日有效订单" :value="12" caption="排除已取消订单" />
-      <StatCard title="需要备料食材" :value="18" caption="按名称和单位合并" tone="orange" />
-      <StatCard title="来源菜品" :value="6" caption="含启用食材配置" tone="green" />
-      <StatCard title="空配置菜品" :value="2" caption="建议补齐食材" tone="muted" />
+      <StatCard title="今日有效订单" :value="12" caption="排除已取消订单" icon="单" />
+      <StatCard title="需要备料食材" :value="18" caption="按名称和单位合并" tone="orange" icon="材" />
+      <StatCard title="来源菜品" :value="6" caption="含启用食材配置" tone="green" icon="餐" />
+      <StatCard title="空配置菜品" :value="2" caption="建议补齐食材" tone="muted" icon="补" />
     </section>
 
     <section class="content-grid">

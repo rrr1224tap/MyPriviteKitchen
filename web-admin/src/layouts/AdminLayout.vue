@@ -6,15 +6,15 @@ const route = useRoute()
 const router = useRouter()
 
 const navItems = [
-  { label: '概览', path: '/', key: 'dashboard' },
-  { label: '商户管理', path: '/merchants', key: 'merchants' },
-  { label: '成员邀请', path: '/merchants/xiaochu/staff', key: 'staff' },
-  { label: '餐品管理', path: '/dishes', key: 'dishes' },
-  { label: '分类管理', path: '/categories', key: 'categories' },
-  { label: '订单管理', path: '/orders', key: 'orders' },
-  { label: '今日备料', path: '/prep-summary', key: 'prep-summary' },
-  { label: '数据检查', path: '/data-health', key: 'data-health' },
-  { label: '系统设置', path: '/settings', key: 'settings' }
+  { label: '概览', path: '/', key: 'dashboard', icon: '总' },
+  { label: '商户管理', path: '/merchants', key: 'merchants', icon: '商' },
+  { label: '成员邀请', path: '/merchants/xiaochu/staff', key: 'staff', icon: '员' },
+  { label: '餐品管理', path: '/dishes', key: 'dishes', icon: '餐' },
+  { label: '分类管理', path: '/categories', key: 'categories', icon: '类' },
+  { label: '订单管理', path: '/orders', key: 'orders', icon: '单' },
+  { label: '今日备料', path: '/prep-summary', key: 'prep-summary', icon: '备' },
+  { label: '数据检查', path: '/data-health', key: 'data-health', icon: '检' },
+  { label: '系统设置', path: '/settings', key: 'settings', icon: '设' }
 ]
 
 const activePath = computed(() => route.path)
@@ -48,10 +48,19 @@ function logout() {
           type="button"
           @click="handleNav(item.path)"
         >
-          <span>{{ item.label }}</span>
+          <span class="side-nav__label">
+            <span class="side-nav__icon">{{ item.icon }}</span>
+            <span>{{ item.label }}</span>
+          </span>
           <span class="side-nav__dot"></span>
         </button>
       </nav>
+
+      <div class="sidebar-profile">
+        <div class="sidebar-profile__label">当前身份</div>
+        <div class="sidebar-profile__name">超级管理员</div>
+        <div class="sidebar-profile__desc">本地静态预览</div>
+      </div>
     </aside>
 
     <div class="admin-main">

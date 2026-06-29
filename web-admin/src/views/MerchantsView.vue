@@ -49,10 +49,10 @@ function openStaff() {
     </PageHeader>
 
     <section class="stat-grid">
-      <StatCard title="商户总数" :value="2" caption="含启用与禁用商户" />
-      <StatCard title="启用商户" :value="1" caption="可被当前系统使用" tone="green" />
-      <StatCard title="禁用商户" :value="1" caption="暂不参与经营" tone="muted" />
-      <StatCard title="待完善资料" :value="1" caption="联系人或备注待补充" tone="orange" />
+      <StatCard title="商户总数" :value="2" caption="含启用与禁用商户" icon="商" />
+      <StatCard title="启用商户" :value="1" caption="可被当前系统使用" tone="green" icon="启" />
+      <StatCard title="禁用商户" :value="1" caption="暂不参与经营" tone="muted" icon="停" />
+      <StatCard title="待完善资料" :value="1" caption="联系人或备注待补充" tone="orange" icon="补" />
     </section>
 
     <GlassCard>

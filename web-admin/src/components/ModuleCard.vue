@@ -5,6 +5,7 @@ defineProps<{
   title: string
   description: string
   tag: string
+  icon?: string
   tone?: 'brand' | 'orange' | 'green' | 'muted'
 }>()
 
@@ -16,7 +17,7 @@ defineEmits<{
 <template>
   <button class="module-card glass-card" type="button" @click="$emit('select')">
     <div class="module-card__top">
-      <span class="module-card__icon">{{ title.slice(0, 1) }}</span>
+      <span class="module-card__icon">{{ icon || title.slice(0, 1) }}</span>
       <StatusBadge :label="tag" :tone="tone || 'orange'" />
     </div>
     <div class="module-card__title">{{ title }}</div>

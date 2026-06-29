@@ -27,10 +27,10 @@ function showMockTip() {
     />
 
     <section class="stat-grid">
-      <StatCard title="今日订单" :value="18" caption="今日有效订单" />
-      <StatCard title="待接单" :value="3" caption="需要商家处理" tone="brand" />
-      <StatCard title="制作中" :value="5" caption="正在出餐" tone="orange" />
-      <StatCard title="已完成" :value="10" caption="今日完成订单" tone="green" />
+      <StatCard title="今日订单" :value="18" caption="今日有效订单" icon="单" />
+      <StatCard title="待接单" :value="3" caption="需要商家处理" tone="brand" icon="接" />
+      <StatCard title="制作中" :value="5" caption="正在出餐" tone="orange" icon="制" />
+      <StatCard title="已完成" :value="10" caption="今日完成订单" tone="green" icon="成" />
     </section>
 
     <section class="content-grid">

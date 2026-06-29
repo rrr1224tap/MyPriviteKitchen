@@ -26,10 +26,10 @@ function showMockTip() {
     </PageHeader>
 
     <section class="stat-grid">
-      <StatCard title="分类总数" :value="4" caption="当前 mock 分类" />
-      <StatCard title="启用分类" :value="3" caption="点餐页可见" tone="green" />
-      <StatCard title="停用分类" :value="1" caption="暂不展示" tone="muted" />
-      <StatCard title="待排序" :value="0" caption="排序状态正常" tone="orange" />
+      <StatCard title="分类总数" :value="4" caption="当前 mock 分类" icon="类" />
+      <StatCard title="启用分类" :value="3" caption="点餐页可见" tone="green" icon="启" />
+      <StatCard title="停用分类" :value="1" caption="暂不展示" tone="muted" icon="停" />
+      <StatCard title="待排序" :value="0" caption="排序状态正常" tone="orange" icon="序" />
     </section>
 
     <GlassCard>
