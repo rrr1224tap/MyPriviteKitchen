@@ -199,8 +199,47 @@ function verifySignedToken(token, options = {}) {
   }
 }
 
+function parseJsonBody(body) {
+  if (!body) {
+    return {}
+  }
+
+  if (typeof body === 'object' && !Array.isArray(body)) {
+    return body
+  }
+
+  if (typeof body !== 'string') {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(body)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch (error) {
+    return {}
+  }
+}
+
 function getPayload(event = {}) {
-  return event && typeof event === 'object' && !Array.isArray(event) ? event : {}
+  if (!event || typeof event !== 'object' || Array.isArray(event)) {
+    return {}
+  }
+
+  if (event.action) {
+    return event
+  }
+
+  const bodyPayload = parseJsonBody(event.body)
+  if (bodyPayload.action) {
+    return bodyPayload
+  }
+
+  const queryPayload = event.queryStringParameters
+  if (queryPayload && typeof queryPayload === 'object' && !Array.isArray(queryPayload)) {
+    return queryPayload
+  }
+
+  return {}
 }
 
 function getConfig(deps = {}) {

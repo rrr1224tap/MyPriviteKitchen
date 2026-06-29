@@ -44,6 +44,58 @@ test('correct fallback passcode logs in and returns signed super admin token', a
   assert.equal(result.data.token.split('.').length, 2)
 })
 
+test('http gateway string body can log in', async () => {
+  const result = await callAuth({
+    body: JSON.stringify({
+      action: 'login',
+      passcode: PASSCODE
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.role, 'super_admin')
+  assert.equal(typeof result.data.token, 'string')
+})
+
+test('http gateway object body can log in', async () => {
+  const result = await callAuth({
+    body: {
+      action: 'login',
+      passcode: PASSCODE
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.role, 'super_admin')
+  assert.equal(typeof result.data.token, 'string')
+})
+
+test('direct event action takes priority over http gateway body action', async () => {
+  const result = await callAuth({
+    action: 'login',
+    passcode: PASSCODE,
+    body: JSON.stringify({
+      action: 'verify',
+      token: ''
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.role, 'super_admin')
+})
+
+test('http gateway query string parameters can log in', async () => {
+  const result = await callAuth({
+    queryStringParameters: {
+      action: 'login',
+      passcode: PASSCODE
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.role, 'super_admin')
+})
+
 test('wrong passcode fails without returning token', async () => {
   const result = await callAuth({
     action: 'login',
@@ -140,6 +192,33 @@ test('verify accepts valid token', async () => {
   assert.equal(verifyResult.data.valid, true)
   assert.equal(verifyResult.data.role, 'super_admin')
   assert.equal(verifyResult.data.expires_at, '2026-06-29T12:00:00.000Z')
+})
+
+test('http gateway string body can verify valid token', async () => {
+  const loginResult = await callAuth({
+    action: 'login',
+    passcode: PASSCODE
+  })
+
+  const verifyResult = await callAuth({
+    body: JSON.stringify({
+      action: 'verify',
+      token: loginResult.data.token
+    })
+  })
+
+  assert.equal(verifyResult.success, true)
+  assert.equal(verifyResult.data.valid, true)
+  assert.equal(verifyResult.data.role, 'super_admin')
+})
+
+test('invalid http body json returns invalid action without crashing', async () => {
+  const result = await callAuth({
+    body: '{"action":"login"'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.error.code, 'INVALID_ACTION')
 })
 
 test('verify empty token fails unauthorized', async () => {
