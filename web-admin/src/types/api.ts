@@ -8,3 +8,22 @@ export interface ApiResponse<T> {
   data?: T
   error?: ApiError
 }
+
+export type AdminApiErrorCode =
+  | 'UNAUTHORIZED'
+  | 'TOKEN_EXPIRED'
+  | 'FORBIDDEN'
+  | 'SERVER_CONFIG_ERROR'
+  | 'NETWORK_ERROR'
+  | 'INVALID_RESPONSE'
+  | 'ENDPOINT_NOT_CONFIGURED'
+
+export class AdminApiError extends Error {
+  code: string
+
+  constructor(error: ApiError) {
+    super(error.message)
+    this.name = 'AdminApiError'
+    this.code = error.code
+  }
+}
