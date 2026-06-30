@@ -131,6 +131,64 @@ test('web valid admin token can get overview without openid', async () => {
   assert.equal(result.data.merchants.total, 0)
 })
 
+test('web admin token in http string body can get overview without openid', async () => {
+  const { result } = await getOverview({
+    openid: '',
+    tokenSecret: 'test_secret',
+    event: {
+      body: JSON.stringify({
+        admin_token: createWebToken()
+      })
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+})
+
+test('web admin token in http object body can get overview without openid', async () => {
+  const { result } = await getOverview({
+    openid: '',
+    tokenSecret: 'test_secret',
+    event: {
+      body: {
+        admin_token: createWebToken()
+      }
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+})
+
+test('web admin token in query string parameters can get overview without openid', async () => {
+  const { result } = await getOverview({
+    openid: '',
+    tokenSecret: 'test_secret',
+    event: {
+      queryStringParameters: {
+        admin_token: createWebToken()
+      }
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+})
+
+test('invalid http body json does not crash and remains unauthorized without openid', async () => {
+  const { result } = await getOverview({
+    openid: '',
+    tokenSecret: 'test_secret',
+    event: {
+      body: '{"admin_token":'
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
 test('web empty token cannot get overview without openid', async () => {
   const { result } = await getOverview({
     openid: '',

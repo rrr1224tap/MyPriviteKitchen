@@ -343,6 +343,49 @@ function buildDependencies(dependencies = {}) {
   }
 }
 
+function parseJsonBody(body) {
+  if (!body) {
+    return {}
+  }
+
+  if (typeof body === 'object' && !Array.isArray(body)) {
+    return body
+  }
+
+  if (typeof body !== 'string') {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(body)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch (error) {
+    return {}
+  }
+}
+
+function normalizeEventPayload(event = {}) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) {
+    return {}
+  }
+
+  if (Object.prototype.hasOwnProperty.call(event, 'admin_token')) {
+    return event
+  }
+
+  const bodyPayload = parseJsonBody(event.body)
+  if (Object.prototype.hasOwnProperty.call(bodyPayload, 'admin_token')) {
+    return bodyPayload
+  }
+
+  const queryPayload = event.queryStringParameters
+  if (queryPayload && typeof queryPayload === 'object' && !Array.isArray(queryPayload)) {
+    return queryPayload
+  }
+
+  return {}
+}
+
 function isWebAdminRequest(event = {}) {
   return Boolean(event && Object.prototype.hasOwnProperty.call(event, 'admin_token'))
 }
@@ -403,7 +446,8 @@ function createGetAdminOverviewHandler(dependencies = {}) {
 
   return async function getAdminOverview(event = {}) {
     try {
-      const adminResult = assertSuperAdmin(event, deps)
+      const payload = normalizeEventPayload(event)
+      const adminResult = assertSuperAdmin(payload, deps)
       if (adminResult.error) {
         return adminResult.error
       }
@@ -470,5 +514,6 @@ module.exports = {
   buildDishOverview,
   buildCategoryOverview,
   buildOrderOverview,
-  buildWarnings
+  buildWarnings,
+  normalizeEventPayload
 }
