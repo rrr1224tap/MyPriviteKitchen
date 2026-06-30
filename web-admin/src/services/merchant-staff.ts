@@ -1,0 +1,148 @@
+import { callAdminFunction } from './cloud'
+
+export type MerchantStaffRole = 'owner' | 'staff'
+export type MerchantStaffStatus = 'active' | 'disabled'
+
+export interface MerchantStaffMerchant {
+  merchant_id: string
+  name: string
+  short_name: string
+  status: string
+}
+
+export interface MerchantStaffItem {
+  id: string
+  merchant_id: string
+  openid: string
+  masked_openid: string
+  role: MerchantStaffRole
+  role_text: string
+  status: MerchantStaffStatus
+  status_text: string
+  nickname: string
+  remark: string
+  created_at: string
+  updated_at: string
+}
+
+export interface MerchantStaffListResult {
+  merchant: MerchantStaffMerchant
+  list: MerchantStaffItem[]
+  total: number
+}
+
+interface RawMerchant {
+  merchant_id?: unknown
+  name?: unknown
+  short_name?: unknown
+  status?: unknown
+}
+
+interface RawStaffItem {
+  _id?: unknown
+  id?: unknown
+  merchant_id?: unknown
+  openid?: unknown
+  masked_openid?: unknown
+  role?: unknown
+  status?: unknown
+  nickname?: unknown
+  remark?: unknown
+  created_at?: unknown
+  updated_at?: unknown
+}
+
+interface RawStaffListResponse {
+  merchant?: RawMerchant
+  list?: RawStaffItem[]
+  total?: unknown
+}
+
+function toText(value: unknown, fallback = '') {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback
+}
+
+function toDateText(value: unknown) {
+  const text = toText(value)
+  if (!text) return '-'
+
+  const date = new Date(text)
+  if (Number.isNaN(date.getTime())) return text
+
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+function toRole(value: unknown): MerchantStaffRole {
+  return value === 'owner' ? 'owner' : 'staff'
+}
+
+function toStatus(value: unknown): MerchantStaffStatus {
+  return value === 'disabled' ? 'disabled' : 'active'
+}
+
+function roleText(role: MerchantStaffRole) {
+  return role === 'owner' ? '负责人' : '成员'
+}
+
+function statusText(status: MerchantStaffStatus) {
+  return status === 'active' ? '启用' : '禁用'
+}
+
+function maskOpenid(openid: string) {
+  if (!openid) return '-'
+  if (openid.length <= 8) return openid
+  return `${openid.slice(0, 4)}****${openid.slice(-4)}`
+}
+
+function normalizeMerchant(raw: RawMerchant | undefined, fallbackMerchantId: string): MerchantStaffMerchant {
+  const merchantId = toText(raw?.merchant_id, fallbackMerchantId)
+
+  return {
+    merchant_id: merchantId,
+    name: toText(raw?.name, merchantId),
+    short_name: toText(raw?.short_name),
+    status: toText(raw?.status, 'active')
+  }
+}
+
+function normalizeStaffItem(raw: RawStaffItem): MerchantStaffItem {
+  const role = toRole(raw.role)
+  const status = toStatus(raw.status)
+  const openid = toText(raw.openid)
+
+  return {
+    id: toText(raw._id || raw.id, openid || '-'),
+    merchant_id: toText(raw.merchant_id),
+    openid,
+    masked_openid: toText(raw.masked_openid, maskOpenid(openid)),
+    role,
+    role_text: roleText(role),
+    status,
+    status_text: statusText(status),
+    nickname: toText(raw.nickname, '-'),
+    remark: toText(raw.remark, '-'),
+    created_at: toDateText(raw.created_at),
+    updated_at: toDateText(raw.updated_at)
+  }
+}
+
+export async function fetchMerchantStaff(merchantId: string): Promise<MerchantStaffListResult> {
+  const data = await callAdminFunction<RawStaffListResponse>('manageMerchantStaff', {
+    action: 'listStaff',
+    merchant_id: merchantId
+  })
+
+  const list = Array.isArray(data.list) ? data.list.map(normalizeStaffItem) : []
+
+  return {
+    merchant: normalizeMerchant(data.merchant, merchantId),
+    list,
+    total: Number(data.total) || list.length
+  }
+}

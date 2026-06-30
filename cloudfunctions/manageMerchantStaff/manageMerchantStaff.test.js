@@ -2,6 +2,9 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 
 const { createManageMerchantStaffHandler } = require('./merchant-staff-service')
+const {
+  createSignedToken
+} = require('../webAdminAuth/web-admin-auth-service')
 
 const FIXED_NOW = new Date('2026-06-25T10:00:00.000Z')
 
@@ -9,6 +12,7 @@ function createDependencies(options = {}) {
   const state = {
     openid: options.openid || 'admin_openid',
     superAdminOpenids: options.superAdminOpenids || 'admin_openid',
+    tokenSecret: options.tokenSecret === undefined ? 'merchant-staff-test-secret' : options.tokenSecret,
     now: options.now || FIXED_NOW,
     codeIndex: 1,
     merchants: options.merchants || [
@@ -40,6 +44,7 @@ function createDependencies(options = {}) {
     deps: {
       getOpenid: () => state.openid,
       getSuperAdminOpenids: () => state.superAdminOpenids,
+      getTokenSecret: () => state.tokenSecret,
       now: () => state.now,
       createInviteCode: () => `XK7M2Q${state.codeIndex++ === 1 ? '8' : '9'}A`,
       findMerchantByMerchantId: async (merchantId) => {
@@ -88,6 +93,16 @@ function createDependencies(options = {}) {
   }
 }
 
+function createWebToken(options = {}) {
+  return createSignedToken({
+    role: options.role || 'super_admin',
+    secret: options.secret || 'merchant-staff-test-secret',
+    now: options.now || FIXED_NOW,
+    ttlMinutes: options.ttlMinutes || 60,
+    nonce: options.nonce || 'merchant-staff-test-nonce'
+  }).token
+}
+
 test('super admin can list merchant staff', async () => {
   const { deps } = createDependencies()
   const handler = createManageMerchantStaffHandler(deps)
@@ -119,6 +134,186 @@ test('non super admin cannot list staff', async () => {
 
   assert.equal(result.success, false)
   assert.equal(result.code, 'FORBIDDEN')
+})
+
+test('web valid admin token can list merchant staff without openid', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'listStaff',
+    merchant_id: 'xiaochu',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.list.length, 1)
+  assert.equal(result.data.list[0].merchant_id, 'xiaochu')
+  assert.equal(result.data.list[0].masked_openid, 'staf****3456')
+})
+
+test('web invalid tokens cannot list merchant staff', async () => {
+  const invalidRequests = [
+    {
+      admin_token: ''
+    },
+    {
+      admin_token: `${createWebToken()}x`
+    },
+    {
+      admin_token: createWebToken({
+        now: new Date('2026-06-24T10:00:00.000Z'),
+        ttlMinutes: 60
+      })
+    },
+    {
+      admin_token: createWebToken({
+        role: 'viewer'
+      })
+    }
+  ]
+
+  for (const request of invalidRequests) {
+    const { deps } = createDependencies({
+      openid: ''
+    })
+    const handler = createManageMerchantStaffHandler(deps)
+
+    const result = await handler({
+      action: 'listStaff',
+      merchant_id: 'xiaochu',
+      admin_token: request.admin_token
+    })
+
+    assert.equal(result.success, false)
+    assert.ok(['UNAUTHORIZED', 'TOKEN_EXPIRED'].includes(result.code))
+  }
+})
+
+test('web admin token in http string body can list merchant staff', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    body: JSON.stringify({
+      action: 'listStaff',
+      merchant_id: 'xiaochu',
+      admin_token: createWebToken()
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 1)
+})
+
+test('web admin token in http object body can list merchant staff', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    body: {
+      action: 'listStaff',
+      merchant_id: 'xiaochu',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 1)
+})
+
+test('web admin token in query string parameters can list merchant staff', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    queryStringParameters: {
+      action: 'listStaff',
+      merchant_id: 'xiaochu',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 1)
+})
+
+test('invalid http body json does not crash', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    body: '{"action":'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+})
+
+test('web admin token cannot write staff or invite data in current phase', async () => {
+  const blockedActions = [
+    {
+      action: 'enableStaff',
+      payload: {
+        staff_id: 'staff_001'
+      }
+    },
+    {
+      action: 'disableStaff',
+      payload: {
+        staff_id: 'staff_001'
+      }
+    },
+    {
+      action: 'createInvite',
+      payload: {
+        merchant_id: 'xiaochu',
+        role: 'staff'
+      }
+    },
+    {
+      action: 'disableInvite',
+      payload: {
+        code: 'XK7M2Q8A'
+      }
+    }
+  ]
+
+  for (const request of blockedActions) {
+    const { state, deps } = createDependencies({
+      openid: '',
+      invites: [
+        {
+          code: 'XK7M2Q8A',
+          merchant_id: 'xiaochu',
+          role: 'staff',
+          status: 'unused'
+        }
+      ]
+    })
+    const handler = createManageMerchantStaffHandler(deps)
+
+    const result = await handler({
+      action: request.action,
+      payload: request.payload,
+      admin_token: createWebToken()
+    })
+
+    assert.equal(result.success, false)
+    assert.equal(result.code, 'FORBIDDEN')
+    assert.equal(state.staff[0].status, 'active')
+    assert.equal(state.invites[0].status, 'unused')
+  }
 })
 
 test('super admin can create invite with default unused status and seven day expiry', async () => {

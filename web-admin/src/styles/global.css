@@ -655,6 +655,17 @@ button {
     150px;
 }
 
+.staff-table__row {
+  grid-template-columns:
+    minmax(90px, 0.65fr)
+    minmax(90px, 0.65fr)
+    minmax(170px, 1.25fr)
+    minmax(120px, 0.85fr)
+    minmax(130px, 1fr)
+    minmax(150px, 1fr)
+    minmax(130px, 0.85fr);
+}
+
 .table-action-group {
   display: flex;
   flex-wrap: wrap;
