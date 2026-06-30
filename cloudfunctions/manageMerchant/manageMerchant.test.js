@@ -368,20 +368,151 @@ test('invalid http body json does not crash', async () => {
   assert.equal(result.code, 'INVALID_PARAMS')
 })
 
-test('web admin token cannot use write merchant actions yet', async () => {
+test('web valid admin token can create merchant', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    action: 'create',
+    admin_token: createWebToken(),
+    payload: {
+      merchant_id: 'web_create',
+      name: 'Web 私厨',
+      short_name: 'Web 私厨',
+      owner_openid: 'web_owner_openid',
+      notice: 'Web 后台创建'
+    }
+  })
+
+  const merchant = state.merchants.find((item) => item.merchant_id === 'web_create')
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.data.merchant.merchant_id, 'web_create')
+  assert.equal(merchant.name, 'Web 私厨')
+  assert.equal(merchant.status, 'active')
+})
+
+test('web invalid tokens cannot create merchant', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const requests = [
+    {
+      admin_token: '',
+      merchant_id: 'web_empty_token'
+    },
+    {
+      admin_token: `${createWebToken()}x`,
+      merchant_id: 'web_tampered_token'
+    },
+    {
+      admin_token: createWebToken({
+        now: new Date('2026-06-25T08:00:00.000Z'),
+        ttlMinutes: 30
+      }),
+      merchant_id: 'web_expired_token'
+    },
+    {
+      admin_token: createWebToken({
+        role: 'viewer'
+      }),
+      merchant_id: 'web_viewer_token'
+    }
+  ]
+
+  for (const request of requests) {
+    const result = await handler({
+      action: 'create',
+      admin_token: request.admin_token,
+      payload: {
+        merchant_id: request.merchant_id,
+        name: '不应创建'
+      }
+    })
+
+    assert.equal(result.success, false)
+  }
+
+  assert.equal(state.merchants.length, 1)
+})
+
+test('web create validates required merchant fields', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const missingMerchantId = await handler({
+    action: 'create',
+    admin_token: createWebToken(),
+    payload: {
+      name: '缺少 ID'
+    }
+  })
+
+  const missingName = await handler({
+    action: 'create',
+    admin_token: createWebToken(),
+    payload: {
+      merchant_id: 'web_missing_name'
+    }
+  })
+
+  const duplicate = await handler({
+    action: 'create',
+    admin_token: createWebToken(),
+    payload: {
+      merchant_id: 'merchant_001',
+      name: '重复商户'
+    }
+  })
+
+  assert.equal(missingMerchantId.success, false)
+  assert.equal(missingMerchantId.code, 'VALIDATION_ERROR')
+  assert.equal(missingName.success, false)
+  assert.equal(missingName.code, 'VALIDATION_ERROR')
+  assert.equal(duplicate.success, false)
+  assert.equal(duplicate.code, 'ALREADY_EXISTS')
+})
+
+test('web create cannot override system merchant fields', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    action: 'create',
+    admin_token: createWebToken(),
+    payload: {
+      merchant_id: 'web_clean',
+      name: '字段安全商户',
+      status: 'disabled',
+      created_at: new Date('2020-01-01T00:00:00.000Z'),
+      updated_at: new Date('2020-01-01T00:00:00.000Z'),
+      unknown_field: 'should_not_write'
+    }
+  })
+
+  const merchant = state.merchants.find((item) => item.merchant_id === 'web_clean')
+  assert.equal(result.success, true)
+  assert.equal(merchant.status, 'active')
+  assert.equal(merchant.created_at, state.now)
+  assert.equal(merchant.updated_at, state.now)
+  assert.equal(Object.prototype.hasOwnProperty.call(merchant, 'unknown_field'), false)
+})
+
+test('web admin token still cannot update enable or disable merchants', async () => {
   const { state, deps } = createDependencies({
     openid: ''
   })
   const handler = createManageMerchantHandler(deps)
 
   const actions = [
-    {
-      action: 'create',
-      payload: {
-        merchant_id: 'web_create',
-        name: 'Web Create'
-      }
-    },
     {
       action: 'update',
       payload: {
@@ -412,7 +543,6 @@ test('web admin token cannot use write merchant actions yet', async () => {
     assert.equal(result.code, 'FORBIDDEN')
   }
 
-  assert.equal(state.merchants.some((merchant) => merchant.merchant_id === 'web_create'), false)
   assert.equal(state.merchants[0].name, '小厨食堂')
   assert.equal(state.merchants[0].status, 'active')
 })

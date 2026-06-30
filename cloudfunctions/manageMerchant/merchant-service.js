@@ -1,5 +1,6 @@
 const VALID_ACTIONS = ['list', 'get', 'create', 'update', 'enable', 'disable']
-const MERCHANT_ID_PATTERN = /^[a-z0-9_-]{3,32}$/
+const MERCHANT_ID_PATTERN = /^[a-z0-9_-]{2,32}$/
+const WEB_ALLOWED_ACTIONS = ['list', 'create']
 const { verifyWebAdminToken } = require('./web-admin-token-helper')
 
 function success(message, data = {}) {
@@ -177,9 +178,9 @@ function assertWebAdmin(event, action, deps) {
     }
   }
 
-  if (action !== 'list') {
+  if (!WEB_ALLOWED_ACTIONS.includes(action)) {
     return {
-      error: failure('FORBIDDEN', 'Web 后台当前仅开放商户列表读取')
+      error: failure('FORBIDDEN', 'Web 后台当前仅开放商户列表读取和新增')
     }
   }
 
@@ -239,17 +240,32 @@ async function handleGet(deps, payload) {
 async function handleCreate(deps, payload) {
   const merchantId = normalizeText(payload.merchant_id)
   const name = normalizeText(payload.name)
+  const shortName = normalizeText(payload.short_name)
+  const ownerOpenid = normalizeText(payload.owner_openid)
+  const notice = normalizeText(payload.notice)
 
   if (!merchantId) {
     return failure('VALIDATION_ERROR', '商户 ID 不能为空')
   }
 
   if (!isValidMerchantId(merchantId)) {
-    return failure('VALIDATION_ERROR', '商户 ID 只能包含小写英文、数字、下划线和短横线，长度 3-32 位')
+    return failure('VALIDATION_ERROR', '商户 ID 只能包含小写英文、数字、下划线和短横线，长度 2-32 位')
   }
 
   if (!name) {
     return failure('VALIDATION_ERROR', '商户名称不能为空')
+  }
+
+  if (name.length < 2 || name.length > 40) {
+    return failure('VALIDATION_ERROR', '商户名称长度应为 2-40 个字符')
+  }
+
+  if (shortName.length > 12) {
+    return failure('VALIDATION_ERROR', '商户短名称不能超过 12 个字符')
+  }
+
+  if (notice.length > 200) {
+    return failure('VALIDATION_ERROR', '备注或公告不能超过 200 个字符')
   }
 
   try {
@@ -262,10 +278,10 @@ async function handleCreate(deps, payload) {
     const merchant = {
       merchant_id: merchantId,
       name,
-      short_name: normalizeText(payload.short_name) || name,
+      short_name: shortName || name,
       status: 'active',
-      owner_openid: normalizeText(payload.owner_openid),
-      notice: normalizeText(payload.notice),
+      owner_openid: ownerOpenid,
+      notice,
       created_at: now,
       updated_at: now
     }

@@ -16,6 +16,14 @@ export interface MerchantListItem {
   updated_at: string | null
 }
 
+export interface CreateMerchantPayload {
+  merchant_id: string
+  name: string
+  short_name?: string
+  owner_openid?: string
+  notice?: string
+}
+
 interface RawMerchantListItem {
   _id?: unknown
   merchant_id?: unknown
@@ -33,6 +41,10 @@ interface RawMerchantListItem {
 interface MerchantListResponse {
   list?: RawMerchantListItem[]
   total?: number
+}
+
+interface MerchantMutationResponse {
+  merchant?: RawMerchantListItem
 }
 
 function toText(value: unknown) {
@@ -99,4 +111,13 @@ export async function fetchMerchants() {
     list: Array.isArray(data.list) ? data.list.map(normalizeMerchant) : [],
     total: Number.isFinite(Number(data.total)) ? Number(data.total) : 0
   }
+}
+
+export async function createMerchant(payload: CreateMerchantPayload) {
+  const data = await callAdminFunction<MerchantMutationResponse>('manageMerchant', {
+    action: 'create',
+    payload
+  })
+
+  return data.merchant ? normalizeMerchant(data.merchant) : null
 }

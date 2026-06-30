@@ -8,7 +8,13 @@ import MockTable from '../components/MockTable.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
-import { fetchMerchants, type MerchantListItem, type MerchantStatus } from '../services/merchants'
+import {
+  createMerchant,
+  fetchMerchants,
+  type CreateMerchantPayload,
+  type MerchantListItem,
+  type MerchantStatus
+} from '../services/merchants'
 import type { AdminApiError } from '../types/api'
 
 type StatusFilter = 'all' | MerchantStatus
@@ -21,6 +27,17 @@ const errorMessage = ref('')
 const errorCode = ref('')
 const statusFilter = ref<StatusFilter>('all')
 const searchKeyword = ref('')
+const isCreateFormOpen = ref(false)
+const isCreating = ref(false)
+const createErrorMessage = ref('')
+const createSuccessMessage = ref('')
+const createForm = ref<CreateMerchantPayload>({
+  merchant_id: '',
+  name: '',
+  short_name: '',
+  owner_openid: '',
+  notice: ''
+})
 
 const isAuthError = computed(() => ['UNAUTHORIZED', 'TOKEN_EXPIRED', 'FORBIDDEN'].includes(errorCode.value))
 
@@ -87,7 +104,97 @@ function maskOpenid(openid: string) {
 }
 
 function showPendingTip() {
-  window.alert('当前商户列表已接入真实云函数，新增 / 编辑 / 启停将在后续版本接入')
+  window.alert('该操作将在后续版本接入')
+}
+
+function resetCreateForm() {
+  createForm.value = {
+    merchant_id: '',
+    name: '',
+    short_name: '',
+    owner_openid: '',
+    notice: ''
+  }
+}
+
+function openCreateForm() {
+  isCreateFormOpen.value = true
+  createErrorMessage.value = ''
+  createSuccessMessage.value = ''
+}
+
+function closeCreateForm() {
+  if (isCreating.value) {
+    return
+  }
+
+  isCreateFormOpen.value = false
+  createErrorMessage.value = ''
+}
+
+function getCreatePayload(): CreateMerchantPayload {
+  return {
+    merchant_id: createForm.value.merchant_id.trim(),
+    name: createForm.value.name.trim(),
+    short_name: createForm.value.short_name?.trim(),
+    owner_openid: createForm.value.owner_openid?.trim(),
+    notice: createForm.value.notice?.trim()
+  }
+}
+
+function validateCreateForm(payload: CreateMerchantPayload) {
+  if (!payload.merchant_id) {
+    return '请填写商户 ID'
+  }
+
+  if (!/^[a-z0-9_-]{2,32}$/.test(payload.merchant_id)) {
+    return '商户 ID 只能使用小写字母、数字、下划线和中划线，长度 2-32 位'
+  }
+
+  if (!payload.name) {
+    return '请填写商户名称'
+  }
+
+  if (payload.name.length < 2 || payload.name.length > 40) {
+    return '商户名称长度应为 2-40 个字符'
+  }
+
+  if ((payload.short_name || '').length > 12) {
+    return '短名称不能超过 12 个字符'
+  }
+
+  if ((payload.notice || '').length > 200) {
+    return '备注 / 公告不能超过 200 个字符'
+  }
+
+  return ''
+}
+
+async function submitCreateMerchant() {
+  const payload = getCreatePayload()
+  const validationMessage = validateCreateForm(payload)
+  createErrorMessage.value = ''
+  createSuccessMessage.value = ''
+
+  if (validationMessage) {
+    createErrorMessage.value = validationMessage
+    return
+  }
+
+  isCreating.value = true
+
+  try {
+    await createMerchant(payload)
+    createSuccessMessage.value = '商户创建成功，列表已刷新'
+    resetCreateForm()
+    isCreateFormOpen.value = false
+    await loadMerchants()
+  } catch (error) {
+    const apiError = error as Partial<AdminApiError>
+    createErrorMessage.value = apiError.message || '商户创建失败，请检查填写内容后重试'
+  } finally {
+    isCreating.value = false
+  }
 }
 
 function openStaff() {
@@ -130,10 +237,91 @@ onMounted(() => {
       description="当前商户列表已接入真实云函数，新增 / 编辑 / 启停仍待接入。"
     >
       <template #actions>
-        <ActionButton variant="primary" @click="showPendingTip">新增商户</ActionButton>
+        <ActionButton variant="primary" @click="openCreateForm">新增商户</ActionButton>
         <ActionButton @click="loadMerchants">刷新列表</ActionButton>
       </template>
     </PageHeader>
+
+    <section v-if="createSuccessMessage" class="panel glass-card">
+      <div class="section-heading compact-section-heading">
+        <div>
+          <h2>商户创建成功</h2>
+          <p>{{ createSuccessMessage }}</p>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="isCreateFormOpen" class="panel glass-card merchant-create-panel">
+      <div class="section-heading">
+        <div>
+          <h2>新增私厨商户</h2>
+          <p>创建后会立即刷新真实商户列表。当前只开放新增，编辑和启停会在后续版本接入。</p>
+        </div>
+        <button class="ghost-button" type="button" :disabled="isCreating" @click="closeCreateForm">收起</button>
+      </div>
+
+      <form class="admin-form" @submit.prevent="submitCreateMerchant">
+        <label class="form-field">
+          <span>商户 ID <b>*</b></span>
+          <input
+            v-model="createForm.merchant_id"
+            autocomplete="off"
+            placeholder="例如 xiaochu_private"
+            :disabled="isCreating"
+          />
+        </label>
+
+        <label class="form-field">
+          <span>商户名称 <b>*</b></span>
+          <input
+            v-model="createForm.name"
+            autocomplete="off"
+            placeholder="例如 小厨食堂私厨店"
+            :disabled="isCreating"
+          />
+        </label>
+
+        <label class="form-field">
+          <span>短名称</span>
+          <input
+            v-model="createForm.short_name"
+            autocomplete="off"
+            placeholder="例如 小厨私厨"
+            :disabled="isCreating"
+          />
+        </label>
+
+        <label class="form-field">
+          <span>负责人 openid</span>
+          <input
+            v-model="createForm.owner_openid"
+            autocomplete="off"
+            placeholder="可后续补充"
+            :disabled="isCreating"
+          />
+        </label>
+
+        <label class="form-field form-field--wide">
+          <span>备注 / 公告</span>
+          <textarea
+            v-model="createForm.notice"
+            rows="4"
+            placeholder="用于记录商户备注或店铺公告"
+            :disabled="isCreating"
+          />
+        </label>
+
+        <p v-if="createErrorMessage" class="form-error">{{ createErrorMessage }}</p>
+        <p v-if="createSuccessMessage" class="form-success">{{ createSuccessMessage }}</p>
+
+        <div class="form-actions">
+          <button class="ghost-button" type="button" :disabled="isCreating" @click="closeCreateForm">取消</button>
+          <button class="primary-button" type="submit" :disabled="isCreating">
+            {{ isCreating ? '正在创建...' : '创建商户' }}
+          </button>
+        </div>
+      </form>
+    </section>
 
     <section class="stat-grid">
       <StatCard title="商户总数" :value="isLoading ? '...' : merchants.length" caption="来自 manageMerchant.list" icon="商" />
