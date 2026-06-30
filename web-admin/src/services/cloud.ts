@@ -1,5 +1,5 @@
 import { clearSession, getSession, hasValidLocalSession } from '../stores/session'
-import { AdminApiError, type ApiError, type ApiResponse } from '../types/api'
+import { AdminApiError, type ApiResponse } from '../types/api'
 
 const TOKEN_ERROR_CODES = new Set(['UNAUTHORIZED', 'TOKEN_EXPIRED'])
 
@@ -11,7 +11,16 @@ function createError(code: string, message: string): AdminApiError {
   return new AdminApiError({ code, message })
 }
 
-function normalizeError(error?: ApiError): AdminApiError {
+function normalizeError(response?: ApiResponse<unknown>): AdminApiError {
+  const error = response?.error || (
+    response?.code
+      ? {
+          code: response.code,
+          message: response.message || '接口调用失败'
+        }
+      : undefined
+  )
+
   return new AdminApiError({
     code: error?.code || 'INVALID_RESPONSE',
     message: error?.message || '接口返回格式异常'
@@ -68,7 +77,7 @@ export async function callAdminFunction<T>(
 
     const result = assertValidResponse<T>(await response.json())
     if (!result.success) {
-      const error = normalizeError(result.error)
+      const error = normalizeError(result)
       handleTokenError(error)
       throw error
     }

@@ -5,11 +5,15 @@ const {
   createManageMerchantHandler,
   maskOpenid
 } = require('./merchant-service')
+const {
+  createSignedToken
+} = require('../webAdminAuth/web-admin-auth-service')
 
 function createDependencies(options = {}) {
   const state = {
-    openid: options.openid || 'admin_openid',
+    openid: options.openid === undefined ? 'admin_openid' : options.openid,
     superAdminOpenids: options.superAdminOpenids || 'admin_openid,another_admin',
+    tokenSecret: options.tokenSecret === undefined ? 'manage-merchant-test-secret' : options.tokenSecret,
     now: options.now || new Date('2026-06-25T10:00:00.000Z'),
     dishesTouched: 0,
     ordersTouched: 0,
@@ -34,6 +38,7 @@ function createDependencies(options = {}) {
     deps: {
       getOpenid: () => state.openid,
       getSuperAdminOpenids: () => state.superAdminOpenids,
+      getTokenSecret: () => state.tokenSecret,
       now: () => state.now,
       findMerchants: async () => state.merchants,
       findMerchantByMerchantId: async (merchantId) => {
@@ -69,6 +74,16 @@ function createDependencies(options = {}) {
       }
     }
   }
+}
+
+function createWebToken(options = {}) {
+  return createSignedToken({
+    role: options.role || 'super_admin',
+    secret: options.secret || 'manage-merchant-test-secret',
+    now: options.now || new Date('2026-06-25T10:00:00.000Z'),
+    ttlMinutes: options.ttlMinutes || 60,
+    nonce: options.nonce || 'manage-merchant-test-nonce'
+  }).token
 }
 
 test('super admin can create merchant with default active status', async () => {
@@ -204,6 +219,202 @@ test('non super admin cannot list merchants', async () => {
 
   assert.equal(result.success, false)
   assert.equal(result.code, 'FORBIDDEN')
+})
+
+test('web valid admin token can list merchants without openid', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    action: 'list',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.list.length, 1)
+  assert.equal(result.data.total, 1)
+  assert.equal(result.data.list[0].merchant_id, 'merchant_001')
+})
+
+test('web empty admin token cannot list merchants', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    action: 'list',
+    admin_token: ''
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web tampered admin token cannot list merchants', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    action: 'list',
+    admin_token: `${createWebToken()}x`
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web expired admin token cannot list merchants', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    action: 'list',
+    admin_token: createWebToken({
+      now: new Date('2026-06-25T08:00:00.000Z'),
+      ttlMinutes: 30
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'TOKEN_EXPIRED')
+})
+
+test('web non super admin token cannot list merchants', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    action: 'list',
+    admin_token: createWebToken({
+      role: 'viewer'
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web admin token in http string body can list merchants', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    body: JSON.stringify({
+      action: 'list',
+      admin_token: createWebToken()
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.list.length, 1)
+})
+
+test('web admin token in http object body can list merchants', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    body: {
+      action: 'list',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.list.length, 1)
+})
+
+test('web admin token in query string parameters can list merchants', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    queryStringParameters: {
+      action: 'list',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.list.length, 1)
+})
+
+test('invalid http body json does not crash', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    body: '{"action":'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+})
+
+test('web admin token cannot use write merchant actions yet', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const actions = [
+    {
+      action: 'create',
+      payload: {
+        merchant_id: 'web_create',
+        name: 'Web Create'
+      }
+    },
+    {
+      action: 'update',
+      payload: {
+        merchant_id: 'merchant_001',
+        name: 'Web Update'
+      }
+    },
+    {
+      action: 'enable',
+      payload: {
+        merchant_id: 'merchant_001'
+      }
+    },
+    {
+      action: 'disable',
+      payload: {
+        merchant_id: 'merchant_001'
+      }
+    }
+  ]
+
+  for (const request of actions) {
+    const result = await handler({
+      ...request,
+      admin_token: createWebToken()
+    })
+    assert.equal(result.success, false)
+    assert.equal(result.code, 'FORBIDDEN')
+  }
+
+  assert.equal(state.merchants.some((merchant) => merchant.merchant_id === 'web_create'), false)
+  assert.equal(state.merchants[0].name, '小厨食堂')
+  assert.equal(state.merchants[0].status, 'active')
 })
 
 test('non super admin receives forbidden before action details', async () => {

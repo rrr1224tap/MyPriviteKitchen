@@ -34,6 +34,7 @@ exports.main = createManageMerchantHandler({
   },
 
   getSuperAdminOpenids: () => process.env.SUPER_ADMIN_OPENIDS,
+  getTokenSecret: () => process.env.WEB_ADMIN_TOKEN_SECRET,
 
   now: () => new Date(),
 

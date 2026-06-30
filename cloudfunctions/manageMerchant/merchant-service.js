@@ -1,5 +1,6 @@
 const VALID_ACTIONS = ['list', 'get', 'create', 'update', 'enable', 'disable']
 const MERCHANT_ID_PATTERN = /^[a-z0-9_-]{3,32}$/
+const { verifyWebAdminToken } = require('./web-admin-token-helper')
 
 function success(message, data = {}) {
   return {
@@ -25,6 +26,50 @@ function normalizeText(value) {
 
 function normalizePayload(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+}
+
+function parseJsonBody(body) {
+  if (!body) {
+    return {}
+  }
+
+  if (typeof body === 'object' && !Array.isArray(body)) {
+    return body
+  }
+
+  if (typeof body !== 'string') {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(body)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch (error) {
+    return {}
+  }
+}
+
+function normalizeEventPayload(event = {}) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) {
+    return {}
+  }
+
+  if (Object.prototype.hasOwnProperty.call(event, 'action') ||
+    Object.prototype.hasOwnProperty.call(event, 'admin_token')) {
+    return event
+  }
+
+  const bodyPayload = parseJsonBody(event.body)
+  if (Object.keys(bodyPayload).length > 0) {
+    return bodyPayload
+  }
+
+  const queryPayload = event.queryStringParameters
+  if (queryPayload && typeof queryPayload === 'object' && !Array.isArray(queryPayload)) {
+    return queryPayload
+  }
+
+  return {}
 }
 
 function parseSuperAdminOpenids(value) {
@@ -56,6 +101,8 @@ function maskOpenid(openid) {
 }
 
 function formatMerchant(merchant = {}) {
+  const membersCount = Number(merchant.members_count)
+
   return {
     _id: merchant._id || '',
     merchant_id: merchant.merchant_id || '',
@@ -64,6 +111,7 @@ function formatMerchant(merchant = {}) {
     status: merchant.status === 'disabled' ? 'disabled' : 'active',
     owner_openid: merchant.owner_openid || '',
     masked_owner_openid: maskOpenid(merchant.owner_openid),
+    members_count: Number.isFinite(membersCount) && membersCount >= 0 ? membersCount : 0,
     notice: merchant.notice || '',
     created_at: merchant.created_at || null,
     updated_at: merchant.updated_at || null
@@ -83,6 +131,7 @@ function buildDependencies(dependencies = {}) {
     findMerchantByMerchantId: dependencies.findMerchantByMerchantId,
     createMerchant: dependencies.createMerchant,
     updateMerchant: dependencies.updateMerchant,
+    getTokenSecret: dependencies.getTokenSecret,
     logger: dependencies.logger || console
   }
 }
@@ -107,6 +156,45 @@ function assertSuperAdmin(deps) {
   return {
     openid
   }
+}
+
+function isWebAdminRequest(event = {}) {
+  return Boolean(event && Object.prototype.hasOwnProperty.call(event, 'admin_token'))
+}
+
+function assertWebAdmin(event, action, deps) {
+  const verifyResult = verifyWebAdminToken(event.admin_token, {
+    secret: deps.getTokenSecret ? deps.getTokenSecret() : process.env.WEB_ADMIN_TOKEN_SECRET,
+    now: deps.now()
+  })
+
+  if (!verifyResult.ok) {
+    return {
+      error: failure(
+        verifyResult.code,
+        verifyResult.code === 'TOKEN_EXPIRED' ? '登录状态已过期' : '登录状态无效或已过期'
+      )
+    }
+  }
+
+  if (action !== 'list') {
+    return {
+      error: failure('FORBIDDEN', 'Web 后台当前仅开放商户列表读取')
+    }
+  }
+
+  return {
+    is_web_admin: true,
+    role: verifyResult.role
+  }
+}
+
+function assertMerchantAccess(event, action, deps) {
+  if (isWebAdminRequest(event)) {
+    return assertWebAdmin(event, action, deps)
+  }
+
+  return assertSuperAdmin(deps)
 }
 
 function getPayloadMerchantId(payload = {}) {
@@ -317,14 +405,15 @@ function createManageMerchantHandler(dependencies = {}) {
 
   return async function manageMerchant(event = {}) {
     try {
-      const action = normalizeText(event.action)
-      const payload = normalizePayload(event.payload || event.data)
+      const normalizedEvent = normalizeEventPayload(event)
+      const action = normalizeText(normalizedEvent.action)
+      const payload = normalizePayload(normalizedEvent.payload || normalizedEvent.data)
 
       if (!action) {
         return failure('INVALID_PARAMS', '操作类型不能为空')
       }
 
-      const adminResult = assertSuperAdmin(deps)
+      const adminResult = assertMerchantAccess(normalizedEvent, action, deps)
       if (adminResult.error) {
         return adminResult.error
       }
