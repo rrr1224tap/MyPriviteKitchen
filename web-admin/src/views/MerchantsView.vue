@@ -9,6 +9,8 @@ import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import {
   createMerchant,
+  disableMerchant,
+  enableMerchant,
   fetchMerchants,
   updateMerchant,
   type CreateMerchantPayload,
@@ -50,6 +52,9 @@ const editForm = ref<UpdateMerchantPayload>({
   owner_openid: '',
   notice: ''
 })
+const changingStatusMerchantId = ref('')
+const statusChangeErrorMessage = ref('')
+const statusChangeSuccessMessage = ref('')
 
 const isAuthError = computed(() => ['UNAUTHORIZED', 'TOKEN_EXPIRED', 'FORBIDDEN'].includes(errorCode.value))
 
@@ -104,10 +109,6 @@ function maskOpenid(openid: string) {
   }
 
   return `${openid.slice(0, 4)}****${openid.slice(-4)}`
-}
-
-function showPendingTip() {
-  window.alert('该操作将在后续版本接入')
 }
 
 function resetCreateForm() {
@@ -282,6 +283,37 @@ async function submitUpdateMerchant() {
   }
 }
 
+async function toggleMerchantStatus(merchant: MerchantListItem) {
+  const isDisabling = merchant.status === 'active'
+  const confirmMessage = isDisabling
+    ? '确认禁用该商户吗？禁用后该商户将不会作为可用商户继续运营。'
+    : '确认启用该商户吗？启用后该商户将恢复为可用状态。'
+
+  if (!window.confirm(confirmMessage)) {
+    return
+  }
+
+  changingStatusMerchantId.value = merchant.merchant_id
+  statusChangeErrorMessage.value = ''
+  statusChangeSuccessMessage.value = ''
+
+  try {
+    if (isDisabling) {
+      await disableMerchant(merchant.merchant_id)
+      statusChangeSuccessMessage.value = '商户已禁用，列表已刷新'
+    } else {
+      await enableMerchant(merchant.merchant_id)
+      statusChangeSuccessMessage.value = '商户已启用，列表已刷新'
+    }
+    await loadMerchants()
+  } catch (error) {
+    const apiError = error as Partial<AdminApiError>
+    statusChangeErrorMessage.value = apiError.message || '操作失败，请稍后重试'
+  } finally {
+    changingStatusMerchantId.value = ''
+  }
+}
+
 function openStaff() {
   router.push(`/merchants/${selectedMerchant.value?.merchant_id || 'xiaochu'}/staff`)
 }
@@ -319,7 +351,7 @@ onMounted(() => {
     <PageHeader
       eyebrow="Merchants"
       title="商户管理"
-      description="当前商户列表、新增和编辑已接入真实云函数，启停仍待接入。"
+      description="当前商户列表、新增、编辑和启停已接入真实云函数。"
     >
       <template #actions>
         <ActionButton variant="primary" @click="openCreateForm">新增商户</ActionButton>
@@ -345,11 +377,29 @@ onMounted(() => {
       </div>
     </section>
 
+    <section v-if="statusChangeSuccessMessage" class="panel glass-card">
+      <div class="section-heading compact-section-heading">
+        <div>
+          <h2>商户状态已更新</h2>
+          <p>{{ statusChangeSuccessMessage }}</p>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="statusChangeErrorMessage" class="panel glass-card">
+      <div class="section-heading compact-section-heading">
+        <div>
+          <h2>商户状态更新失败</h2>
+          <p>{{ statusChangeErrorMessage }}</p>
+        </div>
+      </div>
+    </section>
+
     <section v-if="isCreateFormOpen" class="panel glass-card merchant-create-panel">
       <div class="section-heading">
         <div>
           <h2>新增私厨商户</h2>
-          <p>创建后会立即刷新真实商户列表。当前已开放新增和编辑，启停会在后续版本接入。</p>
+          <p>创建后会立即刷新真实商户列表。当前已开放新增、编辑和启停。</p>
         </div>
         <button class="ghost-button" type="button" :disabled="isCreating" @click="closeCreateForm">收起</button>
       </div>
@@ -570,8 +620,21 @@ onMounted(() => {
             <span>{{ merchant.members_count }}</span>
             <span>{{ merchant.masked_owner_openid || maskOpenid(merchant.owner_openid) || '-' }}</span>
             <span>{{ formatDate(merchant.updated_at || merchant.created_at) }}</span>
-            <span>
+            <span class="table-action-group">
               <button class="table-action-button" type="button" @click="openEditForm(merchant)">编辑</button>
+              <button
+                class="table-action-button"
+                :class="{ 'table-action-button--danger': merchant.status === 'active' }"
+                type="button"
+                :disabled="changingStatusMerchantId === merchant.merchant_id"
+                @click="toggleMerchantStatus(merchant)"
+              >
+                {{
+                  changingStatusMerchantId === merchant.merchant_id
+                    ? '处理中...'
+                    : merchant.status === 'active' ? '禁用' : '启用'
+                }}
+              </button>
             </span>
           </div>
         </div>
@@ -582,7 +645,6 @@ onMounted(() => {
             tone="green"
           />
           <ActionButton @click="openStaff">成员 / 邀请</ActionButton>
-          <ActionButton variant="danger" @click="showPendingTip">禁用 / 启用</ActionButton>
         </div>
       </template>
     </GlassCard>

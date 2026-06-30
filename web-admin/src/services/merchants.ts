@@ -138,3 +138,21 @@ export async function updateMerchant(payload: UpdateMerchantPayload) {
 
   return data.merchant ? normalizeMerchant(data.merchant) : null
 }
+
+export async function enableMerchant(merchantId: string) {
+  const data = await callAdminFunction<MerchantMutationResponse>('manageMerchant', {
+    action: 'enable',
+    merchant_id: merchantId
+  })
+
+  return data.merchant ? normalizeMerchant(data.merchant) : null
+}
+
+export async function disableMerchant(merchantId: string) {
+  const data = await callAdminFunction<MerchantMutationResponse>('manageMerchant', {
+    action: 'disable',
+    merchant_id: merchantId
+  })
+
+  return data.merchant ? normalizeMerchant(data.merchant) : null
+}

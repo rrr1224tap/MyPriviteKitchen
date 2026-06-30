@@ -669,38 +669,191 @@ test('web update cannot override protected merchant fields', async () => {
   assert.equal(state.merchants[0].name, '小厨食堂')
 })
 
-test('web admin token still cannot enable or disable merchants', async () => {
+test('web valid admin token can disable merchant status only', async () => {
   const { state, deps } = createDependencies({
     openid: ''
   })
   const handler = createManageMerchantHandler(deps)
 
-  const actions = [
+  const result = await handler({
+    action: 'disable',
+    admin_token: createWebToken(),
+    payload: {
+      merchant_id: 'merchant_001',
+      name: '不应修改名称',
+      short_name: '不应改',
+      owner_openid: 'should_not_update',
+      notice: '不应修改公告',
+      status: 'active',
+      created_at: new Date('2020-01-01T00:00:00.000Z'),
+      members_count: 99
+    }
+  })
+
+  const merchant = state.merchants[0]
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(merchant.status, 'disabled')
+  assert.equal(merchant.updated_at, state.now)
+  assert.equal(merchant.name, '小厨食堂')
+  assert.equal(merchant.short_name, '小厨')
+  assert.equal(merchant.owner_openid, 'owner_openid_123456')
+  assert.equal(merchant.notice, '默认测试商户')
+  assert.equal(merchant.created_at.toISOString(), '2026-06-01T10:00:00.000Z')
+  assert.equal(merchant.members_count, undefined)
+})
+
+test('web valid admin token can enable merchant status only', async () => {
+  const { state, deps } = createDependencies({
+    openid: '',
+    merchants: [
+      {
+        _id: 'doc_merchant_001',
+        merchant_id: 'merchant_001',
+        name: '小厨食堂',
+        short_name: '小厨',
+        status: 'disabled',
+        owner_openid: 'owner_openid_123456',
+        notice: '默认测试商户',
+        created_at: new Date('2026-06-01T10:00:00.000Z'),
+        updated_at: new Date('2026-06-01T10:00:00.000Z')
+      }
+    ]
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    action: 'enable',
+    admin_token: createWebToken(),
+    payload: {
+      merchant_id: 'merchant_001',
+      name: '不应修改名称',
+      owner_openid: 'should_not_update'
+    }
+  })
+
+  const merchant = state.merchants[0]
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(merchant.status, 'active')
+  assert.equal(merchant.updated_at, state.now)
+  assert.equal(merchant.name, '小厨食堂')
+  assert.equal(merchant.owner_openid, 'owner_openid_123456')
+})
+
+test('web invalid tokens cannot enable or disable merchants', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+  const requests = [
     {
       action: 'enable',
-      payload: {
-        merchant_id: 'merchant_001'
-      }
+      admin_token: ''
     },
     {
       action: 'disable',
-      payload: {
-        merchant_id: 'merchant_001'
-      }
+      admin_token: `${createWebToken()}x`
+    },
+    {
+      action: 'enable',
+      admin_token: createWebToken({
+        now: new Date('2026-06-25T08:00:00.000Z'),
+        ttlMinutes: 30
+      })
+    },
+    {
+      action: 'disable',
+      admin_token: createWebToken({
+        role: 'viewer'
+      })
     }
   ]
 
-  for (const request of actions) {
+  for (const request of requests) {
     const result = await handler({
-      ...request,
-      admin_token: createWebToken()
+      action: request.action,
+      admin_token: request.admin_token,
+      payload: {
+        merchant_id: 'merchant_001'
+      }
     })
     assert.equal(result.success, false)
-    assert.equal(result.code, 'FORBIDDEN')
   }
 
-  assert.equal(state.merchants[0].name, '小厨食堂')
   assert.equal(state.merchants[0].status, 'active')
+})
+
+test('web enable and disable validate merchant id and existence', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const missingEnableId = await handler({
+    action: 'enable',
+    admin_token: createWebToken(),
+    payload: {}
+  })
+  const missingDisableId = await handler({
+    action: 'disable',
+    admin_token: createWebToken(),
+    payload: {}
+  })
+  const enableNotFound = await handler({
+    action: 'enable',
+    admin_token: createWebToken(),
+    payload: {
+      merchant_id: 'missing_merchant'
+    }
+  })
+  const disableNotFound = await handler({
+    action: 'disable',
+    admin_token: createWebToken(),
+    payload: {
+      merchant_id: 'missing_merchant'
+    }
+  })
+
+  assert.equal(missingEnableId.success, false)
+  assert.equal(missingEnableId.code, 'INVALID_PARAMS')
+  assert.equal(missingDisableId.success, false)
+  assert.equal(missingDisableId.code, 'INVALID_PARAMS')
+  assert.equal(enableNotFound.success, false)
+  assert.equal(enableNotFound.code, 'NOT_FOUND')
+  assert.equal(disableNotFound.success, false)
+  assert.equal(disableNotFound.code, 'NOT_FOUND')
+})
+
+test('web enable and disable accept top-level merchant_id from http body', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const disableResult = await handler({
+    body: JSON.stringify({
+      action: 'disable',
+      admin_token: createWebToken(),
+      merchant_id: 'merchant_001'
+    })
+  })
+  const disabledMerchant = state.merchants[0]
+
+  assert.equal(disableResult.success, true)
+  assert.equal(disabledMerchant.status, 'disabled')
+
+  const enableResult = await handler({
+    body: JSON.stringify({
+      action: 'enable',
+      admin_token: createWebToken(),
+      merchant_id: 'merchant_001'
+    })
+  })
+  const enabledMerchant = state.merchants[0]
+
+  assert.equal(enableResult.success, true)
+  assert.equal(enabledMerchant.status, 'active')
 })
 
 test('non super admin receives forbidden before action details', async () => {

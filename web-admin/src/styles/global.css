@@ -652,7 +652,13 @@ button {
     80px
     minmax(150px, 1fr)
     140px
-    86px;
+    150px;
+}
+
+.table-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .table-action-button {
@@ -667,9 +673,21 @@ button {
   cursor: pointer;
 }
 
+.table-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+}
+
 .table-action-button:hover {
   transform: translateY(-1px);
   background: rgba(255, 244, 242, 0.92);
+}
+
+.table-action-button--danger {
+  color: #a24d42;
+  border-color: rgba(216, 90, 66, 0.18);
+  background: rgba(216, 90, 66, 0.1);
 }
 
 .empty-state {

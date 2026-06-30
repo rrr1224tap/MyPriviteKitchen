@@ -1,6 +1,6 @@
 const VALID_ACTIONS = ['list', 'get', 'create', 'update', 'enable', 'disable']
 const MERCHANT_ID_PATTERN = /^[a-z0-9_-]{2,32}$/
-const WEB_ALLOWED_ACTIONS = ['list', 'create', 'update']
+const WEB_ALLOWED_ACTIONS = ['list', 'create', 'update', 'enable', 'disable']
 const { verifyWebAdminToken } = require('./web-admin-token-helper')
 
 function success(message, data = {}) {
@@ -180,7 +180,7 @@ function assertWebAdmin(event, action, deps) {
 
   if (!WEB_ALLOWED_ACTIONS.includes(action)) {
     return {
-      error: failure('FORBIDDEN', 'Web 后台当前仅开放商户列表读取和新增')
+      error: failure('FORBIDDEN', 'Web 后台当前仅开放商户列表、新增、编辑和启停')
     }
   }
 
@@ -448,7 +448,7 @@ function createManageMerchantHandler(dependencies = {}) {
     try {
       const normalizedEvent = normalizeEventPayload(event)
       const action = normalizeText(normalizedEvent.action)
-      const payload = normalizePayload(normalizedEvent.payload || normalizedEvent.data)
+      const payload = normalizePayload(normalizedEvent.payload || normalizedEvent.data || normalizedEvent)
 
       if (!action) {
         return failure('INVALID_PARAMS', '操作类型不能为空')
