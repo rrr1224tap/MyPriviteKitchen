@@ -506,20 +506,176 @@ test('web create cannot override system merchant fields', async () => {
   assert.equal(Object.prototype.hasOwnProperty.call(merchant, 'unknown_field'), false)
 })
 
-test('web admin token still cannot update enable or disable merchants', async () => {
+test('web valid admin token can update merchant basic info', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const result = await handler({
+    action: 'update',
+    admin_token: createWebToken(),
+    payload: {
+      merchant_id: 'merchant_001',
+      name: 'Web 更新商户',
+      short_name: 'Web 更新',
+      owner_openid: 'web_updated_owner',
+      notice: 'Web 后台更新'
+    }
+  })
+
+  const merchant = state.merchants.find((item) => item.merchant_id === 'merchant_001')
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(merchant.name, 'Web 更新商户')
+  assert.equal(merchant.short_name, 'Web 更新')
+  assert.equal(merchant.owner_openid, 'web_updated_owner')
+  assert.equal(merchant.notice, 'Web 后台更新')
+  assert.equal(merchant.status, 'active')
+  assert.equal(merchant.updated_at, state.now)
+})
+
+test('web invalid tokens cannot update merchant', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const requests = [
+    {
+      admin_token: ''
+    },
+    {
+      admin_token: `${createWebToken()}x`
+    },
+    {
+      admin_token: createWebToken({
+        now: new Date('2026-06-25T08:00:00.000Z'),
+        ttlMinutes: 30
+      })
+    },
+    {
+      admin_token: createWebToken({
+        role: 'viewer'
+      })
+    }
+  ]
+
+  for (const request of requests) {
+    const result = await handler({
+      action: 'update',
+      admin_token: request.admin_token,
+      payload: {
+        merchant_id: 'merchant_001',
+        name: '不应更新'
+      }
+    })
+
+    assert.equal(result.success, false)
+  }
+
+  assert.equal(state.merchants[0].name, '小厨食堂')
+})
+
+test('web update validates required merchant fields', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const missingMerchantId = await handler({
+    action: 'update',
+    admin_token: createWebToken(),
+    payload: {
+      name: '缺少 ID'
+    }
+  })
+
+  const missingName = await handler({
+    action: 'update',
+    admin_token: createWebToken(),
+    payload: {
+      merchant_id: 'merchant_001'
+    }
+  })
+
+  const notFound = await handler({
+    action: 'update',
+    admin_token: createWebToken(),
+    payload: {
+      merchant_id: 'missing_merchant',
+      name: '不存在商户'
+    }
+  })
+
+  assert.equal(missingMerchantId.success, false)
+  assert.equal(missingMerchantId.code, 'INVALID_PARAMS')
+  assert.equal(missingName.success, false)
+  assert.equal(missingName.code, 'VALIDATION_ERROR')
+  assert.equal(notFound.success, false)
+  assert.equal(notFound.code, 'NOT_FOUND')
+})
+
+test('web update cannot override protected merchant fields', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantHandler(deps)
+
+  const requests = [
+    {
+      payload: {
+        merchant_id: 'merchant_001',
+        next_merchant_id: 'changed_id',
+        name: '尝试改 ID'
+      }
+    },
+    {
+      payload: {
+        merchant_id: 'merchant_001',
+        name: '尝试改状态',
+        status: 'disabled'
+      }
+    },
+    {
+      payload: {
+        merchant_id: 'merchant_001',
+        name: '尝试改时间',
+        created_at: new Date('2020-01-01T00:00:00.000Z')
+      }
+    },
+    {
+      payload: {
+        merchant_id: 'merchant_001',
+        name: '尝试改成员数',
+        members_count: 999
+      }
+    }
+  ]
+
+  for (const request of requests) {
+    const result = await handler({
+      action: 'update',
+      admin_token: createWebToken(),
+      payload: request.payload
+    })
+    assert.equal(result.success, false)
+    assert.equal(result.code, 'VALIDATION_ERROR')
+  }
+
+  assert.equal(state.merchants[0].merchant_id, 'merchant_001')
+  assert.equal(state.merchants[0].status, 'active')
+  assert.equal(state.merchants[0].members_count, undefined)
+  assert.equal(state.merchants[0].name, '小厨食堂')
+})
+
+test('web admin token still cannot enable or disable merchants', async () => {
   const { state, deps } = createDependencies({
     openid: ''
   })
   const handler = createManageMerchantHandler(deps)
 
   const actions = [
-    {
-      action: 'update',
-      payload: {
-        merchant_id: 'merchant_001',
-        name: 'Web Update'
-      }
-    },
     {
       action: 'enable',
       payload: {

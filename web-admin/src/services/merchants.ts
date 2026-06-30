@@ -24,6 +24,14 @@ export interface CreateMerchantPayload {
   notice?: string
 }
 
+export interface UpdateMerchantPayload {
+  merchant_id: string
+  name: string
+  short_name?: string
+  owner_openid?: string
+  notice?: string
+}
+
 interface RawMerchantListItem {
   _id?: unknown
   merchant_id?: unknown
@@ -116,6 +124,15 @@ export async function fetchMerchants() {
 export async function createMerchant(payload: CreateMerchantPayload) {
   const data = await callAdminFunction<MerchantMutationResponse>('manageMerchant', {
     action: 'create',
+    payload
+  })
+
+  return data.merchant ? normalizeMerchant(data.merchant) : null
+}
+
+export async function updateMerchant(payload: UpdateMerchantPayload) {
+  const data = await callAdminFunction<MerchantMutationResponse>('manageMerchant', {
+    action: 'update',
     payload
   })
 

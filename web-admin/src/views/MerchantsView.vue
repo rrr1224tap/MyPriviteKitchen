@@ -4,16 +4,17 @@ import { useRouter } from 'vue-router'
 import ActionButton from '../components/ActionButton.vue'
 import EmptyState from '../components/EmptyState.vue'
 import GlassCard from '../components/GlassCard.vue'
-import MockTable from '../components/MockTable.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import {
   createMerchant,
   fetchMerchants,
+  updateMerchant,
   type CreateMerchantPayload,
   type MerchantListItem,
-  type MerchantStatus
+  type MerchantStatus,
+  type UpdateMerchantPayload
 } from '../services/merchants'
 import type { AdminApiError } from '../types/api'
 
@@ -38,6 +39,17 @@ const createForm = ref<CreateMerchantPayload>({
   owner_openid: '',
   notice: ''
 })
+const isEditFormOpen = ref(false)
+const isUpdating = ref(false)
+const editErrorMessage = ref('')
+const editSuccessMessage = ref('')
+const editForm = ref<UpdateMerchantPayload>({
+  merchant_id: '',
+  name: '',
+  short_name: '',
+  owner_openid: '',
+  notice: ''
+})
 
 const isAuthError = computed(() => ['UNAUTHORIZED', 'TOKEN_EXPIRED', 'FORBIDDEN'].includes(errorCode.value))
 
@@ -54,15 +66,6 @@ const filteredMerchants = computed(() => {
     return statusMatched && keywordMatched
   })
 })
-
-const merchantRows = computed(() => filteredMerchants.value.map((merchant) => ({
-  商户名称: merchant.name || merchant.short_name || '未命名商户',
-  merchant_id: merchant.merchant_id || '-',
-  状态: formatStatus(merchant.status),
-  成员数: merchant.members_count,
-  负责人: merchant.masked_owner_openid || maskOpenid(merchant.owner_openid) || '-',
-  更新时间: formatDate(merchant.updated_at || merchant.created_at)
-})))
 
 const activeCount = computed(() => merchants.value.filter((merchant) => merchant.status === 'active').length)
 const disabledCount = computed(() => merchants.value.filter((merchant) => merchant.status === 'disabled').length)
@@ -132,6 +135,28 @@ function closeCreateForm() {
   createErrorMessage.value = ''
 }
 
+function openEditForm(merchant: MerchantListItem) {
+  editForm.value = {
+    merchant_id: merchant.merchant_id,
+    name: merchant.name,
+    short_name: merchant.short_name,
+    owner_openid: merchant.owner_openid,
+    notice: merchant.notice
+  }
+  isEditFormOpen.value = true
+  editErrorMessage.value = ''
+  editSuccessMessage.value = ''
+}
+
+function closeEditForm() {
+  if (isUpdating.value) {
+    return
+  }
+
+  isEditFormOpen.value = false
+  editErrorMessage.value = ''
+}
+
 function getCreatePayload(): CreateMerchantPayload {
   return {
     merchant_id: createForm.value.merchant_id.trim(),
@@ -149,6 +174,40 @@ function validateCreateForm(payload: CreateMerchantPayload) {
 
   if (!/^[a-z0-9_-]{2,32}$/.test(payload.merchant_id)) {
     return '商户 ID 只能使用小写字母、数字、下划线和中划线，长度 2-32 位'
+  }
+
+  if (!payload.name) {
+    return '请填写商户名称'
+  }
+
+  if (payload.name.length < 2 || payload.name.length > 40) {
+    return '商户名称长度应为 2-40 个字符'
+  }
+
+  if ((payload.short_name || '').length > 12) {
+    return '短名称不能超过 12 个字符'
+  }
+
+  if ((payload.notice || '').length > 200) {
+    return '备注 / 公告不能超过 200 个字符'
+  }
+
+  return ''
+}
+
+function getEditPayload(): UpdateMerchantPayload {
+  return {
+    merchant_id: editForm.value.merchant_id.trim(),
+    name: editForm.value.name.trim(),
+    short_name: editForm.value.short_name?.trim(),
+    owner_openid: editForm.value.owner_openid?.trim(),
+    notice: editForm.value.notice?.trim()
+  }
+}
+
+function validateEditForm(payload: UpdateMerchantPayload) {
+  if (!payload.merchant_id) {
+    return '商户 ID 不能为空'
   }
 
   if (!payload.name) {
@@ -197,6 +256,32 @@ async function submitCreateMerchant() {
   }
 }
 
+async function submitUpdateMerchant() {
+  const payload = getEditPayload()
+  const validationMessage = validateEditForm(payload)
+  editErrorMessage.value = ''
+  editSuccessMessage.value = ''
+
+  if (validationMessage) {
+    editErrorMessage.value = validationMessage
+    return
+  }
+
+  isUpdating.value = true
+
+  try {
+    await updateMerchant(payload)
+    editSuccessMessage.value = '商户信息已更新，列表已刷新'
+    isEditFormOpen.value = false
+    await loadMerchants()
+  } catch (error) {
+    const apiError = error as Partial<AdminApiError>
+    editErrorMessage.value = apiError.message || '商户信息更新失败，请检查填写内容后重试'
+  } finally {
+    isUpdating.value = false
+  }
+}
+
 function openStaff() {
   router.push(`/merchants/${selectedMerchant.value?.merchant_id || 'xiaochu'}/staff`)
 }
@@ -234,7 +319,7 @@ onMounted(() => {
     <PageHeader
       eyebrow="Merchants"
       title="商户管理"
-      description="当前商户列表已接入真实云函数，新增 / 编辑 / 启停仍待接入。"
+      description="当前商户列表、新增和编辑已接入真实云函数，启停仍待接入。"
     >
       <template #actions>
         <ActionButton variant="primary" @click="openCreateForm">新增商户</ActionButton>
@@ -251,11 +336,20 @@ onMounted(() => {
       </div>
     </section>
 
+    <section v-if="editSuccessMessage" class="panel glass-card">
+      <div class="section-heading compact-section-heading">
+        <div>
+          <h2>商户信息已更新</h2>
+          <p>{{ editSuccessMessage }}</p>
+        </div>
+      </div>
+    </section>
+
     <section v-if="isCreateFormOpen" class="panel glass-card merchant-create-panel">
       <div class="section-heading">
         <div>
           <h2>新增私厨商户</h2>
-          <p>创建后会立即刷新真实商户列表。当前只开放新增，编辑和启停会在后续版本接入。</p>
+          <p>创建后会立即刷新真实商户列表。当前已开放新增和编辑，启停会在后续版本接入。</p>
         </div>
         <button class="ghost-button" type="button" :disabled="isCreating" @click="closeCreateForm">收起</button>
       </div>
@@ -323,6 +417,73 @@ onMounted(() => {
       </form>
     </section>
 
+    <section v-if="isEditFormOpen" class="panel glass-card merchant-create-panel">
+      <div class="section-heading">
+        <div>
+          <h2>编辑商户基础信息</h2>
+          <p>仅更新商户名称、短名称、负责人 openid 和备注 / 公告，不修改商户 ID 和启停状态。</p>
+        </div>
+        <button class="ghost-button" type="button" :disabled="isUpdating" @click="closeEditForm">收起</button>
+      </div>
+
+      <form class="admin-form" @submit.prevent="submitUpdateMerchant">
+        <label class="form-field">
+          <span>商户 ID</span>
+          <input v-model="editForm.merchant_id" class="readonly-input" readonly disabled />
+        </label>
+
+        <label class="form-field">
+          <span>商户名称 <b>*</b></span>
+          <input
+            v-model="editForm.name"
+            autocomplete="off"
+            placeholder="例如 小厨食堂私厨店"
+            :disabled="isUpdating"
+          />
+        </label>
+
+        <label class="form-field">
+          <span>短名称</span>
+          <input
+            v-model="editForm.short_name"
+            autocomplete="off"
+            placeholder="例如 小厨私厨"
+            :disabled="isUpdating"
+          />
+        </label>
+
+        <label class="form-field">
+          <span>负责人 openid</span>
+          <input
+            v-model="editForm.owner_openid"
+            autocomplete="off"
+            placeholder="可后续补充"
+            :disabled="isUpdating"
+          />
+        </label>
+
+        <label class="form-field form-field--wide">
+          <span>备注 / 公告</span>
+          <textarea
+            v-model="editForm.notice"
+            rows="4"
+            placeholder="用于记录商户备注或店铺公告"
+            :disabled="isUpdating"
+          />
+        </label>
+
+        <p v-if="editErrorMessage" class="form-error">{{ editErrorMessage }}</p>
+        <p v-if="editSuccessMessage" class="form-success">{{ editSuccessMessage }}</p>
+
+        <div class="form-actions">
+          <button class="ghost-button" type="button" :disabled="isUpdating" @click="closeEditForm">取消</button>
+          <button class="primary-button" type="submit" :disabled="isUpdating">
+            {{ isUpdating ? '正在保存...' : '保存修改' }}
+          </button>
+        </div>
+      </form>
+    </section>
+
     <section class="stat-grid">
       <StatCard title="商户总数" :value="isLoading ? '...' : merchants.length" caption="来自 manageMerchant.list" icon="商" />
       <StatCard title="启用商户" :value="isLoading ? '...' : activeCount" caption="可被当前系统使用" tone="green" icon="启" />
@@ -381,25 +542,45 @@ onMounted(() => {
       </div>
 
       <EmptyState
-        v-else-if="!merchantRows.length"
+        v-else-if="!filteredMerchants.length"
         title="暂无匹配商户"
-        description="当前没有符合筛选条件的商户。新增商户能力将在后续版本接入。"
+        description="当前没有符合筛选条件的商户。可以调整筛选条件，或新增商户后再查看。"
       >
         <ActionButton @click="loadMerchants">重新加载</ActionButton>
       </EmptyState>
 
       <template v-else>
-        <MockTable
-          :columns="['商户名称', 'merchant_id', '状态', '成员数', '负责人', '更新时间']"
-          :rows="merchantRows"
-        />
+        <div class="mock-table merchant-table">
+          <div class="mock-table__head merchant-table__row">
+            <span>商户名称</span>
+            <span>merchant_id</span>
+            <span>状态</span>
+            <span>成员数</span>
+            <span>负责人</span>
+            <span>更新时间</span>
+            <span>操作</span>
+          </div>
+
+          <div v-for="merchant in filteredMerchants" :key="merchant.merchant_id" class="mock-table__row merchant-table__row">
+            <span>{{ merchant.name || merchant.short_name || '未命名商户' }}</span>
+            <span>{{ merchant.merchant_id || '-' }}</span>
+            <span>
+              <StatusBadge :label="formatStatus(merchant.status)" :tone="merchant.status === 'active' ? 'green' : 'muted'" />
+            </span>
+            <span>{{ merchant.members_count }}</span>
+            <span>{{ merchant.masked_owner_openid || maskOpenid(merchant.owner_openid) || '-' }}</span>
+            <span>{{ formatDate(merchant.updated_at || merchant.created_at) }}</span>
+            <span>
+              <button class="table-action-button" type="button" @click="openEditForm(merchant)">编辑</button>
+            </span>
+          </div>
+        </div>
 
         <div class="card-actions">
           <StatusBadge
             :label="`当前选中：${selectedMerchant?.short_name || selectedMerchant?.name || '未命名商户'}`"
             tone="green"
           />
-          <ActionButton @click="showPendingTip">编辑</ActionButton>
           <ActionButton @click="openStaff">成员 / 邀请</ActionButton>
           <ActionButton variant="danger" @click="showPendingTip">禁用 / 启用</ActionButton>
         </div>

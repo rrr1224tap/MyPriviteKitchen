@@ -1,6 +1,6 @@
 const VALID_ACTIONS = ['list', 'get', 'create', 'update', 'enable', 'disable']
 const MERCHANT_ID_PATTERN = /^[a-z0-9_-]{2,32}$/
-const WEB_ALLOWED_ACTIONS = ['list', 'create']
+const WEB_ALLOWED_ACTIONS = ['list', 'create', 'update']
 const { verifyWebAdminToken } = require('./web-admin-token-helper')
 
 function success(message, data = {}) {
@@ -316,7 +316,7 @@ async function findExistingMerchant(deps, merchantId, actionName) {
   }
 }
 
-async function handleUpdate(deps, payload) {
+async function handleUpdate(deps, payload, accessContext = {}) {
   const merchantId = getPayloadMerchantId(payload)
   if (!merchantId) {
     return failure('INVALID_PARAMS', '商户 ID 不能为空')
@@ -334,22 +334,43 @@ async function handleUpdate(deps, payload) {
     return failure('VALIDATION_ERROR', '商户状态请使用启用或禁用操作')
   }
 
+  if (payload.created_at !== undefined) {
+    return failure('VALIDATION_ERROR', '不允许修改商户创建时间')
+  }
+
+  if (payload.members_count !== undefined) {
+    return failure('VALIDATION_ERROR', '不允许直接修改商户成员数量')
+  }
+
   const existingResult = await findExistingMerchant(deps, merchantId, 'update')
   if (existingResult.error) {
     return existingResult.error
   }
 
   const updateData = {}
+  if (accessContext.is_web_admin && payload.name === undefined) {
+    return failure('VALIDATION_ERROR', '商户名称不能为空')
+  }
+
   if (payload.name !== undefined) {
     const name = normalizeText(payload.name)
     if (!name) {
       return failure('VALIDATION_ERROR', '商户名称不能为空')
     }
+
+    if (name.length < 2 || name.length > 40) {
+      return failure('VALIDATION_ERROR', '商户名称长度应为 2-40 个字符')
+    }
+
     updateData.name = name
   }
 
   if (payload.short_name !== undefined) {
-    updateData.short_name = normalizeText(payload.short_name)
+    const shortName = normalizeText(payload.short_name)
+    if (shortName.length > 12) {
+      return failure('VALIDATION_ERROR', '短名称不能超过 12 个字符')
+    }
+    updateData.short_name = shortName
   }
 
   if (payload.owner_openid !== undefined) {
@@ -357,7 +378,11 @@ async function handleUpdate(deps, payload) {
   }
 
   if (payload.notice !== undefined) {
-    updateData.notice = normalizeText(payload.notice)
+    const notice = normalizeText(payload.notice)
+    if (notice.length > 200) {
+      return failure('VALIDATION_ERROR', '备注或公告不能超过 200 个字符')
+    }
+    updateData.notice = notice
   }
 
   if (Object.keys(updateData).length === 0) {
@@ -451,7 +476,7 @@ function createManageMerchantHandler(dependencies = {}) {
       }
 
       if (action === 'update') {
-        return handleUpdate(deps, payload)
+        return handleUpdate(deps, payload, adminResult)
       }
 
       if (action === 'enable') {

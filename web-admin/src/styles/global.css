@@ -257,6 +257,11 @@ button {
   opacity: 0.68;
 }
 
+.form-field .readonly-input {
+  color: var(--color-muted);
+  background: rgba(255, 248, 238, 0.78);
+}
+
 .form-error {
   margin: 14px 0 0;
   padding: 12px 14px;
@@ -637,6 +642,34 @@ button {
 
 .mock-table__row:hover {
   background: rgba(255, 255, 255, 0.5);
+}
+
+.merchant-table__row {
+  grid-template-columns:
+    minmax(150px, 1.2fr)
+    minmax(120px, 0.9fr)
+    90px
+    80px
+    minmax(150px, 1fr)
+    140px
+    86px;
+}
+
+.table-action-button {
+  min-height: 34px;
+  border: 1px solid rgba(239, 63, 56, 0.18);
+  border-radius: 999px;
+  padding: 0 14px;
+  color: var(--color-brand);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 8px 20px rgba(126, 90, 45, 0.08);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.table-action-button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 244, 242, 0.92);
 }
 
 .empty-state {
