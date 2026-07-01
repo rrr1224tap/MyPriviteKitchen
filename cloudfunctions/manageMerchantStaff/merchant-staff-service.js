@@ -1,5 +1,5 @@
 const VALID_ACTIONS = ['listStaff', 'enableStaff', 'disableStaff', 'createInvite', 'listInvites', 'disableInvite']
-const WEB_ALLOWED_ACTIONS = ['listStaff']
+const WEB_ALLOWED_ACTIONS = ['listStaff', 'listInvites']
 const VALID_ROLES = ['owner', 'staff']
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const DAY_MS = 24 * 60 * 60 * 1000

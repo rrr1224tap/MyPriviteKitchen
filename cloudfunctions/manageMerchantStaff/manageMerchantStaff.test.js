@@ -246,6 +246,176 @@ test('web admin token in query string parameters can list merchant staff', async
   assert.equal(result.data.total, 1)
 })
 
+test('web valid admin token can list merchant invites without openid', async () => {
+  const { deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        _id: 'invite_001',
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused',
+        created_by_openid: 'admin_openid',
+        used_by_openid: '',
+        expires_at: new Date('2026-07-02T10:00:00.000Z'),
+        created_at: FIXED_NOW,
+        updated_at: FIXED_NOW
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'listInvites',
+    merchant_id: 'xiaochu',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 1)
+  assert.equal(result.data.list[0].code, 'XK7M2Q8A')
+  assert.equal(result.data.list[0].status, 'unused')
+  assert.equal(result.data.list[0].created_by_openid, 'admin_openid')
+})
+
+test('web invalid tokens cannot list merchant invites', async () => {
+  const invalidRequests = [
+    {
+      admin_token: ''
+    },
+    {
+      admin_token: `${createWebToken()}x`
+    },
+    {
+      admin_token: createWebToken({
+        now: new Date('2026-06-24T10:00:00.000Z'),
+        ttlMinutes: 60
+      })
+    },
+    {
+      admin_token: createWebToken({
+        role: 'viewer'
+      })
+    }
+  ]
+
+  for (const request of invalidRequests) {
+    const { deps } = createDependencies({
+      openid: '',
+      invites: [
+        {
+          code: 'XK7M2Q8A',
+          merchant_id: 'xiaochu',
+          role: 'staff',
+          status: 'unused'
+        }
+      ]
+    })
+    const handler = createManageMerchantStaffHandler(deps)
+
+    const result = await handler({
+      action: 'listInvites',
+      merchant_id: 'xiaochu',
+      admin_token: request.admin_token
+    })
+
+    assert.equal(result.success, false)
+    assert.ok(['UNAUTHORIZED', 'TOKEN_EXPIRED'].includes(result.code))
+  }
+})
+
+test('web admin token in http string body can list merchant invites', async () => {
+  const { deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused'
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    body: JSON.stringify({
+      action: 'listInvites',
+      merchant_id: 'xiaochu',
+      admin_token: createWebToken()
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 1)
+})
+
+test('web admin token in http object body can list merchant invites', async () => {
+  const { deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused'
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    body: {
+      action: 'listInvites',
+      merchant_id: 'xiaochu',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 1)
+})
+
+test('web admin token in query string parameters can list merchant invites', async () => {
+  const { deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused'
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    queryStringParameters: {
+      action: 'listInvites',
+      merchant_id: 'xiaochu',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 1)
+})
+
+test('list invites requires merchant_id', async () => {
+  const { deps } = createDependencies()
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'listInvites',
+    payload: {}
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+})
+
 test('invalid http body json does not crash', async () => {
   const { deps } = createDependencies({
     openid: ''

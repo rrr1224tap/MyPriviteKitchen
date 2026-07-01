@@ -2,6 +2,7 @@ import { callAdminFunction } from './cloud'
 
 export type MerchantStaffRole = 'owner' | 'staff'
 export type MerchantStaffStatus = 'active' | 'disabled'
+export type MerchantInviteStatus = 'unused' | 'used' | 'disabled' | 'expired'
 
 export interface MerchantStaffMerchant {
   merchant_id: string
@@ -31,6 +32,29 @@ export interface MerchantStaffListResult {
   total: number
 }
 
+export interface MerchantInviteItem {
+  id: string
+  code: string
+  merchant_id: string
+  role: MerchantStaffRole
+  role_text: string
+  status: MerchantInviteStatus
+  status_text: string
+  created_by_openid: string
+  used_by_openid: string
+  masked_used_by_openid: string
+  expires_at: string
+  created_at: string
+  used_at: string
+  updated_at: string
+}
+
+export interface MerchantInviteListResult {
+  merchant: MerchantStaffMerchant
+  list: MerchantInviteItem[]
+  total: number
+}
+
 interface RawMerchant {
   merchant_id?: unknown
   name?: unknown
@@ -55,6 +79,28 @@ interface RawStaffItem {
 interface RawStaffListResponse {
   merchant?: RawMerchant
   list?: RawStaffItem[]
+  total?: unknown
+}
+
+interface RawInviteItem {
+  _id?: unknown
+  id?: unknown
+  code?: unknown
+  merchant_id?: unknown
+  role?: unknown
+  status?: unknown
+  created_by_openid?: unknown
+  used_by_openid?: unknown
+  masked_used_by_openid?: unknown
+  expires_at?: unknown
+  created_at?: unknown
+  used_at?: unknown
+  updated_at?: unknown
+}
+
+interface RawInviteListResponse {
+  merchant?: RawMerchant
+  list?: RawInviteItem[]
   total?: unknown
 }
 
@@ -86,12 +132,37 @@ function toStatus(value: unknown): MerchantStaffStatus {
   return value === 'disabled' ? 'disabled' : 'active'
 }
 
+function toInviteStatus(value: unknown, expiresAt: unknown): MerchantInviteStatus {
+  if (value === 'used' || value === 'disabled' || value === 'expired') {
+    return value
+  }
+
+  const expiresAtText = toText(expiresAt)
+  const expiresAtDate = expiresAtText ? new Date(expiresAtText) : null
+  if (expiresAtDate && !Number.isNaN(expiresAtDate.getTime()) && expiresAtDate.getTime() < Date.now()) {
+    return 'expired'
+  }
+
+  return 'unused'
+}
+
 function roleText(role: MerchantStaffRole) {
   return role === 'owner' ? '负责人' : '成员'
 }
 
 function statusText(status: MerchantStaffStatus) {
   return status === 'active' ? '启用' : '禁用'
+}
+
+function inviteStatusText(status: MerchantInviteStatus) {
+  const textMap: Record<MerchantInviteStatus, string> = {
+    unused: '待使用',
+    used: '已使用',
+    disabled: '已禁用',
+    expired: '已过期'
+  }
+
+  return textMap[status]
 }
 
 function maskOpenid(openid: string) {
@@ -132,6 +203,29 @@ function normalizeStaffItem(raw: RawStaffItem): MerchantStaffItem {
   }
 }
 
+function normalizeInviteItem(raw: RawInviteItem): MerchantInviteItem {
+  const role = toRole(raw.role)
+  const status = toInviteStatus(raw.status, raw.expires_at)
+  const usedByOpenid = toText(raw.used_by_openid)
+
+  return {
+    id: toText(raw._id || raw.id, toText(raw.code, '-')),
+    code: toText(raw.code, '-'),
+    merchant_id: toText(raw.merchant_id),
+    role,
+    role_text: roleText(role),
+    status,
+    status_text: inviteStatusText(status),
+    created_by_openid: toText(raw.created_by_openid, '-'),
+    used_by_openid: usedByOpenid,
+    masked_used_by_openid: toText(raw.masked_used_by_openid, maskOpenid(usedByOpenid)),
+    expires_at: toDateText(raw.expires_at),
+    created_at: toDateText(raw.created_at),
+    used_at: toDateText(raw.used_at),
+    updated_at: toDateText(raw.updated_at)
+  }
+}
+
 export async function fetchMerchantStaff(merchantId: string): Promise<MerchantStaffListResult> {
   const data = await callAdminFunction<RawStaffListResponse>('manageMerchantStaff', {
     action: 'listStaff',
@@ -139,6 +233,21 @@ export async function fetchMerchantStaff(merchantId: string): Promise<MerchantSt
   })
 
   const list = Array.isArray(data.list) ? data.list.map(normalizeStaffItem) : []
+
+  return {
+    merchant: normalizeMerchant(data.merchant, merchantId),
+    list,
+    total: Number(data.total) || list.length
+  }
+}
+
+export async function fetchMerchantInvites(merchantId: string): Promise<MerchantInviteListResult> {
+  const data = await callAdminFunction<RawInviteListResponse>('manageMerchantStaff', {
+    action: 'listInvites',
+    merchant_id: merchantId
+  })
+
+  const list = Array.isArray(data.list) ? data.list.map(normalizeInviteItem) : []
 
   return {
     merchant: normalizeMerchant(data.merchant, merchantId),
