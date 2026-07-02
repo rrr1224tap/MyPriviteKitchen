@@ -430,7 +430,7 @@ test('invalid http body json does not crash', async () => {
   assert.equal(result.code, 'INVALID_PARAMS')
 })
 
-test('web admin token cannot write staff or invite data in current phase', async () => {
+test('web admin token cannot update staff or disable invite data in current phase', async () => {
   const blockedActions = [
     {
       action: 'enableStaff',
@@ -442,13 +442,6 @@ test('web admin token cannot write staff or invite data in current phase', async
       action: 'disableStaff',
       payload: {
         staff_id: 'staff_001'
-      }
-    },
-    {
-      action: 'createInvite',
-      payload: {
-        merchant_id: 'xiaochu',
-        role: 'staff'
       }
     },
     {
@@ -484,6 +477,167 @@ test('web admin token cannot write staff or invite data in current phase', async
     assert.equal(state.staff[0].status, 'active')
     assert.equal(state.invites[0].status, 'unused')
   }
+})
+
+test('web valid admin token can create invite without openid', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'createInvite',
+    merchant_id: 'xiaochu',
+    role: 'staff',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(state.invites.length, 1)
+  assert.match(result.data.invite.code, /^[A-HJ-NP-Z2-9]{8}$/)
+  assert.equal(result.data.invite.role, 'staff')
+  assert.equal(result.data.invite.status, 'unused')
+  assert.equal(result.data.invite.created_by_openid, 'web_super_admin')
+  assert.equal(result.data.invite.used_by_openid, '')
+})
+
+test('web invalid tokens cannot create invite', async () => {
+  const invalidRequests = [
+    {
+      admin_token: ''
+    },
+    {
+      admin_token: `${createWebToken()}x`
+    },
+    {
+      admin_token: createWebToken({
+        now: new Date('2026-06-24T10:00:00.000Z'),
+        ttlMinutes: 60
+      })
+    },
+    {
+      admin_token: createWebToken({
+        role: 'viewer'
+      })
+    }
+  ]
+
+  for (const request of invalidRequests) {
+    const { state, deps } = createDependencies({
+      openid: ''
+    })
+    const handler = createManageMerchantStaffHandler(deps)
+
+    const result = await handler({
+      action: 'createInvite',
+      merchant_id: 'xiaochu',
+      role: 'staff',
+      admin_token: request.admin_token
+    })
+
+    assert.equal(result.success, false)
+    assert.ok(['UNAUTHORIZED', 'TOKEN_EXPIRED'].includes(result.code))
+    assert.equal(state.invites.length, 0)
+  }
+})
+
+test('web admin token in http string body can create invite', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    body: JSON.stringify({
+      action: 'createInvite',
+      merchant_id: 'xiaochu',
+      role: 'staff',
+      admin_token: createWebToken()
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(state.invites.length, 1)
+})
+
+test('web admin token in http object body can create invite', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    body: {
+      action: 'createInvite',
+      merchant_id: 'xiaochu',
+      role: 'owner',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(state.invites.length, 1)
+  assert.equal(result.data.invite.role, 'owner')
+})
+
+test('web admin token in query string parameters can create invite', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    queryStringParameters: {
+      action: 'createInvite',
+      merchant_id: 'xiaochu',
+      role: 'staff',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(state.invites.length, 1)
+})
+
+test('web create invite rejects invalid role', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'createInvite',
+    merchant_id: 'xiaochu',
+    role: 'manager',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+  assert.equal(state.invites.length, 0)
+})
+
+test('web create invite ignores unsafe client supplied invite fields', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'createInvite',
+    merchant_id: 'xiaochu',
+    role: 'staff',
+    code: 'CLIENT01',
+    status: 'used',
+    used_by_openid: 'attacker_openid',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(state.invites.length, 1)
+  assert.notEqual(result.data.invite.code, 'CLIENT01')
+  assert.equal(result.data.invite.status, 'unused')
+  assert.equal(result.data.invite.used_by_openid, '')
 })
 
 test('super admin can create invite with default unused status and seven day expiry', async () => {

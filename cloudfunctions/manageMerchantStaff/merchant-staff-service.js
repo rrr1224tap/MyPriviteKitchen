@@ -1,5 +1,6 @@
 const VALID_ACTIONS = ['listStaff', 'enableStaff', 'disableStaff', 'createInvite', 'listInvites', 'disableInvite']
-const WEB_ALLOWED_ACTIONS = ['listStaff', 'listInvites']
+const WEB_ALLOWED_ACTIONS = ['listStaff', 'listInvites', 'createInvite']
+const WEB_ADMIN_OPENID = 'web_super_admin'
 const VALID_ROLES = ['owner', 'staff']
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -233,13 +234,14 @@ function assertWebAdmin(event, action, deps) {
 
   if (!WEB_ALLOWED_ACTIONS.includes(action)) {
     return {
-      error: failure('FORBIDDEN', 'Web 后台当前仅开放商户成员列表读取')
+      error: failure('FORBIDDEN', 'Web 后台当前不支持该成员 / 邀请操作')
     }
   }
 
   return {
     is_web_admin: true,
-    role: verifyResult.role
+    role: verifyResult.role,
+    openid: WEB_ADMIN_OPENID
   }
 }
 

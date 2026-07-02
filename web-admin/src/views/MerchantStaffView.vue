@@ -8,11 +8,13 @@ import PageHeader from '../components/PageHeader.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import {
+  createMerchantInvite,
   fetchMerchantInvites,
   fetchMerchantStaff,
   type MerchantInviteItem,
   type MerchantInviteStatus,
   type MerchantStaffItem,
+  type MerchantStaffRole,
   type MerchantStaffMerchant
 } from '../services/merchant-staff'
 import type { AdminApiError } from '../types/api'
@@ -29,6 +31,12 @@ const staffErrorMessage = ref('')
 const staffErrorCode = ref('')
 const inviteErrorMessage = ref('')
 const inviteErrorCode = ref('')
+const isCreateInviteOpen = ref(false)
+const isCreatingInvite = ref(false)
+const createInviteRole = ref<MerchantStaffRole>('staff')
+const createInviteError = ref('')
+const createInviteSuccess = ref('')
+const latestInviteCode = ref('')
 
 const merchantId = computed(() => {
   const value = route.params.merchantId
@@ -45,8 +53,44 @@ const authErrorCodes = ['UNAUTHORIZED', 'TOKEN_EXPIRED', 'FORBIDDEN']
 const isStaffAuthError = computed(() => authErrorCodes.includes(staffErrorCode.value))
 const isInviteAuthError = computed(() => authErrorCodes.includes(inviteErrorCode.value))
 
-function showPendingTip() {
-  window.alert('该操作将在后续版本接入')
+function showMemberPendingTip() {
+  window.alert('成员启停将在后续版本接入')
+}
+
+function showInviteDisablePendingTip() {
+  window.alert('禁用邀请码将在后续版本接入')
+}
+
+function openCreateInvitePanel() {
+  isCreateInviteOpen.value = true
+  createInviteRole.value = 'staff'
+  createInviteError.value = ''
+  createInviteSuccess.value = ''
+  latestInviteCode.value = ''
+}
+
+function closeCreateInvitePanel() {
+  if (isCreatingInvite.value) return
+
+  isCreateInviteOpen.value = false
+  createInviteError.value = ''
+  createInviteSuccess.value = ''
+  latestInviteCode.value = ''
+}
+
+async function copyInviteCode(code: string) {
+  if (!code || code === '-') return
+
+  try {
+    await navigator.clipboard.writeText(code)
+    if (isCreateInviteOpen.value) {
+      createInviteSuccess.value = '邀请码已复制'
+    } else {
+      window.alert('邀请码已复制')
+    }
+  } catch (error) {
+    window.prompt('请手动复制邀请码', code)
+  }
 }
 
 function goLogin() {
@@ -69,6 +113,31 @@ function getErrorInfo(error: unknown, fallbackMessage: string) {
   return {
     code: apiError.code || 'REQUEST_FAILED',
     message: apiError.message || fallbackMessage
+  }
+}
+
+async function handleCreateInvite() {
+  if (isCreatingInvite.value) return
+
+  const roleText = createInviteRole.value === 'owner' ? '负责人' : '普通成员'
+  const confirmed = window.confirm(`确认生成${roleText}邀请码？`)
+  if (!confirmed) return
+
+  isCreatingInvite.value = true
+  createInviteError.value = ''
+  createInviteSuccess.value = ''
+  latestInviteCode.value = ''
+
+  try {
+    const invite = await createMerchantInvite(merchantId.value, createInviteRole.value)
+    latestInviteCode.value = invite.code
+    createInviteSuccess.value = `邀请码生成成功：${invite.code}，列表已刷新`
+    await loadInvites()
+  } catch (error) {
+    const errorInfo = getErrorInfo(error, '邀请码生成失败，请稍后重试')
+    createInviteError.value = errorInfo.message
+  } finally {
+    isCreatingInvite.value = false
   }
 }
 
@@ -130,7 +199,7 @@ watch(merchantId, () => {
     >
       <template #actions>
         <ActionButton variant="ghost" @click="loadPageData">刷新列表</ActionButton>
-        <ActionButton variant="primary" @click="showPendingTip">生成邀请码</ActionButton>
+        <ActionButton variant="primary" @click="openCreateInvitePanel">生成邀请码</ActionButton>
       </template>
     </PageHeader>
 
@@ -140,6 +209,57 @@ watch(merchantId, () => {
       <StatCard title="可用邀请码" :value="isInviteLoading ? '...' : availableInviteCount" caption="待使用邀请码" tone="orange" icon="邀" />
       <StatCard title="异常邀请" :value="isInviteLoading ? '...' : abnormalInviteCount" caption="已禁用或已过期" tone="muted" icon="醒" />
     </section>
+
+    <GlassCard v-if="isCreateInviteOpen" class="invite-create-card">
+      <div class="section-heading">
+        <div>
+          <h2>生成邀请码</h2>
+          <p>选择成员角色后生成一次性邀请码。邀请码创建成功后会刷新列表，并显示新邀请码方便复制。</p>
+        </div>
+        <StatusBadge label="真实写入" tone="orange" />
+      </div>
+
+      <div class="invite-create-form">
+        <label class="field-label">成员角色</label>
+        <div class="role-segment">
+          <button
+            class="role-segment__button"
+            :class="{ 'role-segment__button--active': createInviteRole === 'staff' }"
+            type="button"
+            :disabled="isCreatingInvite"
+            @click="createInviteRole = 'staff'"
+          >
+            普通成员
+          </button>
+          <button
+            class="role-segment__button"
+            :class="{ 'role-segment__button--active': createInviteRole === 'owner' }"
+            type="button"
+            :disabled="isCreatingInvite"
+            @click="createInviteRole = 'owner'"
+          >
+            负责人
+          </button>
+        </div>
+        <p class="form-helper">邀请码默认 7 天有效。创建前会二次确认，本阶段只开放生成，不开放禁用。</p>
+
+        <div v-if="latestInviteCode" class="invite-code-card">
+          <span>新邀请码</span>
+          <strong>{{ latestInviteCode }}</strong>
+          <button class="table-action-button" type="button" @click="copyInviteCode(latestInviteCode)">复制邀请码</button>
+        </div>
+
+        <div v-if="createInviteError" class="form-error">{{ createInviteError }}</div>
+        <div v-if="createInviteSuccess" class="form-success">{{ createInviteSuccess }}</div>
+
+        <div class="form-actions">
+          <ActionButton variant="ghost" :disabled="isCreatingInvite" @click="closeCreateInvitePanel">收起</ActionButton>
+          <ActionButton variant="primary" :disabled="isCreatingInvite" @click="handleCreateInvite">
+            {{ isCreatingInvite ? '生成中...' : '确认生成' }}
+          </ActionButton>
+        </div>
+      </div>
+    </GlassCard>
 
     <section class="content-grid">
       <GlassCard>
@@ -187,7 +307,7 @@ watch(merchantId, () => {
             <span>{{ item.remark }}</span>
             <span>{{ item.created_at }}</span>
             <div class="table-action-group">
-              <button class="table-action-button" type="button" @click="showPendingTip">启用 / 禁用</button>
+              <button class="table-action-button" type="button" @click="showMemberPendingTip">启用 / 禁用</button>
             </div>
           </div>
         </div>
@@ -238,8 +358,8 @@ watch(merchantId, () => {
             <span>{{ item.masked_used_by_openid }}</span>
             <span>{{ item.created_at }}</span>
             <div class="table-action-group">
-              <button class="table-action-button" type="button" @click="showPendingTip">复制</button>
-              <button class="table-action-button table-action-button--danger" type="button" @click="showPendingTip">禁用</button>
+              <button class="table-action-button" type="button" @click="copyInviteCode(item.code)">复制</button>
+              <button class="table-action-button table-action-button--danger" type="button" @click="showInviteDisablePendingTip">禁用</button>
             </div>
           </div>
         </div>

@@ -104,6 +104,10 @@ interface RawInviteListResponse {
   total?: unknown
 }
 
+interface RawInviteCreateResponse {
+  invite?: RawInviteItem
+}
+
 function toText(value: unknown, fallback = '') {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback
 }
@@ -254,4 +258,17 @@ export async function fetchMerchantInvites(merchantId: string): Promise<Merchant
     list,
     total: Number(data.total) || list.length
   }
+}
+
+export async function createMerchantInvite(
+  merchantId: string,
+  role: MerchantStaffRole
+): Promise<MerchantInviteItem> {
+  const data = await callAdminFunction<RawInviteCreateResponse>('manageMerchantStaff', {
+    action: 'createInvite',
+    merchant_id: merchantId,
+    role
+  })
+
+  return normalizeInviteItem(data.invite || {})
 }

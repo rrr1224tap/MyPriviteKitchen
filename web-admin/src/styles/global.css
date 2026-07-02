@@ -535,6 +535,12 @@ button {
   border: 1px solid rgba(216, 90, 66, 0.14);
 }
 
+.action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -675,6 +681,85 @@ button {
     minmax(150px, 1fr)
     minmax(150px, 1fr)
     minmax(130px, 0.85fr);
+}
+
+.invite-create-card {
+  border-color: rgba(255, 255, 255, 0.94);
+}
+
+.invite-create-form {
+  display: grid;
+  gap: 14px;
+}
+
+.field-label {
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.role-segment {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 10px 24px rgba(126, 90, 45, 0.08);
+}
+
+.role-segment__button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 18px;
+  color: var(--color-muted);
+  background: transparent;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.role-segment__button--active {
+  color: var(--color-brand);
+  background: rgba(255, 239, 235, 0.94);
+  box-shadow: 0 8px 18px rgba(226, 49, 37, 0.12);
+}
+
+.role-segment__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.form-helper {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.invite-code-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(255, 248, 238, 0.66));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96), 0 14px 34px rgba(126, 90, 45, 0.1);
+}
+
+.invite-code-card span {
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.invite-code-card strong {
+  color: var(--color-brand);
+  font-size: 24px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
 }
 
 .inline-error {
