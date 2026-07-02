@@ -1,5 +1,5 @@
 const VALID_ACTIONS = ['listStaff', 'enableStaff', 'disableStaff', 'createInvite', 'listInvites', 'disableInvite']
-const WEB_ALLOWED_ACTIONS = ['listStaff', 'listInvites', 'createInvite', 'disableInvite', 'disableStaff']
+const WEB_ALLOWED_ACTIONS = ['listStaff', 'listInvites', 'createInvite', 'disableInvite', 'disableStaff', 'enableStaff']
 const WEB_ADMIN_OPENID = 'web_super_admin'
 const VALID_ROLES = ['owner', 'staff']
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -440,7 +440,7 @@ async function handleDisableInvite(deps, payload) {
   }
 }
 
-async function handleWebDisableStaff(deps, payload) {
+async function handleWebStaffStatus(deps, payload, status) {
   const merchantId = getMerchantId(payload)
   const merchantResult = await assertMerchantAvailable(deps, merchantId, true)
   if (merchantResult.error) {
@@ -459,12 +459,13 @@ async function handleWebDisableStaff(deps, payload) {
       return failure('NOT_FOUND', '成员不存在')
     }
 
-    if (staff.status === 'disabled') {
-      return failure('VALIDATION_ERROR', '成员已禁用')
+    const currentStatus = staff.status === 'disabled' ? 'disabled' : 'active'
+    if (currentStatus === status) {
+      return failure('VALIDATION_ERROR', status === 'active' ? '成员已启用' : '成员已禁用')
     }
 
     const updateData = {
-      status: 'disabled',
+      status,
       updated_at: deps.now()
     }
     const updatedStaff = await deps.updateStaff({
@@ -472,25 +473,21 @@ async function handleWebDisableStaff(deps, payload) {
       updateData
     })
 
-    return success('禁用成员成功', {
+    return success(status === 'active' ? '启用成员成功' : '禁用成员成功', {
       staff: formatStaff({
         ...staff,
         ...(updatedStaff || updateData)
       })
     })
   } catch (error) {
-    deps.logger.error('manageMerchantStaff disable staff failed', error)
-    return failure('DATABASE_ERROR', '禁用成员失败，请稍后重试')
+    deps.logger.error('manageMerchantStaff update web staff status failed', error)
+    return failure('DATABASE_ERROR', '更新成员状态失败，请稍后重试')
   }
 }
 
 async function handleStaffStatus(deps, payload, status, adminResult = {}) {
   if (adminResult.is_web_admin) {
-    if (status !== 'disabled') {
-      return failure('FORBIDDEN', 'Web 后台当前不支持该成员操作')
-    }
-
-    return handleWebDisableStaff(deps, payload)
+    return handleWebStaffStatus(deps, payload, status)
   }
 
   const staffId = getStaffId(payload)

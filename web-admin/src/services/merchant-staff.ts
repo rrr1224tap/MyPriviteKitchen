@@ -116,6 +116,10 @@ interface RawStaffDisableResponse {
   staff?: RawStaffItem
 }
 
+interface RawStaffEnableResponse {
+  staff?: RawStaffItem
+}
+
 function toText(value: unknown, fallback = '') {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback
 }
@@ -294,6 +298,16 @@ export async function disableMerchantInvite(merchantId: string, code: string): P
 export async function disableMerchantStaff(merchantId: string, openid: string): Promise<MerchantStaffItem> {
   const data = await callAdminFunction<RawStaffDisableResponse>('manageMerchantStaff', {
     action: 'disableStaff',
+    merchant_id: merchantId,
+    openid
+  })
+
+  return normalizeStaffItem(data.staff || {})
+}
+
+export async function enableMerchantStaff(merchantId: string, openid: string): Promise<MerchantStaffItem> {
+  const data = await callAdminFunction<RawStaffEnableResponse>('manageMerchantStaff', {
+    action: 'enableStaff',
     merchant_id: merchantId,
     openid
   })

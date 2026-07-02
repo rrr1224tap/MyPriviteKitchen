@@ -11,6 +11,7 @@ import {
   createMerchantInvite,
   disableMerchantInvite,
   disableMerchantStaff,
+  enableMerchantStaff,
   fetchMerchantInvites,
   fetchMerchantStaff,
   type MerchantInviteItem,
@@ -45,6 +46,9 @@ const disableInviteSuccess = ref('')
 const isDisablingStaffOpenid = ref('')
 const disableStaffError = ref('')
 const disableStaffSuccess = ref('')
+const isEnablingStaffOpenid = ref('')
+const enableStaffError = ref('')
+const enableStaffSuccess = ref('')
 
 const merchantId = computed(() => {
   const value = route.params.merchantId
@@ -60,10 +64,7 @@ const merchantTitle = computed(() => merchant.value?.name || merchantId.value)
 const authErrorCodes = ['UNAUTHORIZED', 'TOKEN_EXPIRED', 'FORBIDDEN']
 const isStaffAuthError = computed(() => authErrorCodes.includes(staffErrorCode.value))
 const isInviteAuthError = computed(() => authErrorCodes.includes(inviteErrorCode.value))
-
-function showMemberEnablePendingTip() {
-  window.alert('成员启用将在后续版本接入')
-}
+const isStaffStatusChanging = computed(() => Boolean(isDisablingStaffOpenid.value || isEnablingStaffOpenid.value))
 
 function openCreateInvitePanel() {
   isCreateInviteOpen.value = true
@@ -118,6 +119,10 @@ function staffTone(status: MerchantStaffItem['status']) {
 
 function canDisableStaff(item: MerchantStaffItem) {
   return item.status === 'active'
+}
+
+function canEnableStaff(item: MerchantStaffItem) {
+  return item.status === 'disabled'
 }
 
 function canDisableInvite(item: MerchantInviteItem) {
@@ -179,7 +184,7 @@ async function handleDisableInvite(item: MerchantInviteItem) {
 }
 
 async function handleDisableStaff(item: MerchantStaffItem) {
-  if (!canDisableStaff(item) || isDisablingStaffOpenid.value) return
+  if (!canDisableStaff(item) || isStaffStatusChanging.value) return
 
   const confirmMessage = item.role === 'owner'
     ? '该成员是负责人角色。确认禁用后，可能影响商户管理协作。是否继续？'
@@ -190,6 +195,8 @@ async function handleDisableStaff(item: MerchantStaffItem) {
   isDisablingStaffOpenid.value = item.openid
   disableStaffError.value = ''
   disableStaffSuccess.value = ''
+  enableStaffError.value = ''
+  enableStaffSuccess.value = ''
 
   try {
     await disableMerchantStaff(merchantId.value, item.openid)
@@ -199,6 +206,29 @@ async function handleDisableStaff(item: MerchantStaffItem) {
     disableStaffError.value = '成员禁用失败，请稍后重试'
   } finally {
     isDisablingStaffOpenid.value = ''
+  }
+}
+
+async function handleEnableStaff(item: MerchantStaffItem) {
+  if (!canEnableStaff(item) || isStaffStatusChanging.value) return
+
+  const confirmed = window.confirm('确认启用这个成员吗？启用后该成员将恢复商户管理权限。')
+  if (!confirmed) return
+
+  isEnablingStaffOpenid.value = item.openid
+  enableStaffError.value = ''
+  enableStaffSuccess.value = ''
+  disableStaffError.value = ''
+  disableStaffSuccess.value = ''
+
+  try {
+    await enableMerchantStaff(merchantId.value, item.openid)
+    enableStaffSuccess.value = '成员已启用，列表已刷新'
+    await loadStaff()
+  } catch (error) {
+    enableStaffError.value = '成员启用失败，请稍后重试'
+  } finally {
+    isEnablingStaffOpenid.value = ''
   }
 }
 
@@ -256,7 +286,7 @@ watch(merchantId, () => {
     <PageHeader
       eyebrow="Staff & Invites"
       title="成员与邀请"
-      :description="`当前商户：${merchantTitle}（merchant_id：${merchantId}）。成员列表、邀请码列表、禁用成员和禁用未使用邀请码已接入真实云函数，成员启用仍在后续版本接入。`"
+      :description="`当前商户：${merchantTitle}（merchant_id：${merchantId}）。成员列表、成员启用/禁用、邀请码列表、创建邀请码和禁用未使用邀请码已接入真实云函数。`"
     >
       <template #actions>
         <ActionButton variant="ghost" @click="loadPageData">刷新列表</ActionButton>
@@ -327,13 +357,15 @@ watch(merchantId, () => {
         <div class="section-heading">
           <div>
             <h2>成员列表</h2>
-            <p>当前支持真实读取和禁用已启用成员；成员启用会在后续版本接入。</p>
+            <p>当前支持真实读取、禁用已启用成员和启用已禁用成员；不开放删除成员或修改成员角色。</p>
           </div>
           <StatusBadge label="真实数据" tone="green" />
         </div>
 
         <div v-if="disableStaffError" class="form-error">{{ disableStaffError }}</div>
         <div v-if="disableStaffSuccess" class="form-success">{{ disableStaffSuccess }}</div>
+        <div v-if="enableStaffError" class="form-error">{{ enableStaffError }}</div>
+        <div v-if="enableStaffSuccess" class="form-success">{{ enableStaffSuccess }}</div>
 
         <div v-if="staffErrorMessage" class="inline-error">
           <div>
@@ -375,19 +407,19 @@ watch(merchantId, () => {
                 v-if="canDisableStaff(item)"
                 class="table-action-button table-action-button--danger"
                 type="button"
-                :disabled="Boolean(isDisablingStaffOpenid)"
+                :disabled="isStaffStatusChanging"
                 @click="handleDisableStaff(item)"
               >
                 {{ isDisablingStaffOpenid === item.openid ? '禁用中...' : '禁用成员' }}
               </button>
               <button
-                v-else
+                v-else-if="canEnableStaff(item)"
                 class="table-action-button"
                 type="button"
-                :disabled="Boolean(isDisablingStaffOpenid)"
-                @click="showMemberEnablePendingTip"
+                :disabled="isStaffStatusChanging"
+                @click="handleEnableStaff(item)"
               >
-                启用成员
+                {{ isEnablingStaffOpenid === item.openid ? '启用中...' : '启用成员' }}
               </button>
             </div>
           </div>
