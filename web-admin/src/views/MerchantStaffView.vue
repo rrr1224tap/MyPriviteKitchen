@@ -10,6 +10,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 import {
   createMerchantInvite,
   disableMerchantInvite,
+  disableMerchantStaff,
   fetchMerchantInvites,
   fetchMerchantStaff,
   type MerchantInviteItem,
@@ -41,6 +42,9 @@ const latestInviteCode = ref('')
 const isDisablingInviteCode = ref('')
 const disableInviteError = ref('')
 const disableInviteSuccess = ref('')
+const isDisablingStaffOpenid = ref('')
+const disableStaffError = ref('')
+const disableStaffSuccess = ref('')
 
 const merchantId = computed(() => {
   const value = route.params.merchantId
@@ -57,8 +61,8 @@ const authErrorCodes = ['UNAUTHORIZED', 'TOKEN_EXPIRED', 'FORBIDDEN']
 const isStaffAuthError = computed(() => authErrorCodes.includes(staffErrorCode.value))
 const isInviteAuthError = computed(() => authErrorCodes.includes(inviteErrorCode.value))
 
-function showMemberPendingTip() {
-  window.alert('成员启停将在后续版本接入')
+function showMemberEnablePendingTip() {
+  window.alert('成员启用将在后续版本接入')
 }
 
 function openCreateInvitePanel() {
@@ -106,6 +110,14 @@ function inviteTone(status: MerchantInviteStatus) {
   }
 
   return toneMap[status]
+}
+
+function staffTone(status: MerchantStaffItem['status']) {
+  return status === 'active' ? 'green' : 'muted'
+}
+
+function canDisableStaff(item: MerchantStaffItem) {
+  return item.status === 'active'
 }
 
 function canDisableInvite(item: MerchantInviteItem) {
@@ -166,6 +178,30 @@ async function handleDisableInvite(item: MerchantInviteItem) {
   }
 }
 
+async function handleDisableStaff(item: MerchantStaffItem) {
+  if (!canDisableStaff(item) || isDisablingStaffOpenid.value) return
+
+  const confirmMessage = item.role === 'owner'
+    ? '该成员是负责人角色。确认禁用后，可能影响商户管理协作。是否继续？'
+    : '确认禁用这个成员吗？禁用后该成员将无法继续参与商户管理。'
+  const confirmed = window.confirm(confirmMessage)
+  if (!confirmed) return
+
+  isDisablingStaffOpenid.value = item.openid
+  disableStaffError.value = ''
+  disableStaffSuccess.value = ''
+
+  try {
+    await disableMerchantStaff(merchantId.value, item.openid)
+    disableStaffSuccess.value = '成员已禁用，列表已刷新'
+    await loadStaff()
+  } catch (error) {
+    disableStaffError.value = '成员禁用失败，请稍后重试'
+  } finally {
+    isDisablingStaffOpenid.value = ''
+  }
+}
+
 async function loadStaff() {
   isStaffLoading.value = true
   staffErrorMessage.value = ''
@@ -220,7 +256,7 @@ watch(merchantId, () => {
     <PageHeader
       eyebrow="Staff & Invites"
       title="成员与邀请"
-      :description="`当前商户：${merchantTitle}（merchant_id：${merchantId}）。成员列表、邀请码列表和禁用未使用邀请码已接入真实云函数，成员启停仍在后续版本接入。`"
+      :description="`当前商户：${merchantTitle}（merchant_id：${merchantId}）。成员列表、邀请码列表、禁用成员和禁用未使用邀请码已接入真实云函数，成员启用仍在后续版本接入。`"
     >
       <template #actions>
         <ActionButton variant="ghost" @click="loadPageData">刷新列表</ActionButton>
@@ -291,10 +327,13 @@ watch(merchantId, () => {
         <div class="section-heading">
           <div>
             <h2>成员列表</h2>
-            <p>当前只开放真实读取，成员启用 / 禁用会在后续版本接入。</p>
+            <p>当前支持真实读取和禁用已启用成员；成员启用会在后续版本接入。</p>
           </div>
           <StatusBadge label="真实数据" tone="green" />
         </div>
+
+        <div v-if="disableStaffError" class="form-error">{{ disableStaffError }}</div>
+        <div v-if="disableStaffSuccess" class="form-success">{{ disableStaffSuccess }}</div>
 
         <div v-if="staffErrorMessage" class="inline-error">
           <div>
@@ -326,13 +365,30 @@ watch(merchantId, () => {
           </div>
           <div v-for="item in staffList" :key="item.id" class="mock-table__row staff-table__row">
             <span>{{ item.role_text }}</span>
-            <StatusBadge :label="item.status_text" :tone="item.status === 'active' ? 'green' : 'muted'" />
+            <StatusBadge :label="item.status_text" :tone="staffTone(item.status)" />
             <span>{{ item.masked_openid }}</span>
             <span>{{ item.nickname }}</span>
             <span>{{ item.remark }}</span>
             <span>{{ item.created_at }}</span>
             <div class="table-action-group">
-              <button class="table-action-button" type="button" @click="showMemberPendingTip">启用 / 禁用</button>
+              <button
+                v-if="canDisableStaff(item)"
+                class="table-action-button table-action-button--danger"
+                type="button"
+                :disabled="Boolean(isDisablingStaffOpenid)"
+                @click="handleDisableStaff(item)"
+              >
+                {{ isDisablingStaffOpenid === item.openid ? '禁用中...' : '禁用成员' }}
+              </button>
+              <button
+                v-else
+                class="table-action-button"
+                type="button"
+                :disabled="Boolean(isDisablingStaffOpenid)"
+                @click="showMemberEnablePendingTip"
+              >
+                启用成员
+              </button>
             </div>
           </div>
         </div>

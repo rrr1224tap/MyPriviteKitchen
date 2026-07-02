@@ -1,5 +1,5 @@
 const VALID_ACTIONS = ['listStaff', 'enableStaff', 'disableStaff', 'createInvite', 'listInvites', 'disableInvite']
-const WEB_ALLOWED_ACTIONS = ['listStaff', 'listInvites', 'createInvite', 'disableInvite']
+const WEB_ALLOWED_ACTIONS = ['listStaff', 'listInvites', 'createInvite', 'disableInvite', 'disableStaff']
 const WEB_ADMIN_OPENID = 'web_super_admin'
 const VALID_ROLES = ['owner', 'staff']
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -261,6 +261,10 @@ function getStaffId(payload = {}) {
   return normalizeText(payload.staff_id || payload._id)
 }
 
+function getStaffOpenid(payload = {}) {
+  return normalizeText(payload.openid)
+}
+
 async function assertMerchantAvailable(deps, merchantId, allowDisabled = false) {
   if (!merchantId) {
     return {
@@ -436,7 +440,59 @@ async function handleDisableInvite(deps, payload) {
   }
 }
 
-async function handleStaffStatus(deps, payload, status) {
+async function handleWebDisableStaff(deps, payload) {
+  const merchantId = getMerchantId(payload)
+  const merchantResult = await assertMerchantAvailable(deps, merchantId, true)
+  if (merchantResult.error) {
+    return merchantResult.error
+  }
+
+  const openid = getStaffOpenid(payload)
+  if (!openid) {
+    return failure('INVALID_PARAMS', '成员 openid 不能为空')
+  }
+
+  try {
+    const staffList = await deps.findStaffByMerchantId(merchantId) || []
+    const staff = staffList.find((item) => normalizeText(item.openid) === openid)
+    if (!staff) {
+      return failure('NOT_FOUND', '成员不存在')
+    }
+
+    if (staff.status === 'disabled') {
+      return failure('VALIDATION_ERROR', '成员已禁用')
+    }
+
+    const updateData = {
+      status: 'disabled',
+      updated_at: deps.now()
+    }
+    const updatedStaff = await deps.updateStaff({
+      staff_id: staff._id,
+      updateData
+    })
+
+    return success('禁用成员成功', {
+      staff: formatStaff({
+        ...staff,
+        ...(updatedStaff || updateData)
+      })
+    })
+  } catch (error) {
+    deps.logger.error('manageMerchantStaff disable staff failed', error)
+    return failure('DATABASE_ERROR', '禁用成员失败，请稍后重试')
+  }
+}
+
+async function handleStaffStatus(deps, payload, status, adminResult = {}) {
+  if (adminResult.is_web_admin) {
+    if (status !== 'disabled') {
+      return failure('FORBIDDEN', 'Web 后台当前不支持该成员操作')
+    }
+
+    return handleWebDisableStaff(deps, payload)
+  }
+
   const staffId = getStaffId(payload)
   if (!staffId) {
     return failure('INVALID_PARAMS', '成员 ID 不能为空')
@@ -508,11 +564,11 @@ function createManageMerchantStaffHandler(dependencies = {}) {
       }
 
       if (action === 'enableStaff') {
-        return handleStaffStatus(deps, payload, 'active')
+        return handleStaffStatus(deps, payload, 'active', adminResult)
       }
 
       if (action === 'disableStaff') {
-        return handleStaffStatus(deps, payload, 'disabled')
+        return handleStaffStatus(deps, payload, 'disabled', adminResult)
       }
 
       return failure('INVALID_PARAMS', '成员管理操作类型不合法')
