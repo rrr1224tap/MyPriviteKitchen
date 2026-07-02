@@ -430,7 +430,7 @@ test('invalid http body json does not crash', async () => {
   assert.equal(result.code, 'INVALID_PARAMS')
 })
 
-test('web admin token cannot update staff or disable invite data in current phase', async () => {
+test('web admin token cannot update staff status in current phase', async () => {
   const blockedActions = [
     {
       action: 'enableStaff',
@@ -442,12 +442,6 @@ test('web admin token cannot update staff or disable invite data in current phas
       action: 'disableStaff',
       payload: {
         staff_id: 'staff_001'
-      }
-    },
-    {
-      action: 'disableInvite',
-      payload: {
-        code: 'XK7M2Q8A'
       }
     }
   ]
@@ -475,8 +469,338 @@ test('web admin token cannot update staff or disable invite data in current phas
     assert.equal(result.success, false)
     assert.equal(result.code, 'FORBIDDEN')
     assert.equal(state.staff[0].status, 'active')
-    assert.equal(state.invites[0].status, 'unused')
   }
+})
+
+test('web valid admin token can disable merchant invite without openid', async () => {
+  const originalCreatedAt = new Date('2026-06-20T10:00:00.000Z')
+  const originalExpiresAt = new Date('2026-07-02T10:00:00.000Z')
+  const { state, deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        _id: 'invite_001',
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused',
+        created_by_openid: 'admin_openid',
+        used_by_openid: '',
+        used_at: null,
+        expires_at: originalExpiresAt,
+        created_at: originalCreatedAt,
+        updated_at: originalCreatedAt
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'disableInvite',
+    merchant_id: 'xiaochu',
+    code: 'XK7M2Q8A',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.invite.code, 'XK7M2Q8A')
+  assert.equal(result.data.invite.status, 'disabled')
+  assert.equal(state.invites[0].status, 'disabled')
+  assert.equal(state.invites[0].updated_at, FIXED_NOW)
+  assert.equal(state.invites[0].role, 'staff')
+  assert.equal(state.invites[0].created_at, originalCreatedAt)
+  assert.equal(state.invites[0].used_at, null)
+  assert.equal(state.invites[0].used_by_openid, '')
+  assert.equal(state.invites[0].created_by_openid, 'admin_openid')
+  assert.equal(state.invites[0].expires_at, originalExpiresAt)
+})
+
+test('web empty token cannot disable merchant invite', async () => {
+  const { state, deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused'
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'disableInvite',
+    merchant_id: 'xiaochu',
+    code: 'XK7M2Q8A',
+    admin_token: ''
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.invites[0].status, 'unused')
+})
+
+test('web tampered token cannot disable merchant invite', async () => {
+  const { state, deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused'
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'disableInvite',
+    merchant_id: 'xiaochu',
+    code: 'XK7M2Q8A',
+    admin_token: `${createWebToken()}x`
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.invites[0].status, 'unused')
+})
+
+test('web expired token cannot disable merchant invite', async () => {
+  const { state, deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused'
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'disableInvite',
+    merchant_id: 'xiaochu',
+    code: 'XK7M2Q8A',
+    admin_token: createWebToken({
+      now: new Date('2026-06-24T10:00:00.000Z'),
+      ttlMinutes: 60
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'TOKEN_EXPIRED')
+  assert.equal(state.invites[0].status, 'unused')
+})
+
+test('web non super admin role cannot disable merchant invite', async () => {
+  const { state, deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused'
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'disableInvite',
+    merchant_id: 'xiaochu',
+    code: 'XK7M2Q8A',
+    admin_token: createWebToken({
+      role: 'viewer'
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.invites[0].status, 'unused')
+})
+
+test('web admin token in http string body can disable merchant invite', async () => {
+  const { state, deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused'
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    body: JSON.stringify({
+      action: 'disableInvite',
+      merchant_id: 'xiaochu',
+      code: 'XK7M2Q8A',
+      admin_token: createWebToken()
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(state.invites[0].status, 'disabled')
+})
+
+test('web admin token in http object body can disable merchant invite', async () => {
+  const { state, deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused'
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    body: {
+      action: 'disableInvite',
+      merchant_id: 'xiaochu',
+      code: 'XK7M2Q8A',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(state.invites[0].status, 'disabled')
+})
+
+test('web admin token in query string parameters can disable merchant invite', async () => {
+  const { state, deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused'
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    queryStringParameters: {
+      action: 'disableInvite',
+      merchant_id: 'xiaochu',
+      code: 'XK7M2Q8A',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(state.invites[0].status, 'disabled')
+})
+
+test('disable invite requires merchant_id', async () => {
+  const { state, deps } = createDependencies({
+    openid: '',
+    invites: [
+      {
+        code: 'XK7M2Q8A',
+        merchant_id: 'xiaochu',
+        role: 'staff',
+        status: 'unused'
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'disableInvite',
+    code: 'XK7M2Q8A',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+  assert.equal(state.invites[0].status, 'unused')
+})
+
+test('disable invite requires code', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'disableInvite',
+    merchant_id: 'xiaochu',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+})
+
+test('disable invite fails when invite does not exist', async () => {
+  const { deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'disableInvite',
+    merchant_id: 'xiaochu',
+    code: 'NOINVITE',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'NOT_FOUND')
+})
+
+test('disable invite cannot update another merchant invite', async () => {
+  const { state, deps } = createDependencies({
+    openid: '',
+    merchants: [
+      {
+        _id: 'doc_xiaochu',
+        merchant_id: 'xiaochu',
+        name: 'xiaochu',
+        status: 'active'
+      },
+      {
+        _id: 'doc_other',
+        merchant_id: 'other',
+        name: 'other',
+        status: 'active'
+      }
+    ],
+    invites: [
+      {
+        code: 'XK7M2Q8A',
+        merchant_id: 'other',
+        role: 'staff',
+        status: 'unused'
+      }
+    ]
+  })
+  const handler = createManageMerchantStaffHandler(deps)
+
+  const result = await handler({
+    action: 'disableInvite',
+    merchant_id: 'xiaochu',
+    code: 'XK7M2Q8A',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'FORBIDDEN')
+  assert.equal(state.invites[0].status, 'unused')
 })
 
 test('web valid admin token can create invite without openid', async () => {
@@ -725,6 +1049,7 @@ test('super admin can disable invite', async () => {
   const result = await handler({
     action: 'disableInvite',
     payload: {
+      merchant_id: 'xiaochu',
       code: 'XK7M2Q8A'
     }
   })

@@ -1,5 +1,5 @@
 const VALID_ACTIONS = ['listStaff', 'enableStaff', 'disableStaff', 'createInvite', 'listInvites', 'disableInvite']
-const WEB_ALLOWED_ACTIONS = ['listStaff', 'listInvites', 'createInvite']
+const WEB_ALLOWED_ACTIONS = ['listStaff', 'listInvites', 'createInvite', 'disableInvite']
 const WEB_ADMIN_OPENID = 'web_super_admin'
 const VALID_ROLES = ['owner', 'staff']
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -390,6 +390,12 @@ async function handleListInvites(deps, payload) {
 }
 
 async function handleDisableInvite(deps, payload) {
+  const merchantId = getMerchantId(payload)
+  const merchantResult = await assertMerchantAvailable(deps, merchantId, true)
+  if (merchantResult.error) {
+    return merchantResult.error
+  }
+
   const code = normalizeText(payload.code).toUpperCase()
   if (!code) {
     return failure('INVALID_PARAMS', '邀请码不能为空')
@@ -399,6 +405,14 @@ async function handleDisableInvite(deps, payload) {
     const invite = await deps.findInviteByCode(code)
     if (!invite) {
       return failure('NOT_FOUND', '邀请码不存在')
+    }
+
+    if (invite.merchant_id !== merchantId) {
+      return failure('FORBIDDEN', '不能禁用其他商户的邀请码')
+    }
+
+    if (invite.status && invite.status !== 'unused') {
+      return failure('VALIDATION_ERROR', '只能禁用未使用的邀请码')
     }
 
     const updateData = {

@@ -108,6 +108,10 @@ interface RawInviteCreateResponse {
   invite?: RawInviteItem
 }
 
+interface RawInviteDisableResponse {
+  invite?: RawInviteItem
+}
+
 function toText(value: unknown, fallback = '') {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback
 }
@@ -268,6 +272,16 @@ export async function createMerchantInvite(
     action: 'createInvite',
     merchant_id: merchantId,
     role
+  })
+
+  return normalizeInviteItem(data.invite || {})
+}
+
+export async function disableMerchantInvite(merchantId: string, code: string): Promise<MerchantInviteItem> {
+  const data = await callAdminFunction<RawInviteDisableResponse>('manageMerchantStaff', {
+    action: 'disableInvite',
+    merchant_id: merchantId,
+    code
   })
 
   return normalizeInviteItem(data.invite || {})

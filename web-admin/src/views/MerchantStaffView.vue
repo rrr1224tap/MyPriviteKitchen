@@ -9,6 +9,7 @@ import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import {
   createMerchantInvite,
+  disableMerchantInvite,
   fetchMerchantInvites,
   fetchMerchantStaff,
   type MerchantInviteItem,
@@ -37,6 +38,9 @@ const createInviteRole = ref<MerchantStaffRole>('staff')
 const createInviteError = ref('')
 const createInviteSuccess = ref('')
 const latestInviteCode = ref('')
+const isDisablingInviteCode = ref('')
+const disableInviteError = ref('')
+const disableInviteSuccess = ref('')
 
 const merchantId = computed(() => {
   const value = route.params.merchantId
@@ -55,10 +59,6 @@ const isInviteAuthError = computed(() => authErrorCodes.includes(inviteErrorCode
 
 function showMemberPendingTip() {
   window.alert('成员启停将在后续版本接入')
-}
-
-function showInviteDisablePendingTip() {
-  window.alert('禁用邀请码将在后续版本接入')
 }
 
 function openCreateInvitePanel() {
@@ -108,6 +108,10 @@ function inviteTone(status: MerchantInviteStatus) {
   return toneMap[status]
 }
 
+function canDisableInvite(item: MerchantInviteItem) {
+  return item.status === 'unused'
+}
+
 function getErrorInfo(error: unknown, fallbackMessage: string) {
   const apiError = error as AdminApiError
   return {
@@ -138,6 +142,27 @@ async function handleCreateInvite() {
     createInviteError.value = errorInfo.message
   } finally {
     isCreatingInvite.value = false
+  }
+}
+
+async function handleDisableInvite(item: MerchantInviteItem) {
+  if (!canDisableInvite(item) || isDisablingInviteCode.value) return
+
+  const confirmed = window.confirm('确认禁用这个邀请码吗？禁用后该邀请码将无法再被使用。')
+  if (!confirmed) return
+
+  isDisablingInviteCode.value = item.code
+  disableInviteError.value = ''
+  disableInviteSuccess.value = ''
+
+  try {
+    await disableMerchantInvite(merchantId.value, item.code)
+    disableInviteSuccess.value = '邀请码已禁用，列表已刷新'
+    await loadInvites()
+  } catch (error) {
+    disableInviteError.value = '邀请码禁用失败，请稍后重试'
+  } finally {
+    isDisablingInviteCode.value = ''
   }
 }
 
@@ -195,7 +220,7 @@ watch(merchantId, () => {
     <PageHeader
       eyebrow="Staff & Invites"
       title="成员与邀请"
-      :description="`当前商户：${merchantTitle}（merchant_id：${merchantId}）。成员列表和邀请码列表已接入真实云函数，本阶段不执行写操作。`"
+      :description="`当前商户：${merchantTitle}（merchant_id：${merchantId}）。成员列表、邀请码列表和禁用未使用邀请码已接入真实云函数，成员启停仍在后续版本接入。`"
     >
       <template #actions>
         <ActionButton variant="ghost" @click="loadPageData">刷新列表</ActionButton>
@@ -241,7 +266,7 @@ watch(merchantId, () => {
             负责人
           </button>
         </div>
-        <p class="form-helper">邀请码默认 7 天有效。创建前会二次确认，本阶段只开放生成，不开放禁用。</p>
+        <p class="form-helper">邀请码默认 7 天有效。创建前会二次确认，本阶段只开放生成和禁用未使用邀请码，不开放重新启用或删除。</p>
 
         <div v-if="latestInviteCode" class="invite-code-card">
           <span>新邀请码</span>
@@ -317,10 +342,13 @@ watch(merchantId, () => {
         <div class="section-heading">
           <div>
             <h2>邀请码列表</h2>
-            <p>当前只开放真实读取，创建、复制和禁用仍在后续版本接入。</p>
+            <p>当前支持真实读取、创建、复制和禁用未使用邀请码；已使用、已禁用、已过期的邀请码不提供禁用操作。</p>
           </div>
           <StatusBadge label="真实数据" tone="green" />
         </div>
+
+        <div v-if="disableInviteError" class="form-error">{{ disableInviteError }}</div>
+        <div v-if="disableInviteSuccess" class="form-success">{{ disableInviteSuccess }}</div>
 
         <div v-if="inviteErrorMessage" class="inline-error">
           <div>
@@ -337,7 +365,7 @@ watch(merchantId, () => {
         <EmptyState
           v-else-if="!inviteList.length"
           title="暂无邀请码"
-          description="当前商户还没有邀请码，创建能力会在后续版本接入。"
+          description="当前商户还没有邀请码，可以点击右上角生成邀请码。"
         />
 
         <div v-else class="mock-table invite-table">
@@ -359,7 +387,15 @@ watch(merchantId, () => {
             <span>{{ item.created_at }}</span>
             <div class="table-action-group">
               <button class="table-action-button" type="button" @click="copyInviteCode(item.code)">复制</button>
-              <button class="table-action-button table-action-button--danger" type="button" @click="showInviteDisablePendingTip">禁用</button>
+              <button
+                v-if="canDisableInvite(item)"
+                class="table-action-button table-action-button--danger"
+                type="button"
+                :disabled="Boolean(isDisablingInviteCode)"
+                @click="handleDisableInvite(item)"
+              >
+                {{ isDisablingInviteCode === item.code ? '禁用中...' : '禁用邀请码' }}
+              </button>
             </div>
           </div>
         </div>
