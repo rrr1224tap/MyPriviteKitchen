@@ -2,11 +2,18 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 
 const { createManageCategoryHandler } = require('./category-service')
+const {
+  createSignedToken
+} = require('../webAdminAuth/web-admin-auth-service')
+
+const FIXED_NOW = new Date('2026-06-25T10:00:00.000Z')
 
 function createDependencies(options = {}) {
   const state = {
     openid: options.openid || 'staff_openid',
-    now: options.now || new Date('2026-06-17T10:00:00.000Z'),
+    tokenSecret: options.tokenSecret === undefined ? 'manage-category-test-secret' : options.tokenSecret,
+    now: options.now || FIXED_NOW,
+    writes: 0,
     idIndex: 1,
     merchantStaff: options.merchantStaff || [
       {
@@ -56,6 +63,7 @@ function createDependencies(options = {}) {
     state,
     deps: {
       getOpenid: () => state.openid,
+      getTokenSecret: () => state.tokenSecret,
       now: () => state.now,
       createCategoryId: () => `category_new_${state.idIndex++}`,
       findMerchantStaff: async ({ merchant_id, openid }) => {
@@ -79,6 +87,7 @@ function createDependencies(options = {}) {
         return currentMax + 1
       },
       createCategory: async (category) => {
+        state.writes += 1
         const record = {
           _id: `doc_${category.category_id}`,
           ...category
@@ -87,6 +96,7 @@ function createDependencies(options = {}) {
         return record
       },
       updateCategory: async ({ category_id, updateData }) => {
+        state.writes += 1
         const category = state.categories.find((item) => item.category_id === category_id)
         if (!category) {
           return null
@@ -95,6 +105,7 @@ function createDependencies(options = {}) {
         return category
       },
       updateCategorySortList: async (items) => {
+        state.writes += 1
         items.forEach((item) => {
           const category = state.categories.find((record) => record.category_id === item.category_id)
           if (category) {
@@ -109,6 +120,16 @@ function createDependencies(options = {}) {
       }
     }
   }
+}
+
+function createWebToken(options = {}) {
+  return createSignedToken({
+    role: options.role || 'super_admin',
+    secret: options.secret || 'manage-category-test-secret',
+    now: options.now || FIXED_NOW,
+    ttlMinutes: options.ttlMinutes || 60,
+    nonce: options.nonce || 'manage-category-test-nonce'
+  }).token
 }
 
 test('active merchant staff can list categories for their merchant only', async () => {
@@ -126,6 +147,220 @@ test('active merchant staff can list categories for their merchant only', async 
     'category_001',
     'category_002'
   ])
+})
+
+test('web valid admin token can list categories without openid', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    action: 'listCategories',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.deepEqual(result.data.list.map((category) => category.category_id), [
+    'category_001',
+    'category_002'
+  ])
+  assert.equal(result.data.total, 2)
+  assert.equal(state.writes, 0)
+})
+
+test('web empty token cannot list categories', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    action: 'listCategories',
+    merchant_id: 'merchant_001',
+    admin_token: ''
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.writes, 0)
+})
+
+test('web tampered token cannot list categories', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    action: 'listCategories',
+    merchant_id: 'merchant_001',
+    admin_token: `${createWebToken()}x`
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.writes, 0)
+})
+
+test('web expired token cannot list categories', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    action: 'listCategories',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken({
+      now: new Date('2026-06-24T10:00:00.000Z'),
+      ttlMinutes: 60
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'TOKEN_EXPIRED')
+  assert.equal(state.writes, 0)
+})
+
+test('web non super admin role cannot list categories', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    action: 'listCategories',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken({
+      role: 'viewer'
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.writes, 0)
+})
+
+test('web admin token in http string body can list categories', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    body: JSON.stringify({
+      action: 'listCategories',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 2)
+  assert.equal(state.writes, 0)
+})
+
+test('web admin token in http object body can list categories', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    body: {
+      action: 'listCategories',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 2)
+  assert.equal(state.writes, 0)
+})
+
+test('web admin token in query string parameters can list categories', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    queryStringParameters: {
+      action: 'listCategories',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 2)
+  assert.equal(state.writes, 0)
+})
+
+test('invalid http body json does not crash', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    body: '{"action":'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+  assert.equal(state.writes, 0)
+})
+
+test('web list categories requires merchant_id', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    action: 'listCategories',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+  assert.equal(state.writes, 0)
+})
+
+test('web token cannot call write category actions in this phase', async () => {
+  const writeActions = ['create', 'update', 'disable', 'sort']
+
+  for (const action of writeActions) {
+    const { state, deps } = createDependencies({
+      openid: ''
+    })
+    const handler = createManageCategoryHandler(deps)
+
+    const result = await handler({
+      action,
+      merchant_id: 'merchant_001',
+      category_id: 'category_001',
+      data: {
+        name: 'Blocked',
+        categories: [
+          {
+            category_id: 'category_001',
+            sort_order: 9
+          }
+        ]
+      },
+      admin_token: createWebToken()
+    })
+
+    assert.equal(result.success, false)
+    assert.equal(result.code, 'FORBIDDEN')
+    assert.equal(state.writes, 0)
+  }
 })
 
 test('user without active merchant staff permission cannot manage categories', async () => {

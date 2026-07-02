@@ -1,5 +1,7 @@
-const VALID_ACTIONS = ['list', 'create', 'update', 'disable', 'sort']
+const VALID_ACTIONS = ['list', 'listCategories', 'create', 'update', 'disable', 'sort']
+const WEB_ALLOWED_ACTIONS = ['listCategories']
 const VALID_CATEGORY_STATUSES = ['active', 'inactive', 'deleted']
+const { verifyWebAdminToken } = require('./web-admin-token-helper')
 
 function success(message, data = {}) {
   return {
@@ -25,6 +27,50 @@ function normalizeString(value) {
 
 function normalizeData(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+}
+
+function parseJsonBody(body) {
+  if (!body) {
+    return {}
+  }
+
+  if (typeof body === 'object' && !Array.isArray(body)) {
+    return body
+  }
+
+  if (typeof body !== 'string') {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(body)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch (error) {
+    return {}
+  }
+}
+
+function normalizeEventPayload(event = {}) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) {
+    return {}
+  }
+
+  if (Object.prototype.hasOwnProperty.call(event, 'action') ||
+    Object.prototype.hasOwnProperty.call(event, 'admin_token')) {
+    return event
+  }
+
+  const bodyPayload = parseJsonBody(event.body)
+  if (Object.keys(bodyPayload).length > 0) {
+    return bodyPayload
+  }
+
+  const queryPayload = event.queryStringParameters
+  if (queryPayload && typeof queryPayload === 'object' && !Array.isArray(queryPayload)) {
+    return queryPayload
+  }
+
+  return {}
 }
 
 function normalizeSortOrder(value) {
@@ -92,7 +138,39 @@ function buildHandlerDependencies(dependencies) {
     createCategory: dependencies.createCategory,
     updateCategory: dependencies.updateCategory,
     updateCategorySortList: dependencies.updateCategorySortList,
+    getTokenSecret: dependencies.getTokenSecret,
     logger: dependencies.logger || console
+  }
+}
+
+function isWebAdminRequest(event = {}) {
+  return Boolean(event && Object.prototype.hasOwnProperty.call(event, 'admin_token'))
+}
+
+function assertWebAdmin(event, action, deps) {
+  const verifyResult = verifyWebAdminToken(event.admin_token, {
+    secret: deps.getTokenSecret ? deps.getTokenSecret() : process.env.WEB_ADMIN_TOKEN_SECRET,
+    now: deps.now()
+  })
+
+  if (!verifyResult.ok) {
+    return {
+      error: failure(
+        verifyResult.code,
+        verifyResult.code === 'TOKEN_EXPIRED' ? '登录状态已过期' : '登录状态无效或已过期'
+      )
+    }
+  }
+
+  if (!WEB_ALLOWED_ACTIONS.includes(action)) {
+    return {
+      error: failure('FORBIDDEN', 'Web 后台当前仅开放分类列表读取')
+    }
+  }
+
+  return {
+    is_web_admin: true,
+    role: verifyResult.role
   }
 }
 
@@ -131,7 +209,8 @@ async function handleList(deps, merchantId) {
     .map(formatCategory)
 
   return success('获取分类列表成功', {
-    list
+    list,
+    total: list.length
   })
 }
 
@@ -359,15 +438,16 @@ function createManageCategoryHandler(dependencies) {
 
   return async function manageCategory(event = {}) {
     try {
+      const normalizedEvent = normalizeEventPayload(event)
       const openid = deps.getOpenid ? deps.getOpenid() : ''
-      if (!openid) {
+      if (!openid && !isWebAdminRequest(normalizedEvent)) {
         return failure('UNAUTHORIZED', '无法获取用户身份')
       }
 
-      const merchantId = normalizeString(event.merchant_id)
-      const action = normalizeString(event.action)
-      const categoryId = normalizeString(event.category_id)
-      const data = normalizeData(event.data)
+      const merchantId = normalizeString(normalizedEvent.merchant_id)
+      const action = normalizeString(normalizedEvent.action)
+      const categoryId = normalizeString(normalizedEvent.category_id)
+      const data = normalizeData(normalizedEvent.data)
 
       if (!merchantId || !action) {
         return failure('INVALID_PARAMS', '商家 ID 和操作类型不能为空')
@@ -375,6 +455,15 @@ function createManageCategoryHandler(dependencies) {
 
       if (!VALID_ACTIONS.includes(action)) {
         return failure('INVALID_PARAMS', '分类操作类型不合法')
+      }
+
+      if (isWebAdminRequest(normalizedEvent)) {
+        const webAdminResult = assertWebAdmin(normalizedEvent, action, deps)
+        if (webAdminResult.error) {
+          return webAdminResult.error
+        }
+
+        return handleList(deps, merchantId)
       }
 
       let staff
@@ -392,7 +481,7 @@ function createManageCategoryHandler(dependencies) {
         return failure('FORBIDDEN', '没有分类管理权限')
       }
 
-      if (action === 'list') {
+      if (action === 'list' || action === 'listCategories') {
         return handleList(deps, merchantId)
       }
 
