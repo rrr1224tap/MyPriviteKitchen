@@ -1,6 +1,8 @@
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
+const WEB_ALLOWED_ACTIONS = ['listOrders']
+const { verifyWebAdminToken } = require('./web-admin-token-helper')
 
 function success(message, data) {
   return {
@@ -49,6 +51,50 @@ function asList(value) {
   return Array.isArray(value) ? value : []
 }
 
+function parseJsonBody(body) {
+  if (!body) {
+    return {}
+  }
+
+  if (typeof body === 'object' && !Array.isArray(body)) {
+    return body
+  }
+
+  if (typeof body !== 'string') {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(body)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch (error) {
+    return {}
+  }
+}
+
+function normalizeEventPayload(event = {}) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) {
+    return {}
+  }
+
+  if (Object.prototype.hasOwnProperty.call(event, 'merchant_id') ||
+    Object.prototype.hasOwnProperty.call(event, 'admin_token')) {
+    return event
+  }
+
+  const bodyPayload = parseJsonBody(event.body)
+  if (Object.keys(bodyPayload).length > 0) {
+    return bodyPayload
+  }
+
+  const queryPayload = event.queryStringParameters
+  if (queryPayload && typeof queryPayload === 'object' && !Array.isArray(queryPayload)) {
+    return queryPayload
+  }
+
+  return {}
+}
+
 function isSafeAmount(value) {
   return Number.isInteger(value) && value >= 0
 }
@@ -64,6 +110,39 @@ function isActiveMerchantStaff(staff = {}, merchantId, openid) {
     staff.openid === openid &&
     staff.status === 'active'
   )
+}
+
+function isWebAdminRequest(event = {}) {
+  return Boolean(event && Object.prototype.hasOwnProperty.call(event, 'admin_token'))
+}
+
+function assertWebAdmin(event, action, dependencies) {
+  const verifyResult = verifyWebAdminToken(event.admin_token, {
+    secret: dependencies.getTokenSecret
+      ? dependencies.getTokenSecret()
+      : process.env.WEB_ADMIN_TOKEN_SECRET,
+    now: dependencies.now ? dependencies.now() : new Date()
+  })
+
+  if (!verifyResult.ok) {
+    return {
+      error: failure(
+        verifyResult.code,
+        verifyResult.code === 'TOKEN_EXPIRED' ? '登录状态已过期' : '登录状态无效或已过期'
+      )
+    }
+  }
+
+  if (action && !WEB_ALLOWED_ACTIONS.includes(action)) {
+    return {
+      error: failure('FORBIDDEN', 'Web 后台当前仅开放订单列表读取')
+    }
+  }
+
+  return {
+    is_web_admin: true,
+    role: verifyResult.role
+  }
 }
 
 function formatOrderItem(item = {}) {
@@ -144,30 +223,41 @@ function groupItemsByOrderId(items, merchantId) {
 function createGetMerchantOrdersHandler(dependencies) {
   return async function getMerchantOrders(event = {}) {
     try {
-      const openid = dependencies.getOpenid()
+      const normalizedEvent = normalizeEventPayload(event)
 
-      if (!openid) {
-        return failure('UNAUTHORIZED', '无法获取用户身份')
-      }
-
-      const merchantId = normalizeText(event.merchant_id)
+      const merchantId = normalizeText(normalizedEvent.merchant_id)
 
       if (!merchantId) {
         return failure('INVALID_PARAMS', '商家 ID 不能为空')
       }
 
-      const status = normalizeText(event.status)
-      const page = normalizePage(event.page)
-      const pageSize = normalizePageSize(event.page_size)
-      const staff = await dependencies.findMerchantStaff({
-        merchant_id: merchantId,
-        openid
-      })
+      const action = normalizeText(normalizedEvent.action)
+      const isWebAdmin = isWebAdminRequest(normalizedEvent)
+      if (isWebAdmin) {
+        const webAdminResult = assertWebAdmin(normalizedEvent, action, dependencies)
+        if (webAdminResult.error) {
+          return webAdminResult.error
+        }
+      } else {
+        const openid = dependencies.getOpenid()
 
-      if (!isActiveMerchantStaff(staff, merchantId, openid)) {
-        return failure('FORBIDDEN', '没有商家订单查看权限')
+        if (!openid) {
+          return failure('UNAUTHORIZED', '无法获取用户身份')
+        }
+
+        const staff = await dependencies.findMerchantStaff({
+          merchant_id: merchantId,
+          openid
+        })
+
+        if (!isActiveMerchantStaff(staff, merchantId, openid)) {
+          return failure('FORBIDDEN', '没有商家订单查看权限')
+        }
       }
 
+      const status = normalizeText(normalizedEvent.status)
+      const page = normalizePage(normalizedEvent.page)
+      const pageSize = normalizePageSize(normalizedEvent.page_size)
       const orderResult = await dependencies.findMerchantOrders({
         merchant_id: merchantId,
         status,
@@ -180,7 +270,7 @@ function createGetMerchantOrdersHandler(dependencies) {
         ? orderResult.total
         : orders.length
       const orderIds = orders.map(getOrderId).filter(Boolean)
-      const orderItems = orderIds.length
+      const orderItems = !isWebAdmin && orderIds.length
         ? await dependencies.findOrderItemsByOrderIds(orderIds)
         : []
       const itemsByOrderId = groupItemsByOrderId(orderItems, merchantId)

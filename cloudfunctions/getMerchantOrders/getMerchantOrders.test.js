@@ -1,7 +1,25 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const Module = require('node:module')
 
 const { createGetMerchantOrdersHandler } = require('./merchant-orders-service')
+const {
+  createSignedToken
+} = require('../webAdminAuth/web-admin-auth-service')
+
+const FIXED_NOW = new Date('2026-07-04T10:00:00.000Z')
+
+function createWebToken(options = {}) {
+  return createSignedToken({
+    role: options.role || 'super_admin',
+    issued_at: options.now || FIXED_NOW,
+    expires_at: new Date((options.now || FIXED_NOW).getTime() + (options.ttlMinutes || 60) * 60 * 1000),
+    now: options.now || FIXED_NOW,
+    ttlMinutes: options.ttlMinutes || 60,
+    nonce: options.nonce || 'merchant-orders-test-nonce',
+    secret: options.secret || 'merchant-orders-test-secret'
+  }).token
+}
 
 const ORDERS = [
   {
@@ -138,6 +156,8 @@ function createDependencies(overrides = {}) {
   return {
     logError: () => {},
     getOpenid: () => 'openid_staff_001',
+    now: () => FIXED_NOW,
+    getTokenSecret: () => 'merchant-orders-test-secret',
     findMerchantStaff: async ({ merchant_id, openid }) =>
       STAFF.find((staff) => staff.merchant_id === merchant_id && staff.openid === openid) || null,
     findMerchantOrders: async ({ merchant_id, status, page, page_size }) => {
@@ -155,6 +175,47 @@ function createDependencies(overrides = {}) {
     findOrderItemsByOrderIds: async (orderIds) =>
       ORDER_ITEMS.filter((item) => orderIds.includes(item.order_id)),
     ...overrides
+  }
+}
+
+function loadIndexWithMockedCloud(deps = createDependencies()) {
+  const indexPath = require.resolve('./index')
+  delete require.cache[indexPath]
+
+  const chain = {
+    where: () => chain,
+    orderBy: () => chain,
+    skip: () => chain,
+    limit: () => chain,
+    get: async () => ({ data: [] }),
+    count: async () => ({ total: 0 })
+  }
+  const dbMock = {
+    command: {
+      in: (values) => values
+    },
+    collection: () => chain
+  }
+  const cloudMock = {
+    DYNAMIC_CURRENT_ENV: 'test-env',
+    init: () => {},
+    database: () => dbMock,
+    getWXContext: () => ({ OPENID: deps.getOpenid() })
+  }
+
+  const originalLoad = Module._load
+  Module._load = function loadMockedModule(request, parent, isMain) {
+    if (request === 'wx-server-sdk') {
+      return cloudMock
+    }
+
+    return originalLoad.call(this, request, parent, isMain)
+  }
+
+  try {
+    return require('./index').main
+  } finally {
+    Module._load = originalLoad
   }
 }
 
@@ -303,4 +364,192 @@ test('getMerchantOrders returns UNAUTHORIZED when cloud openid is unavailable', 
 
   assert.equal(result.success, false)
   assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web valid admin token can list merchant orders without openid', async () => {
+  let orderItemReads = 0
+  const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
+    getOpenid: () => '',
+    findOrderItemsByOrderIds: async () => {
+      orderItemReads += 1
+      return []
+    }
+  }))
+
+  const result = await getMerchantOrders({
+    action: 'listOrders',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.deepEqual(
+    result.data.list.map((order) => order.order_id),
+    ['order_001', 'order_002']
+  )
+  assert.equal(result.data.pagination.total, 2)
+  assert.equal(orderItemReads, 0)
+})
+
+test('web empty token cannot list merchant orders', async () => {
+  const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
+    getOpenid: () => ''
+  }))
+
+  const result = await getMerchantOrders({
+    action: 'listOrders',
+    merchant_id: 'merchant_001',
+    admin_token: ''
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web tampered token cannot list merchant orders', async () => {
+  const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
+    getOpenid: () => ''
+  }))
+
+  const result = await getMerchantOrders({
+    action: 'listOrders',
+    merchant_id: 'merchant_001',
+    admin_token: `${createWebToken()}x`
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web expired token cannot list merchant orders', async () => {
+  const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
+    getOpenid: () => ''
+  }))
+
+  const result = await getMerchantOrders({
+    action: 'listOrders',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken({
+      now: new Date('2026-07-04T08:00:00.000Z'),
+      ttlMinutes: 30
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'TOKEN_EXPIRED')
+})
+
+test('web non super admin role cannot list merchant orders', async () => {
+  const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
+    getOpenid: () => ''
+  }))
+
+  const result = await getMerchantOrders({
+    action: 'listOrders',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken({ role: 'staff' })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web http string body can list merchant orders', async () => {
+  const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
+    getOpenid: () => ''
+  }))
+
+  const result = await getMerchantOrders({
+    body: JSON.stringify({
+      action: 'listOrders',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.list.length, 2)
+})
+
+test('web http object body can list merchant orders', async () => {
+  const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
+    getOpenid: () => ''
+  }))
+
+  const result = await getMerchantOrders({
+    body: {
+      action: 'listOrders',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.list.length, 2)
+})
+
+test('web query string parameters can list merchant orders', async () => {
+  const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
+    getOpenid: () => ''
+  }))
+
+  const result = await getMerchantOrders({
+    queryStringParameters: {
+      action: 'listOrders',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.list.length, 2)
+})
+
+test('web invalid json body does not crash', async () => {
+  const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
+    getOpenid: () => ''
+  }))
+
+  const result = await getMerchantOrders({
+    body: '{invalid json'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+})
+
+test('web list orders requires merchant_id', async () => {
+  const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
+    getOpenid: () => ''
+  }))
+
+  const result = await getMerchantOrders({
+    action: 'listOrders',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+})
+
+test('index entry accepts web listOrders action', async () => {
+  const previousSecret = process.env.WEB_ADMIN_TOKEN_SECRET
+  process.env.WEB_ADMIN_TOKEN_SECRET = 'merchant-orders-test-secret'
+  const main = loadIndexWithMockedCloud(createDependencies({
+    getOpenid: () => ''
+  }))
+
+  try {
+    const result = await main({
+      action: 'listOrders',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    })
+
+    assert.equal(result.success, true)
+    assert.equal(result.code, 'SUCCESS')
+  } finally {
+    process.env.WEB_ADMIN_TOKEN_SECRET = previousSecret
+  }
 })

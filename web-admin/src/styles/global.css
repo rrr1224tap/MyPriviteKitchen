@@ -717,6 +717,42 @@ button {
   cursor: pointer;
 }
 
+.orders-table__row {
+  grid-template-columns:
+    minmax(150px, 1.1fr)
+    minmax(110px, 0.78fr)
+    minmax(120px, 0.9fr)
+    minmax(96px, 0.65fr)
+    minmax(70px, 0.45fr)
+    minmax(92px, 0.62fr)
+    minmax(150px, 1fr)
+    minmax(120px, 0.78fr);
+}
+
+.order-no,
+.order-amount {
+  color: var(--color-text);
+  font-weight: 950;
+}
+
+.order-remark {
+  overflow: hidden;
+  color: var(--color-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orders-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
 .dish-table__row--selected {
   background: rgba(255, 244, 242, 0.78);
   box-shadow: inset 4px 0 0 rgba(239, 63, 56, 0.72);

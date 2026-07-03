@@ -77,6 +77,8 @@ exports.main = createGetMerchantOrdersHandler({
     const wxContext = cloud.getWXContext()
     return wxContext.OPENID || ''
   },
+  now: () => new Date(),
+  getTokenSecret: () => process.env.WEB_ADMIN_TOKEN_SECRET || '',
   findMerchantStaff,
   findMerchantOrders,
   findOrderItemsByOrderIds,
