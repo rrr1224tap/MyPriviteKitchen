@@ -7,8 +7,11 @@ import PageHeader from '../components/PageHeader.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import {
+  getOrderDetail,
   getOrderStatusText,
   listOrders,
+  type OrderDetail,
+  type OrderDetailItem,
   type OrderListItem,
   type OrderPagination,
   type OrderStatus
@@ -40,6 +43,11 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 const errorCode = ref('')
 const merchantId = ref(getStoredMerchantId() || FALLBACK_MERCHANT_ID)
+const selectedOrderId = ref('')
+const orderDetail = ref<OrderDetail | null>(null)
+const isDetailLoading = ref(false)
+const detailErrorMessage = ref('')
+const detailErrorCode = ref('')
 
 const pendingCount = computed(() => orders.value.filter((item) => item.status === 'pending').length)
 const processingCount = computed(() =>
@@ -50,6 +58,10 @@ const totalAmountText = computed(() => {
   return `¥${(total / 100).toFixed(2)}`
 })
 const isAuthError = computed(() => ['UNAUTHORIZED', 'TOKEN_EXPIRED', 'FORBIDDEN'].includes(errorCode.value))
+const selectedOrder = computed(() =>
+  orders.value.find((item) => getOrderKey(item) === selectedOrderId.value) || null
+)
+const detailOrder = computed(() => orderDetail.value?.order || selectedOrder.value)
 
 function getStoredMerchantId() {
   if (typeof window === 'undefined') {
@@ -57,6 +69,10 @@ function getStoredMerchantId() {
   }
 
   return window.localStorage.getItem(MERCHANT_CONTEXT_KEY) || ''
+}
+
+function getOrderKey(item: OrderListItem) {
+  return item.order_id || item.id
 }
 
 function orderTone(status: OrderStatus) {
@@ -110,7 +126,72 @@ function getRemarkText(value: string) {
 }
 
 function showPendingTip() {
-  window.alert('订单详情和状态流转会在后续版本接入，本阶段只开放订单列表真实读取。')
+  window.alert('订单状态流转、取消、删除和退款会在后续版本接入，本阶段只开放订单详情真实读取。')
+}
+
+function clearDetail() {
+  selectedOrderId.value = ''
+  orderDetail.value = null
+  detailErrorMessage.value = ''
+  detailErrorCode.value = ''
+}
+
+async function loadOrderDetail(orderId = selectedOrderId.value) {
+  if (!orderId) {
+    clearDetail()
+    return
+  }
+
+  isDetailLoading.value = true
+  detailErrorMessage.value = ''
+  detailErrorCode.value = ''
+
+  try {
+    const result = await getOrderDetail(merchantId.value, orderId)
+    orderDetail.value = result
+  } catch (error) {
+    const apiError = error as AdminApiError
+    detailErrorCode.value = apiError.code || 'UNKNOWN'
+    detailErrorMessage.value = apiError.message || '订单详情读取失败，请稍后重试'
+    orderDetail.value = null
+  } finally {
+    isDetailLoading.value = false
+  }
+}
+
+function openOrderDetail(item: OrderListItem) {
+  selectedOrderId.value = getOrderKey(item)
+  orderDetail.value = null
+  loadOrderDetail(selectedOrderId.value)
+}
+
+function formatOptionList(items: Array<Record<string, unknown>>) {
+  if (!items.length) {
+    return ''
+  }
+
+  return items
+    .map((item) => {
+      const groupName = String(item.group_name || item.name || item.group_id || '选项')
+      const optionName = String(item.option_name || item.option_id || '')
+      const options = Array.isArray(item.options)
+        ? item.options
+          .map((option) => String((option as Record<string, unknown>).option_name || (option as Record<string, unknown>).option_id || ''))
+          .filter(Boolean)
+          .join('、')
+        : ''
+
+      return [groupName, optionName || options].filter(Boolean).join('：')
+    })
+    .filter(Boolean)
+    .join('；')
+}
+
+function getItemOptionsText(item: OrderDetailItem) {
+  const specs = formatOptionList(item.selected_specs)
+  const addons = formatOptionList(item.selected_addons)
+
+  return [specs, addons].filter(Boolean).join(' / ')
 }
 
 async function loadOrders(page = 1) {
@@ -127,11 +208,15 @@ async function loadOrders(page = 1) {
 
     orders.value = result.list
     pagination.value = result.pagination
+    if (selectedOrderId.value && !result.list.some((item) => getOrderKey(item) === selectedOrderId.value)) {
+      clearDetail()
+    }
   } catch (error) {
     const apiError = error as AdminApiError
     errorCode.value = apiError.code || 'UNKNOWN'
     errorMessage.value = apiError.message || '订单列表读取失败，请稍后重试'
     orders.value = []
+    clearDetail()
     pagination.value = {
       page,
       page_size: PAGE_SIZE,
@@ -235,6 +320,7 @@ onMounted(() => {
           v-for="item in orders"
           :key="item.order_id || item.id"
           class="mock-table__row orders-table__row"
+          :class="{ 'orders-table__row--selected': getOrderKey(item) === selectedOrderId }"
         >
           <span>
             <strong class="order-no">{{ item.order_no || item.order_id }}</strong>
@@ -248,7 +334,7 @@ onMounted(() => {
           </span>
           <span class="order-remark">{{ getRemarkText(item.remark) }}</span>
           <span class="table-action-group">
-            <ActionButton variant="ghost" @click="showPendingTip">查看详情</ActionButton>
+            <ActionButton variant="ghost" @click="openOrderDetail(item)">查看详情</ActionButton>
           </span>
         </div>
       </div>
@@ -270,6 +356,112 @@ onMounted(() => {
           >
             下一页
           </ActionButton>
+        </div>
+      </div>
+    </GlassCard>
+
+    <GlassCard>
+      <div class="section-heading">
+        <div>
+          <h2>订单详情</h2>
+          <p>查看选中订单的基础信息、联系信息、商品明细和备注。</p>
+        </div>
+        <StatusBadge
+          :label="detailOrder ? getOrderStatusText(detailOrder.status) : '未选择'"
+          :tone="detailOrder ? orderTone(detailOrder.status) : 'muted'"
+        />
+      </div>
+
+      <EmptyState
+        v-if="!selectedOrderId"
+        title="请选择订单"
+        description="点击左侧订单列表中的查看详情，读取真实订单详情。"
+      />
+
+      <EmptyState
+        v-else-if="isDetailLoading"
+        title="正在读取详情"
+        description="请稍候，正在从云函数获取真实订单详情。"
+      />
+
+      <div v-else-if="detailErrorMessage" class="inline-error">
+        <div>
+          <strong>订单详情读取失败</strong>
+          <span>{{ detailErrorMessage }}（{{ detailErrorCode }}）</span>
+        </div>
+        <ActionButton variant="ghost" :disabled="isDetailLoading" @click="loadOrderDetail()">
+          重试
+        </ActionButton>
+      </div>
+
+      <EmptyState
+        v-else-if="!orderDetail"
+        title="暂无详情"
+        description="当前订单详情为空，请刷新后重试。"
+      />
+
+      <div v-else class="order-detail-panel">
+        <div class="order-detail-section">
+          <div class="order-detail-title">
+            <strong>{{ orderDetail.order.order_no || orderDetail.order.order_id }}</strong>
+            <StatusBadge :label="getOrderStatusText(orderDetail.order.status)" :tone="orderTone(orderDetail.order.status)" />
+          </div>
+          <div class="order-detail-meta">
+            <span>下单：{{ formatDateTime(orderDetail.order.created_at) }}</span>
+            <span>更新：{{ formatDateTime(orderDetail.order.updated_at) }}</span>
+            <span>金额：{{ orderDetail.order.total_amount_text }}</span>
+            <span>商品数：{{ orderDetail.order.item_count }}</span>
+          </div>
+        </div>
+
+        <div class="order-detail-section">
+          <div class="order-detail-title compact">
+            <strong>联系信息</strong>
+          </div>
+          <div class="order-detail-meta">
+            <span>联系人：{{ getContactText(orderDetail.order) }}</span>
+            <span>手机：{{ orderDetail.order.contact_phone || '-' }}</span>
+            <span>用户：{{ maskOpenid(orderDetail.order.user_openid) || '-' }}</span>
+          </div>
+        </div>
+
+        <div class="order-detail-section">
+          <div class="order-detail-title compact">
+            <strong>商品明细</strong>
+            <span>{{ orderDetail.items.length }} 项</span>
+          </div>
+          <div v-if="orderDetail.items.length" class="order-items-list">
+            <div v-for="item in orderDetail.items" :key="item.order_item_id || item.id" class="order-item-card">
+              <div>
+                <strong>{{ item.dish_name }}</strong>
+                <span v-if="getItemOptionsText(item)">{{ getItemOptionsText(item) }}</span>
+                <span v-else>暂无规格 / 加料</span>
+              </div>
+              <div>
+                <b>{{ item.quantity }} 份</b>
+                <span>{{ item.unit_price_text }} / 份</span>
+                <strong>{{ item.subtotal_text }}</strong>
+              </div>
+            </div>
+          </div>
+          <p v-else class="dish-detail-muted">暂无商品明细</p>
+        </div>
+
+        <div class="order-detail-section">
+          <div class="order-detail-title compact">
+            <strong>备注与其它信息</strong>
+          </div>
+          <div class="order-detail-meta">
+            <span>备注：{{ orderDetail.order.remark || '暂无' }}</span>
+            <span>取餐时间：{{ orderDetail.order.pickup_time || '暂无' }}</span>
+            <span>用餐方式：{{ orderDetail.order.dining_type || orderDetail.order.pickup_type || '暂无' }}</span>
+            <span>地址：{{ orderDetail.order.address || '暂无' }}</span>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <ActionButton variant="ghost" @click="showPendingTip">状态流转后续接入</ActionButton>
+          <ActionButton variant="ghost" @click="clearDetail">关闭详情</ActionButton>
         </div>
       </div>
     </GlassCard>

@@ -16,12 +16,59 @@ function failure(code, message) {
   }
 }
 
+const WEB_ALLOWED_ACTIONS = ['getOrderDetail']
+const { verifyWebAdminToken } = require('./web-admin-token-helper')
+
 function normalizeText(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
 function asList(value) {
   return Array.isArray(value) ? value : []
+}
+
+function parseJsonBody(body) {
+  if (!body) {
+    return {}
+  }
+
+  if (typeof body === 'object' && !Array.isArray(body)) {
+    return body
+  }
+
+  if (typeof body !== 'string') {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(body)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch (error) {
+    return {}
+  }
+}
+
+function normalizeEventPayload(event = {}) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) {
+    return {}
+  }
+
+  if (Object.prototype.hasOwnProperty.call(event, 'merchant_id') ||
+    Object.prototype.hasOwnProperty.call(event, 'admin_token')) {
+    return event
+  }
+
+  const bodyPayload = parseJsonBody(event.body)
+  if (Object.keys(bodyPayload).length > 0) {
+    return bodyPayload
+  }
+
+  const queryPayload = event.queryStringParameters
+  if (queryPayload && typeof queryPayload === 'object' && !Array.isArray(queryPayload)) {
+    return queryPayload
+  }
+
+  return {}
 }
 
 const VALID_TUTORIAL_PLATFORMS = ['douyin', 'xiaohongshu', 'bilibili', 'other']
@@ -46,6 +93,39 @@ function isActiveMerchantStaff(staff = {}, merchantId, openid) {
     staff.openid === openid &&
     staff.status === 'active'
   )
+}
+
+function isWebAdminRequest(event = {}) {
+  return Boolean(event && Object.prototype.hasOwnProperty.call(event, 'admin_token'))
+}
+
+function assertWebAdmin(event, action, dependencies) {
+  const verifyResult = verifyWebAdminToken(event.admin_token, {
+    secret: dependencies.getTokenSecret
+      ? dependencies.getTokenSecret()
+      : process.env.WEB_ADMIN_TOKEN_SECRET,
+    now: dependencies.now ? dependencies.now() : new Date()
+  })
+
+  if (!verifyResult.ok) {
+    return {
+      error: failure(
+        verifyResult.code,
+        verifyResult.code === 'TOKEN_EXPIRED' ? '登录状态已过期' : '登录状态无效或已过期'
+      )
+    }
+  }
+
+  if (action && !WEB_ALLOWED_ACTIONS.includes(action)) {
+    return {
+      error: failure('FORBIDDEN', 'Web 后台当前仅开放订单详情读取')
+    }
+  }
+
+  return {
+    is_web_admin: true,
+    role: verifyResult.role
+  }
 }
 
 function normalizeTutorialPlatform(value) {
@@ -118,6 +198,14 @@ function formatOrder(order = {}) {
     payment_method: order.payment_method || '',
     pickup_type: order.pickup_type || '',
     remark: order.remark || '',
+    contact_name: order.contact_name || order.receiver_name || order.user_nickname || '',
+    receiver_name: order.receiver_name || '',
+    user_nickname: order.user_nickname || '',
+    contact_phone: order.contact_phone || order.phone || '',
+    phone: order.phone || order.contact_phone || '',
+    address: order.address || '',
+    pickup_time: order.pickup_time || '',
+    dining_type: order.dining_type || '',
     item_count: Number.isInteger(itemCount) ? itemCount : 0,
     total_amount_cent: isSafeAmount(totalAmountCent) ? totalAmountCent : 0,
     created_at: order.created_at || null,
@@ -164,26 +252,36 @@ function formatOrderItem(item = {}, tutorialMap = {}) {
 function createGetMerchantOrderDetailHandler(dependencies) {
   return async function getMerchantOrderDetail(event = {}) {
     try {
-      const openid = dependencies.getOpenid()
+      const normalizedEvent = normalizeEventPayload(event)
 
-      if (!openid) {
-        return failure('UNAUTHORIZED', '无法获取用户身份')
-      }
-
-      const merchantId = normalizeText(event.merchant_id)
-      const orderId = normalizeText(event.order_id)
+      const merchantId = normalizeText(normalizedEvent.merchant_id)
+      const orderId = normalizeText(normalizedEvent.order_id)
 
       if (!merchantId || !orderId) {
         return failure('INVALID_PARAMS', '商家 ID 和订单 ID 不能为空')
       }
 
-      const staff = await dependencies.findMerchantStaff({
-        merchant_id: merchantId,
-        openid
-      })
+      const action = normalizeText(normalizedEvent.action)
+      if (isWebAdminRequest(normalizedEvent)) {
+        const webAdminResult = assertWebAdmin(normalizedEvent, action, dependencies)
+        if (webAdminResult.error) {
+          return webAdminResult.error
+        }
+      } else {
+        const openid = dependencies.getOpenid()
 
-      if (!isActiveMerchantStaff(staff, merchantId, openid)) {
-        return failure('FORBIDDEN', '没有查看商家订单详情的权限')
+        if (!openid) {
+          return failure('UNAUTHORIZED', '无法获取用户身份')
+        }
+
+        const staff = await dependencies.findMerchantStaff({
+          merchant_id: merchantId,
+          openid
+        })
+
+        if (!isActiveMerchantStaff(staff, merchantId, openid)) {
+          return failure('FORBIDDEN', '没有查看商家订单详情的权限')
+        }
       }
 
       const order = await dependencies.findOrderById(orderId)

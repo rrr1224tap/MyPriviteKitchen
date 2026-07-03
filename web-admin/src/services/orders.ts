@@ -22,6 +22,31 @@ export interface OrderListItem {
   updated_at: string | null
 }
 
+export interface OrderDetailItem {
+  id: string
+  order_item_id: string
+  order_id: string
+  dish_id: string
+  dish_name: string
+  dish_image_url: string
+  unit_price_cent: number
+  unit_price_text: string
+  quantity: number
+  subtotal_cent: number
+  subtotal_text: string
+  selected_specs: Array<Record<string, unknown>>
+  selected_addons: Array<Record<string, unknown>>
+}
+
+export interface OrderDetail {
+  order: OrderListItem & {
+    address: string
+    pickup_time: string
+    dining_type: string
+  }
+  items: OrderDetailItem[]
+}
+
 export interface ListOrdersParams {
   page?: number
   page_size?: number
@@ -56,15 +81,40 @@ interface RawOrderItem {
   user_nickname?: unknown
   contact_phone?: unknown
   phone?: unknown
+  address?: unknown
+  pickup_time?: unknown
+  dining_type?: unknown
   user_openid?: unknown
   openid?: unknown
   created_at?: unknown
   updated_at?: unknown
 }
 
+interface RawOrderDetailItem {
+  _id?: unknown
+  order_item_id?: unknown
+  order_id?: unknown
+  dish_id?: unknown
+  dish_name?: unknown
+  name?: unknown
+  dish_image_url?: unknown
+  dish_image?: unknown
+  unit_price_cent?: unknown
+  price_cent?: unknown
+  quantity?: unknown
+  subtotal_cent?: unknown
+  selected_specs?: unknown
+  selected_addons?: unknown
+}
+
 interface OrderListResponse {
   list?: RawOrderItem[]
   pagination?: Partial<OrderPagination>
+}
+
+interface OrderDetailResponse {
+  order?: RawOrderItem
+  items?: RawOrderDetailItem[]
 }
 
 function toText(value: unknown, fallback = '') {
@@ -145,6 +195,45 @@ function normalizeOrder(raw: RawOrderItem): OrderListItem {
   }
 }
 
+function normalizeOrderDetail(raw: RawOrderItem): OrderDetail['order'] {
+  return {
+    ...normalizeOrder(raw),
+    address: toText(raw.address),
+    pickup_time: toText(raw.pickup_time),
+    dining_type: toText(raw.dining_type)
+  }
+}
+
+function toPlainList(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> =>
+      Boolean(item) && typeof item === 'object' && !Array.isArray(item)
+    )
+    : []
+}
+
+function normalizeOrderDetailItem(raw: RawOrderDetailItem): OrderDetailItem {
+  const orderItemId = toText(raw.order_item_id ?? raw._id)
+  const unitPriceCent = toNumber(raw.unit_price_cent ?? raw.price_cent)
+  const subtotalCent = toNumber(raw.subtotal_cent)
+
+  return {
+    id: toText(raw._id ?? orderItemId),
+    order_item_id: orderItemId,
+    order_id: toText(raw.order_id),
+    dish_id: toText(raw.dish_id),
+    dish_name: toText(raw.dish_name ?? raw.name, '未命名餐品'),
+    dish_image_url: toText(raw.dish_image_url ?? raw.dish_image),
+    unit_price_cent: unitPriceCent,
+    unit_price_text: toMoneyText(unitPriceCent),
+    quantity: toNumber(raw.quantity),
+    subtotal_cent: subtotalCent,
+    subtotal_text: toMoneyText(subtotalCent),
+    selected_specs: toPlainList(raw.selected_specs),
+    selected_addons: toPlainList(raw.selected_addons)
+  }
+}
+
 function normalizePagination(value: Partial<OrderPagination> | undefined, fallbackTotal: number): OrderPagination {
   return {
     page: toNumber(value?.page, 1),
@@ -166,5 +255,22 @@ export async function listOrders(merchantId: string, params: ListOrdersParams = 
   return {
     list,
     pagination: normalizePagination(result.pagination, list.length)
+  }
+}
+
+export async function getOrderDetail(merchantId: string, orderId: string): Promise<OrderDetail | null> {
+  const result = await callAdminFunction<OrderDetailResponse>('getMerchantOrderDetail', {
+    action: 'getOrderDetail',
+    merchant_id: merchantId,
+    order_id: orderId
+  })
+
+  if (!result.order) {
+    return null
+  }
+
+  return {
+    order: normalizeOrderDetail(result.order),
+    items: Array.isArray(result.items) ? result.items.map(normalizeOrderDetailItem) : []
   }
 }
