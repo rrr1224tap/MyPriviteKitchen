@@ -56,6 +56,14 @@ export interface CreateDishPayload {
   image_url?: string
 }
 
+export interface UpdateDishPayload {
+  name: string
+  category_id: string
+  price: number
+  description?: string
+  image_url?: string
+}
+
 function toText(value: unknown, fallback = '') {
   if (value === null || value === undefined) {
     return fallback
@@ -141,6 +149,17 @@ export async function createDish(merchantId: string, payload: CreateDishPayload)
   const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', {
     action: 'createDish',
     merchant_id: merchantId,
+    ...payload
+  })
+
+  return result.dish ? normalizeDish(result.dish) : null
+}
+
+export async function updateDish(merchantId: string, dishId: string, payload: UpdateDishPayload) {
+  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', {
+    action: 'updateDish',
+    merchant_id: merchantId,
+    dish_id: dishId,
     ...payload
   })
 

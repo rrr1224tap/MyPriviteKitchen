@@ -1,5 +1,5 @@
-const VALID_ACTIONS = ['list', 'listDishes', 'create', 'createDish', 'update', 'onSale', 'offSale', 'sort']
-const WEB_ALLOWED_ACTIONS = ['listDishes', 'createDish']
+const VALID_ACTIONS = ['list', 'listDishes', 'create', 'createDish', 'update', 'updateDish', 'onSale', 'offSale', 'sort']
+const WEB_ALLOWED_ACTIONS = ['listDishes', 'createDish', 'updateDish']
 const VALID_DISH_STATUSES = ['on_sale', 'off_sale']
 const VALID_TUTORIAL_PLATFORMS = ['douyin', 'xiaohongshu', 'bilibili', 'other']
 const MAX_TUTORIAL_COUNT = 3
@@ -138,7 +138,7 @@ function normalizePriceYuanToCent(value) {
   return Math.round(numberValue * 100)
 }
 
-function normalizeWebDishCreateData(event = {}) {
+function normalizeWebDishBasicData(event = {}) {
   const data = {}
 
   if (getPayloadValue(event, 'name') !== undefined) {
@@ -168,6 +168,14 @@ function normalizeWebDishCreateData(event = {}) {
   }
 
   return data
+}
+
+function normalizeWebDishCreateData(event = {}) {
+  return normalizeWebDishBasicData(event)
+}
+
+function normalizeWebDishUpdateData(event = {}) {
+  return normalizeWebDishBasicData(event)
 }
 
 function normalizeTags(value) {
@@ -699,6 +707,17 @@ function buildWebDishCreateData(merchantId, data, now, dishId, sortOrder) {
   }
 }
 
+function buildWebDishUpdateData(data, now) {
+  return {
+    category_id: normalizeString(data.category_id),
+    name: normalizeString(data.name),
+    description: normalizeString(data.description),
+    image_url: normalizeString(data.image_url),
+    price_cent: normalizePriceCent(data.price_cent),
+    updated_at: now
+  }
+}
+
 function applyDishUpdateData(updateData, data) {
   if (data.category_id !== undefined) {
     updateData.category_id = normalizeString(data.category_id)
@@ -1003,6 +1022,67 @@ async function handleWebCreate(deps, merchantId, data) {
   }
 }
 
+async function handleWebUpdate(deps, merchantId, dishId, data) {
+  if (!dishId) {
+    return failure('INVALID_PARAMS', '餐品 ID 不能为空')
+  }
+
+  const validationError = validateDishData(data, {
+    requireCategory: true,
+    requireName: true,
+    requirePrice: true
+  })
+  if (validationError) {
+    return validationError
+  }
+
+  let dishResult
+  try {
+    dishResult = await assertDishBelongsToMerchant(deps, dishId, merchantId)
+  } catch (error) {
+    deps.logger.error('manageDish web update query database error', error)
+    return failure('DATABASE_ERROR', '查询餐品失败，请稍后重试')
+  }
+
+  if (dishResult.error) {
+    return dishResult.error
+  }
+
+  let categoryResult
+  try {
+    categoryResult = await assertCategoryBelongsToMerchant(
+      deps,
+      normalizeString(data.category_id),
+      merchantId
+    )
+  } catch (error) {
+    deps.logger.error('manageDish web update category query error', error)
+    return failure('DATABASE_ERROR', '查询分类失败，请稍后重试')
+  }
+
+  if (categoryResult.error) {
+    return categoryResult.error
+  }
+
+  const updateData = buildWebDishUpdateData(data, deps.now())
+
+  try {
+    const updatedDish = await deps.updateDish({
+      dish_id: dishResult.dish.dish_id || dishId,
+      updateData
+    })
+    return success('编辑餐品成功', {
+      dish: formatDish({
+        ...dishResult.dish,
+        ...(updatedDish || updateData)
+      })
+    })
+  } catch (error) {
+    deps.logger.error('manageDish web update database error', error)
+    return failure('DATABASE_ERROR', '编辑餐品失败，请稍后重试')
+  }
+}
+
 async function handleUpdate(deps, merchantId, dishId, data) {
   if (!dishId) {
     return failure('INVALID_PARAMS', '餐品 ID 不能为空')
@@ -1225,7 +1305,16 @@ function createManageDishHandler(dependencies) {
           return handleWebCreate(deps, merchantId, normalizeWebDishCreateData(normalizedEvent))
         }
 
-        return failure('FORBIDDEN', 'Web 后台当前仅开放餐品列表读取和新增餐品')
+        if (action === 'updateDish') {
+          return handleWebUpdate(
+            deps,
+            merchantId,
+            dishId,
+            normalizeWebDishUpdateData(normalizedEvent)
+          )
+        }
+
+        return failure('FORBIDDEN', 'Web 后台当前仅开放餐品列表读取、新增餐品和编辑餐品基础信息')
       }
 
       if (!openid) {

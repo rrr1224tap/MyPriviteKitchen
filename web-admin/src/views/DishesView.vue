@@ -8,7 +8,7 @@ import PageHeader from '../components/PageHeader.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { fetchCategories, type CategoryListItem } from '../services/categories'
-import { createDish, fetchDishes, type DishListItem, type DishStatus } from '../services/dishes'
+import { createDish, fetchDishes, updateDish, type DishListItem, type DishStatus } from '../services/dishes'
 import type { AdminApiError } from '../types/api'
 
 const route = useRoute()
@@ -28,6 +28,18 @@ const isCreating = ref(false)
 const createErrorMessage = ref('')
 const createSuccessMessage = ref('')
 const createForm = ref({
+  name: '',
+  category_id: '',
+  price: '',
+  description: '',
+  image_url: ''
+})
+const isEditFormOpen = ref(false)
+const isUpdating = ref(false)
+const editErrorMessage = ref('')
+const editSuccessMessage = ref('')
+const editingDish = ref<DishListItem | null>(null)
+const editForm = ref({
   name: '',
   category_id: '',
   price: '',
@@ -74,7 +86,12 @@ function getDishTone(status: DishStatus) {
 }
 
 function showPendingTip() {
-  window.alert('编辑、删除、上下架、做法参考和食材配置会在后续版本接入，本阶段只开放新增餐品基础信息。')
+  window.alert('上下架、删除、做法参考和食材配置会在后续版本接入，本阶段只开放新增和编辑餐品基础信息。')
+}
+
+function formatPriceInput(priceCent: number) {
+  const yuan = priceCent / 100
+  return Number.isInteger(yuan) ? String(yuan) : String(Number(yuan.toFixed(2)))
 }
 
 function resetCreateForm() {
@@ -102,6 +119,42 @@ function closeCreateForm() {
 
   isCreateFormOpen.value = false
   resetCreateForm()
+}
+
+function resetEditForm() {
+  editForm.value = {
+    name: '',
+    category_id: '',
+    price: '',
+    description: '',
+    image_url: ''
+  }
+  editErrorMessage.value = ''
+  editingDish.value = null
+}
+
+async function openEditForm(item: DishListItem) {
+  editSuccessMessage.value = ''
+  if (!categories.value.length) {
+    await loadCategories()
+  }
+  editingDish.value = item
+  editForm.value = {
+    name: item.name,
+    category_id: item.category_id,
+    price: formatPriceInput(item.price_cent),
+    description: item.description || '',
+    image_url: item.image_url || ''
+  }
+  editErrorMessage.value = ''
+  isEditFormOpen.value = true
+}
+
+function closeEditForm() {
+  if (isUpdating.value) return
+
+  isEditFormOpen.value = false
+  resetEditForm()
 }
 
 function validateCreateForm() {
@@ -142,6 +195,44 @@ function validateCreateForm() {
   }
 }
 
+function validateEditForm() {
+  const name = editForm.value.name.trim()
+  if (!name) {
+    return {
+      error: '餐品名称不能为空'
+    }
+  }
+
+  if (!editForm.value.category_id) {
+    return {
+      error: '请选择所属分类'
+    }
+  }
+
+  if (!editForm.value.price.trim()) {
+    return {
+      error: '价格不能为空'
+    }
+  }
+
+  const price = Number(editForm.value.price)
+  if (!Number.isFinite(price) || price < 0) {
+    return {
+      error: '价格必须是大于等于 0 的数字'
+    }
+  }
+
+  return {
+    payload: {
+      name,
+      category_id: editForm.value.category_id,
+      price,
+      description: editForm.value.description.trim(),
+      image_url: editForm.value.image_url.trim()
+    }
+  }
+}
+
 async function submitCreateDish() {
   if (isCreating.value) return
 
@@ -165,6 +256,32 @@ async function submitCreateDish() {
     createErrorMessage.value = adminError.message || '餐品新增失败，请稍后重试'
   } finally {
     isCreating.value = false
+  }
+}
+
+async function submitUpdateDish() {
+  if (isUpdating.value || !editingDish.value) return
+
+  editErrorMessage.value = ''
+  editSuccessMessage.value = ''
+  const validation = validateEditForm()
+  if (validation.error || !validation.payload) {
+    editErrorMessage.value = validation.error || '请检查餐品表单'
+    return
+  }
+
+  isUpdating.value = true
+  try {
+    await updateDish(merchantId.value, editingDish.value.dish_id, validation.payload)
+    await loadDishes()
+    editSuccessMessage.value = '餐品已更新，列表已刷新'
+    isEditFormOpen.value = false
+    resetEditForm()
+  } catch (error) {
+    const adminError = error as Partial<AdminApiError>
+    editErrorMessage.value = adminError.message || '餐品编辑失败，请稍后重试'
+  } finally {
+    isUpdating.value = false
   }
 }
 
@@ -220,7 +337,7 @@ watch(merchantId, loadPageData)
     <PageHeader
       eyebrow="Dishes"
       title="餐品管理"
-      :description="`当前商户：${merchantId}。餐品列表和新增餐品基础信息已接入真实云函数；编辑、上下架、删除、做法参考和食材配置仍为后续接入。`"
+      :description="`当前商户：${merchantId}。餐品列表、新增和编辑餐品基础信息已接入真实云函数；上下架、删除、做法参考和食材配置仍为后续接入。`"
     >
       <template #actions>
         <ActionButton variant="ghost" :disabled="isLoading" @click="loadPageData">刷新</ActionButton>
@@ -240,6 +357,15 @@ watch(merchantId, loadPageData)
         <div>
           <h2>餐品已新增</h2>
           <p>{{ createSuccessMessage }}</p>
+        </div>
+      </div>
+    </GlassCard>
+
+    <GlassCard v-if="editSuccessMessage">
+      <div class="section-heading compact-section-heading">
+        <div>
+          <h2>餐品已更新</h2>
+          <p>{{ editSuccessMessage }}</p>
         </div>
       </div>
     </GlassCard>
@@ -317,6 +443,79 @@ watch(merchantId, loadPageData)
       </form>
     </GlassCard>
 
+    <GlassCard v-if="isEditFormOpen">
+      <div class="section-heading">
+        <div>
+          <h2>编辑餐品基础信息</h2>
+          <p>只更新餐品名称、所属分类、价格、描述和图片地址。</p>
+        </div>
+        <ActionButton variant="ghost" :disabled="isUpdating" @click="closeEditForm">收起</ActionButton>
+      </div>
+
+      <form class="admin-form" @submit.prevent="submitUpdateDish">
+        <label class="form-field">
+          <span>餐品名称 <b>*</b></span>
+          <input
+            v-model="editForm.name"
+            autocomplete="off"
+            placeholder="例如 番茄炒蛋"
+            :disabled="isUpdating"
+          />
+        </label>
+
+        <label class="form-field">
+          <span>所属分类 <b>*</b></span>
+          <select v-model="editForm.category_id" :disabled="isUpdating || isCategoryLoading">
+            <option value="">请选择分类</option>
+            <option v-for="item in activeCategories" :key="item.category_id" :value="item.category_id">
+              {{ item.name || item.category_id }}
+            </option>
+          </select>
+        </label>
+
+        <label class="form-field">
+          <span>价格 <b>*</b></span>
+          <input
+            v-model="editForm.price"
+            inputmode="decimal"
+            autocomplete="off"
+            placeholder="例如 18"
+            :disabled="isUpdating"
+          />
+        </label>
+
+        <label class="form-field">
+          <span>图片地址</span>
+          <input
+            v-model="editForm.image_url"
+            autocomplete="off"
+            placeholder="https://example.com/dish.jpg"
+            :disabled="isUpdating"
+          />
+        </label>
+
+        <label class="form-field form-field--wide">
+          <span>描述</span>
+          <textarea
+            v-model="editForm.description"
+            rows="3"
+            placeholder="例如 家常下饭菜"
+            :disabled="isUpdating"
+          />
+        </label>
+
+        <p v-if="categoryErrorMessage" class="form-error">{{ categoryErrorMessage }}</p>
+        <p v-if="editErrorMessage" class="form-error">{{ editErrorMessage }}</p>
+
+        <div class="form-actions">
+          <button class="ghost-button" type="button" :disabled="isUpdating" @click="closeEditForm">取消</button>
+          <button class="primary-button" type="submit" :disabled="isUpdating || isCategoryLoading">
+            {{ isUpdating ? '正在保存...' : '保存修改' }}
+          </button>
+        </div>
+      </form>
+    </GlassCard>
+
     <section class="content-grid">
       <GlassCard>
         <div class="section-heading">
@@ -367,7 +566,7 @@ watch(merchantId, loadPageData)
             <span>{{ item.tutorials.length }} 条</span>
             <span>{{ item.ingredients.length }} 项</span>
             <span class="table-action-group">
-              <ActionButton variant="ghost" @click="showPendingTip">编辑</ActionButton>
+              <ActionButton variant="ghost" @click="openEditForm(item)">编辑</ActionButton>
               <ActionButton variant="ghost" @click="showPendingTip">上下架</ActionButton>
               <ActionButton variant="danger" @click="showPendingTip">删除</ActionButton>
             </span>
@@ -379,14 +578,14 @@ watch(merchantId, loadPageData)
         <div class="section-heading">
           <div>
             <h2>后续接入范围</h2>
-            <p>编辑、删除、上下架、做法参考和食材配置仍为后续接入。</p>
+            <p>上下架、删除、做法参考和食材配置仍为后续接入。</p>
           </div>
-          <StatusBadge label="基础新增" tone="orange" />
+          <StatusBadge label="基础信息" tone="orange" />
         </div>
         <div class="form-preview">
           <div class="form-preview__group">
             <strong>已接入</strong>
-            <span>餐品名称、分类、价格、描述、图片地址</span>
+            <span>新增 / 编辑餐品名称、分类、价格、描述、图片地址</span>
           </div>
           <div class="form-preview__group">
             <strong>规格配置</strong>
