@@ -8,7 +8,14 @@ import PageHeader from '../components/PageHeader.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { fetchCategories, type CategoryListItem } from '../services/categories'
-import { createDish, fetchDishes, updateDish, type DishListItem, type DishStatus } from '../services/dishes'
+import {
+  createDish,
+  fetchDishes,
+  updateDish,
+  updateDishStatus,
+  type DishListItem,
+  type DishStatus
+} from '../services/dishes'
 import type { AdminApiError } from '../types/api'
 
 const route = useRoute()
@@ -46,6 +53,9 @@ const editForm = ref({
   description: '',
   image_url: ''
 })
+const statusActionDishId = ref('')
+const statusSuccessMessage = ref('')
+const statusErrorMessage = ref('')
 
 function getRouteMerchantId() {
   const value = route.params.merchantId
@@ -86,7 +96,7 @@ function getDishTone(status: DishStatus) {
 }
 
 function showPendingTip() {
-  window.alert('上下架、删除、做法参考和食材配置会在后续版本接入，本阶段只开放新增和编辑餐品基础信息。')
+  window.alert('删除、做法参考和食材配置会在后续版本接入，本阶段不执行真实删除。')
 }
 
 function formatPriceInput(priceCent: number) {
@@ -285,6 +295,44 @@ async function submitUpdateDish() {
   }
 }
 
+function getStatusActionLabel(item: DishListItem) {
+  return item.status === 'on_sale' ? '下架' : '上架'
+}
+
+function getStatusActionLoadingLabel(item: DishListItem) {
+  return item.status === 'on_sale' ? '下架中...' : '上架中...'
+}
+
+async function toggleDishStatus(item: DishListItem) {
+  if (statusActionDishId.value) return
+
+  const isOnSale = item.status === 'on_sale'
+  const nextStatus = isOnSale ? 'off_sale' : 'on_sale'
+  const confirmMessage = isOnSale
+    ? '确认下架该餐品吗？下架后用户端将不再展示或不可点选，具体以小程序现有逻辑为准。'
+    : '确认上架该餐品吗？'
+
+  if (!window.confirm(confirmMessage)) {
+    return
+  }
+
+  statusActionDishId.value = item.dish_id
+  statusSuccessMessage.value = ''
+  statusErrorMessage.value = ''
+  try {
+    await updateDishStatus(merchantId.value, item.dish_id, nextStatus)
+    await loadDishes()
+    statusSuccessMessage.value = nextStatus === 'on_sale'
+      ? '餐品已上架，列表已刷新'
+      : '餐品已下架，列表已刷新'
+  } catch (error) {
+    const adminError = error as Partial<AdminApiError>
+    statusErrorMessage.value = adminError.message || '餐品状态更新失败，请稍后重试'
+  } finally {
+    statusActionDishId.value = ''
+  }
+}
+
 async function loadDishes() {
   isLoading.value = true
   errorMessage.value = ''
@@ -337,7 +385,7 @@ watch(merchantId, loadPageData)
     <PageHeader
       eyebrow="Dishes"
       title="餐品管理"
-      :description="`当前商户：${merchantId}。餐品列表、新增和编辑餐品基础信息已接入真实云函数；上下架、删除、做法参考和食材配置仍为后续接入。`"
+      :description="`当前商户：${merchantId}。餐品列表、新增、编辑和上下架已接入真实云函数；删除、做法参考和食材配置仍为后续接入。`"
     >
       <template #actions>
         <ActionButton variant="ghost" :disabled="isLoading" @click="loadPageData">刷新</ActionButton>
@@ -366,6 +414,24 @@ watch(merchantId, loadPageData)
         <div>
           <h2>餐品已更新</h2>
           <p>{{ editSuccessMessage }}</p>
+        </div>
+      </div>
+    </GlassCard>
+
+    <GlassCard v-if="statusSuccessMessage">
+      <div class="section-heading compact-section-heading">
+        <div>
+          <h2>餐品状态已更新</h2>
+          <p>{{ statusSuccessMessage }}</p>
+        </div>
+      </div>
+    </GlassCard>
+
+    <GlassCard v-if="statusErrorMessage">
+      <div class="inline-error">
+        <div>
+          <strong>餐品状态更新失败</strong>
+          <span>{{ statusErrorMessage }}</span>
         </div>
       </div>
     </GlassCard>
@@ -521,7 +587,7 @@ watch(merchantId, loadPageData)
         <div class="section-heading">
           <div>
             <h2>餐品列表</h2>
-            <p>数据来自 manageDish.listDishes，新增成功后会自动刷新。</p>
+            <p>数据来自 manageDish.listDishes，新增、编辑和上下架成功后会自动刷新。</p>
           </div>
           <StatusBadge label="真实数据" tone="green" />
         </div>
@@ -567,7 +633,13 @@ watch(merchantId, loadPageData)
             <span>{{ item.ingredients.length }} 项</span>
             <span class="table-action-group">
               <ActionButton variant="ghost" @click="openEditForm(item)">编辑</ActionButton>
-              <ActionButton variant="ghost" @click="showPendingTip">上下架</ActionButton>
+              <ActionButton
+                :variant="item.status === 'on_sale' ? 'danger' : 'ghost'"
+                :disabled="Boolean(statusActionDishId)"
+                @click="toggleDishStatus(item)"
+              >
+                {{ statusActionDishId === item.dish_id ? getStatusActionLoadingLabel(item) : getStatusActionLabel(item) }}
+              </ActionButton>
               <ActionButton variant="danger" @click="showPendingTip">删除</ActionButton>
             </span>
           </div>
@@ -578,14 +650,14 @@ watch(merchantId, loadPageData)
         <div class="section-heading">
           <div>
             <h2>后续接入范围</h2>
-            <p>上下架、删除、做法参考和食材配置仍为后续接入。</p>
+            <p>删除、做法参考和食材配置仍为后续接入。</p>
           </div>
           <StatusBadge label="基础信息" tone="orange" />
         </div>
         <div class="form-preview">
           <div class="form-preview__group">
             <strong>已接入</strong>
-            <span>新增 / 编辑餐品名称、分类、价格、描述、图片地址</span>
+            <span>新增 / 编辑基础信息，上架 / 下架状态切换</span>
           </div>
           <div class="form-preview__group">
             <strong>规格配置</strong>

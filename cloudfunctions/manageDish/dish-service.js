@@ -1,5 +1,5 @@
-const VALID_ACTIONS = ['list', 'listDishes', 'create', 'createDish', 'update', 'updateDish', 'onSale', 'offSale', 'sort']
-const WEB_ALLOWED_ACTIONS = ['listDishes', 'createDish', 'updateDish']
+const VALID_ACTIONS = ['list', 'listDishes', 'create', 'createDish', 'update', 'updateDish', 'updateDishStatus', 'onSale', 'offSale', 'sort']
+const WEB_ALLOWED_ACTIONS = ['listDishes', 'createDish', 'updateDish', 'updateDishStatus']
 const VALID_DISH_STATUSES = ['on_sale', 'off_sale']
 const VALID_TUTORIAL_PLATFORMS = ['douyin', 'xiaohongshu', 'bilibili', 'other']
 const MAX_TUTORIAL_COUNT = 3
@@ -176,6 +176,13 @@ function normalizeWebDishCreateData(event = {}) {
 
 function normalizeWebDishUpdateData(event = {}) {
   return normalizeWebDishBasicData(event)
+}
+
+function normalizeWebDishStatusData(event = {}) {
+  const status = getPayloadValue(event, 'status')
+  return {
+    status: status === undefined ? undefined : status
+  }
 }
 
 function normalizeTags(value) {
@@ -1083,6 +1090,23 @@ async function handleWebUpdate(deps, merchantId, dishId, data) {
   }
 }
 
+async function handleWebStatusUpdate(deps, merchantId, dishId, data) {
+  if (!dishId) {
+    return failure('INVALID_PARAMS', '餐品 ID 不能为空')
+  }
+
+  const status = normalizeString(data.status)
+  if (!status) {
+    return failure('VALIDATION_ERROR', '餐品状态不能为空')
+  }
+
+  if (!VALID_DISH_STATUSES.includes(status)) {
+    return failure('VALIDATION_ERROR', '餐品状态不合法')
+  }
+
+  return handleStatusUpdate(deps, merchantId, dishId, status)
+}
+
 async function handleUpdate(deps, merchantId, dishId, data) {
   if (!dishId) {
     return failure('INVALID_PARAMS', '餐品 ID 不能为空')
@@ -1314,7 +1338,16 @@ function createManageDishHandler(dependencies) {
           )
         }
 
-        return failure('FORBIDDEN', 'Web 后台当前仅开放餐品列表读取、新增餐品和编辑餐品基础信息')
+        if (action === 'updateDishStatus') {
+          return handleWebStatusUpdate(
+            deps,
+            merchantId,
+            dishId,
+            normalizeWebDishStatusData(normalizedEvent)
+          )
+        }
+
+        return failure('FORBIDDEN', 'Web 后台当前仅开放餐品列表读取、新增餐品、编辑餐品基础信息和上下架')
       }
 
       if (!openid) {

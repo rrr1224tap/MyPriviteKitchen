@@ -64,6 +64,8 @@ export interface UpdateDishPayload {
   image_url?: string
 }
 
+export type UpdateDishStatusValue = 'on_sale' | 'off_sale'
+
 function toText(value: unknown, fallback = '') {
   if (value === null || value === undefined) {
     return fallback
@@ -161,6 +163,21 @@ export async function updateDish(merchantId: string, dishId: string, payload: Up
     merchant_id: merchantId,
     dish_id: dishId,
     ...payload
+  })
+
+  return result.dish ? normalizeDish(result.dish) : null
+}
+
+export async function updateDishStatus(
+  merchantId: string,
+  dishId: string,
+  status: UpdateDishStatusValue
+) {
+  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', {
+    action: 'updateDishStatus',
+    merchant_id: merchantId,
+    dish_id: dishId,
+    status
   })
 
   return result.dish ? normalizeDish(result.dish) : null

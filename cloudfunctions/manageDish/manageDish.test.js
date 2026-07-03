@@ -1445,6 +1445,377 @@ test('web update dish cannot override system or advanced fields', async () => {
   ])
 })
 
+test('web valid admin token can off sale dish status', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'updateDishStatus',
+    merchant_id: 'merchant_001',
+    dish_id: 'dish_001',
+    status: 'off_sale',
+    admin_token: createWebToken()
+  })
+
+  const updatedDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.data.dish.status, 'off_sale')
+  assert.equal(updatedDish.status, 'off_sale')
+  assert.equal(updatedDish.updated_at, FIXED_NOW)
+  assert.equal(state.writes, 1)
+})
+
+test('web valid admin token can on sale dish status', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'updateDishStatus',
+    merchant_id: 'merchant_001',
+    dish_id: 'dish_002',
+    status: 'on_sale',
+    admin_token: createWebToken()
+  })
+
+  const updatedDish = state.dishes.find((dish) => dish.dish_id === 'dish_002')
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.data.dish.status, 'on_sale')
+  assert.equal(updatedDish.status, 'on_sale')
+  assert.equal(updatedDish.updated_at, FIXED_NOW)
+  assert.equal(state.writes, 1)
+})
+
+test('index entry accepts web updateDishStatus action', async () => {
+  const previousSecret = process.env.WEB_ADMIN_TOKEN_SECRET
+  process.env.WEB_ADMIN_TOKEN_SECRET = 'manage-dish-test-secret'
+  const { state, cloud } = createIndexCloudMock()
+  const handler = loadManageDishIndexWithCloudMock(cloud)
+
+  try {
+    const result = await handler({
+      action: 'updateDishStatus',
+      merchant_id: 'merchant_001',
+      dish_id: 'dish_001',
+      status: 'off_sale',
+      admin_token: createWebToken({ now: new Date() })
+    })
+
+    const updatedDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+    assert.equal(result.success, true)
+    assert.equal(result.code, 'SUCCESS')
+    assert.equal(updatedDish.status, 'off_sale')
+  } finally {
+    process.env.WEB_ADMIN_TOKEN_SECRET = previousSecret
+  }
+})
+
+test('web invalid json body for updateDishStatus does not crash', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    body: '{"action":'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+  assert.equal(state.writes, 0)
+})
+
+test('web empty token cannot update dish status', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'updateDishStatus',
+    merchant_id: 'merchant_001',
+    dish_id: 'dish_001',
+    status: 'off_sale',
+    admin_token: ''
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.writes, 0)
+})
+
+test('web tampered token cannot update dish status', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'updateDishStatus',
+    merchant_id: 'merchant_001',
+    dish_id: 'dish_001',
+    status: 'off_sale',
+    admin_token: `${createWebToken()}x`
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.writes, 0)
+})
+
+test('web expired token cannot update dish status', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'updateDishStatus',
+    merchant_id: 'merchant_001',
+    dish_id: 'dish_001',
+    status: 'off_sale',
+    admin_token: createWebToken({
+      now: new Date('2026-06-24T10:00:00.000Z'),
+      ttlMinutes: 60
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'TOKEN_EXPIRED')
+  assert.equal(state.writes, 0)
+})
+
+test('web non super admin role cannot update dish status', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'updateDishStatus',
+    merchant_id: 'merchant_001',
+    dish_id: 'dish_001',
+    status: 'off_sale',
+    admin_token: createWebToken({
+      role: 'viewer'
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.writes, 0)
+})
+
+test('web http string body can update dish status', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    body: JSON.stringify({
+      action: 'updateDishStatus',
+      merchant_id: 'merchant_001',
+      dish_id: 'dish_001',
+      status: 'off_sale',
+      admin_token: createWebToken()
+    })
+  })
+
+  const updatedDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.equal(updatedDish.status, 'off_sale')
+})
+
+test('web http object body can update dish status', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    body: {
+      action: 'updateDishStatus',
+      merchant_id: 'merchant_001',
+      dish_id: 'dish_001',
+      status: 'off_sale',
+      admin_token: createWebToken()
+    }
+  })
+
+  const updatedDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.equal(updatedDish.status, 'off_sale')
+})
+
+test('web query string parameters can update dish status', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    queryStringParameters: {
+      action: 'updateDishStatus',
+      merchant_id: 'merchant_001',
+      dish_id: 'dish_001',
+      status: 'off_sale',
+      admin_token: createWebToken()
+    }
+  })
+
+  const updatedDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.equal(updatedDish.status, 'off_sale')
+})
+
+test('web update dish status validates required params and status', async () => {
+  const cases = [
+    {
+      title: 'missing merchant',
+      payload: { dish_id: 'dish_001', status: 'off_sale' },
+      expectedCode: 'INVALID_PARAMS'
+    },
+    {
+      title: 'missing dish',
+      payload: { merchant_id: 'merchant_001', status: 'off_sale' },
+      expectedCode: 'INVALID_PARAMS'
+    },
+    {
+      title: 'missing status',
+      payload: { merchant_id: 'merchant_001', dish_id: 'dish_001' },
+      expectedCode: 'VALIDATION_ERROR'
+    },
+    {
+      title: 'invalid status',
+      payload: { merchant_id: 'merchant_001', dish_id: 'dish_001', status: 'disabled' },
+      expectedCode: 'VALIDATION_ERROR'
+    }
+  ]
+
+  for (const item of cases) {
+    const { state, deps } = createDependencies({
+      openid: ''
+    })
+    const handler = createManageDishHandler(deps)
+
+    const result = await handler({
+      action: 'updateDishStatus',
+      admin_token: createWebToken(),
+      ...item.payload
+    })
+
+    assert.equal(result.success, false, item.title)
+    assert.equal(result.code, item.expectedCode, item.title)
+    assert.equal(state.writes, 0, item.title)
+  }
+})
+
+test('web update dish status validates existing dish ownership', async () => {
+  const cases = [
+    {
+      title: 'missing dish',
+      dish_id: 'missing_dish',
+      expectedCode: 'NOT_FOUND'
+    },
+    {
+      title: 'other merchant dish',
+      dish_id: 'dish_other',
+      expectedCode: 'FORBIDDEN'
+    }
+  ]
+
+  for (const item of cases) {
+    const { state, deps } = createDependencies({
+      openid: ''
+    })
+    const handler = createManageDishHandler(deps)
+
+    const result = await handler({
+      action: 'updateDishStatus',
+      merchant_id: 'merchant_001',
+      dish_id: item.dish_id,
+      status: 'off_sale',
+      admin_token: createWebToken()
+    })
+
+    assert.equal(result.success, false, item.title)
+    assert.equal(result.code, item.expectedCode, item.title)
+    assert.equal(state.writes, 0, item.title)
+  }
+})
+
+test('web update dish status only updates status and updated_at', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+  const originalDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+  const originalCreatedAt = new Date('2020-01-01T00:00:00.000Z')
+  originalDish.created_at = originalCreatedAt
+  originalDish.status = 'on_sale'
+  originalDish.name = 'Original Name'
+  originalDish.category_id = 'category_001'
+  originalDish.price_cent = 2990
+  originalDish.description = 'Original Description'
+  originalDish.image_url = 'https://example.com/original.jpg'
+  originalDish.tutorials = createValidTutorials(1)
+  originalDish.ingredients = createValidIngredients(1)
+  originalDish.spec_groups = createValidSpecGroups()
+  originalDish.addon_groups = createValidAddonGroups()
+
+  const result = await handler({
+    action: 'updateDishStatus',
+    merchant_id: 'merchant_001',
+    dish_id: 'dish_001',
+    status: 'off_sale',
+    name: 'Injected Name',
+    category_id: 'category_other',
+    price_cent: 1,
+    description: 'Injected Description',
+    image_url: 'https://example.com/injected.jpg',
+    created_at: new Date('2000-01-01T00:00:00.000Z'),
+    data: {
+      merchant_id: 'merchant_002',
+      dish_id: 'evil_dish',
+      name: 'Nested Name',
+      category_id: 'category_other',
+      price_cent: 2,
+      tutorials: [],
+      ingredients: [],
+      spec_groups: [],
+      addon_groups: []
+    },
+    admin_token: createWebToken()
+  })
+
+  const updatedDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.equal(updatedDish.merchant_id, 'merchant_001')
+  assert.equal(updatedDish.dish_id, 'dish_001')
+  assert.equal(updatedDish.status, 'off_sale')
+  assert.equal(updatedDish.updated_at, FIXED_NOW)
+  assert.equal(updatedDish.created_at, originalCreatedAt)
+  assert.equal(updatedDish.name, 'Original Name')
+  assert.equal(updatedDish.category_id, 'category_001')
+  assert.equal(updatedDish.price_cent, 2990)
+  assert.equal(updatedDish.description, 'Original Description')
+  assert.equal(updatedDish.image_url, 'https://example.com/original.jpg')
+  assert.deepEqual(updatedDish.tutorials, createValidTutorials(1))
+  assert.deepEqual(updatedDish.ingredients, createValidIngredients(1))
+  assert.deepEqual(updatedDish.spec_groups, createValidSpecGroups())
+  assert.deepEqual(updatedDish.addon_groups, createValidAddonGroups())
+  assert.deepEqual(Object.keys(state.updateCalls[0].updateData).sort(), [
+    'status',
+    'updated_at'
+  ])
+})
+
 test('web token cannot call unexposed dish write actions in this phase', async () => {
   const writeActions = ['create', 'update', 'onSale', 'offSale', 'sort']
 
