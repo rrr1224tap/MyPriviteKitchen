@@ -1,7 +1,9 @@
-const VALID_ACTIONS = ['list', 'create', 'update', 'onSale', 'offSale', 'sort']
+const VALID_ACTIONS = ['list', 'listDishes', 'create', 'update', 'onSale', 'offSale', 'sort']
+const WEB_ALLOWED_ACTIONS = ['listDishes']
 const VALID_DISH_STATUSES = ['on_sale', 'off_sale']
 const VALID_TUTORIAL_PLATFORMS = ['douyin', 'xiaohongshu', 'bilibili', 'other']
 const MAX_TUTORIAL_COUNT = 3
+const { verifyWebAdminToken } = require('./web-admin-token-helper')
 
 function success(message, data = {}) {
   return {
@@ -27,6 +29,50 @@ function normalizeString(value) {
 
 function normalizeData(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+}
+
+function parseJsonBody(body) {
+  if (!body) {
+    return {}
+  }
+
+  if (typeof body === 'object' && !Array.isArray(body)) {
+    return body
+  }
+
+  if (typeof body !== 'string') {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(body)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch (error) {
+    return {}
+  }
+}
+
+function normalizeEventPayload(event = {}) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) {
+    return {}
+  }
+
+  if (Object.prototype.hasOwnProperty.call(event, 'action') ||
+    Object.prototype.hasOwnProperty.call(event, 'admin_token')) {
+    return event
+  }
+
+  const bodyPayload = parseJsonBody(event.body)
+  if (Object.keys(bodyPayload).length > 0) {
+    return bodyPayload
+  }
+
+  const queryPayload = event.queryStringParameters
+  if (queryPayload && typeof queryPayload === 'object' && !Array.isArray(queryPayload)) {
+    return queryPayload
+  }
+
+  return {}
 }
 
 const DISH_DATA_FIELDS = [
@@ -457,7 +503,39 @@ function buildHandlerDependencies(dependencies) {
     createDish: dependencies.createDish,
     updateDish: dependencies.updateDish,
     updateDishSortList: dependencies.updateDishSortList,
+    getTokenSecret: dependencies.getTokenSecret,
     logger: dependencies.logger || console
+  }
+}
+
+function isWebAdminRequest(event = {}) {
+  return Boolean(event && Object.prototype.hasOwnProperty.call(event, 'admin_token'))
+}
+
+function assertWebAdmin(event, action, deps) {
+  const verifyResult = verifyWebAdminToken(event.admin_token, {
+    secret: deps.getTokenSecret ? deps.getTokenSecret() : process.env.WEB_ADMIN_TOKEN_SECRET,
+    now: deps.now()
+  })
+
+  if (!verifyResult.ok) {
+    return {
+      error: failure(
+        verifyResult.code,
+        verifyResult.code === 'TOKEN_EXPIRED' ? '登录状态已过期' : '登录状态无效或已过期'
+      )
+    }
+  }
+
+  if (!WEB_ALLOWED_ACTIONS.includes(action)) {
+    return {
+      error: failure('FORBIDDEN', 'Web 后台当前仅开放餐品列表读取')
+    }
+  }
+
+  return {
+    is_web_admin: true,
+    role: verifyResult.role
   }
 }
 
@@ -719,7 +797,8 @@ async function handleList(deps, merchantId, data) {
     .map(formatDish)
 
   return success('获取餐品列表成功', {
-    list
+    list,
+    total: list.length
   })
 }
 
@@ -979,15 +1058,12 @@ function createManageDishHandler(dependencies) {
 
   return async function manageDish(event = {}) {
     try {
+      const normalizedEvent = normalizeEventPayload(event)
       const openid = deps.getOpenid ? deps.getOpenid() : ''
-      if (!openid) {
-        return failure('UNAUTHORIZED', '无法获取用户身份')
-      }
-
-      const merchantId = normalizeString(event.merchant_id)
-      const action = normalizeString(event.action)
-      const dishId = normalizeString(event.dish_id)
-      const data = normalizeEventData(event)
+      const merchantId = normalizeString(normalizedEvent.merchant_id)
+      const action = normalizeString(normalizedEvent.action)
+      const dishId = normalizeString(normalizedEvent.dish_id)
+      const data = normalizeEventData(normalizedEvent)
 
       if (!merchantId || !action) {
         return failure('INVALID_PARAMS', '商家 ID 和操作类型不能为空')
@@ -995,6 +1071,19 @@ function createManageDishHandler(dependencies) {
 
       if (!VALID_ACTIONS.includes(action)) {
         return failure('INVALID_PARAMS', '餐品操作类型不合法')
+      }
+
+      if (isWebAdminRequest(normalizedEvent)) {
+        const webAdminResult = assertWebAdmin(normalizedEvent, action, deps)
+        if (webAdminResult.error) {
+          return webAdminResult.error
+        }
+
+        return handleList(deps, merchantId, data)
+      }
+
+      if (!openid) {
+        return failure('UNAUTHORIZED', '无法获取用户身份')
       }
 
       let staff
@@ -1012,7 +1101,7 @@ function createManageDishHandler(dependencies) {
         return failure('FORBIDDEN', '没有餐品管理权限')
       }
 
-      if (action === 'list') {
+      if (action === 'list' || action === 'listDishes') {
         return handleList(deps, merchantId, data)
       }
 

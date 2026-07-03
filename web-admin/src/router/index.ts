@@ -40,6 +40,11 @@ const router = createRouter({
           component: MerchantStaffView
         },
         {
+          path: 'merchants/:merchantId/dishes',
+          name: 'merchant-dishes',
+          component: DishesView
+        },
+        {
           path: 'dishes',
           name: 'dishes',
           component: DishesView

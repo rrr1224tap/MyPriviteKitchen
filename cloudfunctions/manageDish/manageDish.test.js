@@ -2,6 +2,11 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 
 const { createManageDishHandler } = require('./dish-service')
+const {
+  createSignedToken
+} = require('../webAdminAuth/web-admin-auth-service')
+
+const FIXED_NOW = new Date('2026-06-25T10:00:00.000Z')
 
 function createValidSpecGroups(overrides = {}) {
   return [
@@ -76,9 +81,11 @@ function createValidIngredients(count = 1, overrides = {}) {
 
 function createDependencies(options = {}) {
   const state = {
-    openid: options.openid || 'staff_openid',
-    now: options.now || new Date('2026-06-18T10:00:00.000Z'),
+    openid: options.openid === undefined ? 'staff_openid' : options.openid,
+    tokenSecret: options.tokenSecret === undefined ? 'manage-dish-test-secret' : options.tokenSecret,
+    now: options.now || FIXED_NOW,
     idIndex: 1,
+    writes: 0,
     updateCalls: [],
     merchantStaff: options.merchantStaff || [
       {
@@ -169,6 +176,7 @@ function createDependencies(options = {}) {
     state,
     deps: {
       getOpenid: () => state.openid,
+      getTokenSecret: () => state.tokenSecret,
       now: () => state.now,
       createDishId: () => `dish_new_${state.idIndex++}`,
       findMerchantStaff: async ({ merchant_id, openid }) => {
@@ -197,6 +205,7 @@ function createDependencies(options = {}) {
         return currentMax + 1
       },
       createDish: async (dish) => {
+        state.writes += 1
         const record = {
           _id: `doc_${dish.dish_id}`,
           ...dish
@@ -205,6 +214,7 @@ function createDependencies(options = {}) {
         return record
       },
       updateDish: async ({ dish_id, updateData }) => {
+        state.writes += 1
         state.updateCalls.push({
           dish_id,
           updateData
@@ -217,6 +227,7 @@ function createDependencies(options = {}) {
         return dish
       },
       updateDishSortList: async (items) => {
+        state.writes += 1
         items.forEach((item) => {
           const dish = state.dishes.find((record) => record.dish_id === item.dish_id)
           if (dish) {
@@ -231,6 +242,16 @@ function createDependencies(options = {}) {
       }
     }
   }
+}
+
+function createWebToken(options = {}) {
+  return createSignedToken({
+    role: options.role || 'super_admin',
+    secret: options.secret || 'manage-dish-test-secret',
+    now: options.now || FIXED_NOW,
+    ttlMinutes: options.ttlMinutes || 60,
+    nonce: options.nonce || 'manage-dish-test-nonce'
+  }).token
 }
 
 test('active merchant staff can list dishes for their merchant only', async () => {
@@ -256,6 +277,222 @@ test('active merchant staff can list dishes for their merchant only', async () =
   assert.deepEqual(result.data.list[0].tutorials, [])
   assert.deepEqual(result.data.list[0].ingredients, [])
   assert.equal(result.data.list[0].has_options, false)
+})
+
+test('web valid admin token can list dishes without openid', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'listDishes',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.deepEqual(result.data.list.map((dish) => dish.dish_id), [
+    'dish_001',
+    'dish_002'
+  ])
+  assert.equal(result.data.total, 2)
+  assert.equal(state.writes, 0)
+})
+
+test('web empty token cannot list dishes', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'listDishes',
+    merchant_id: 'merchant_001',
+    admin_token: ''
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.writes, 0)
+})
+
+test('web tampered token cannot list dishes', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'listDishes',
+    merchant_id: 'merchant_001',
+    admin_token: `${createWebToken()}x`
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.writes, 0)
+})
+
+test('web expired token cannot list dishes', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'listDishes',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken({
+      now: new Date('2026-06-24T10:00:00.000Z'),
+      ttlMinutes: 60
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'TOKEN_EXPIRED')
+  assert.equal(state.writes, 0)
+})
+
+test('web non super admin role cannot list dishes', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'listDishes',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken({
+      role: 'viewer'
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.writes, 0)
+})
+
+test('web admin token in http string body can list dishes', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    body: JSON.stringify({
+      action: 'listDishes',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 2)
+  assert.equal(state.writes, 0)
+})
+
+test('web admin token in http object body can list dishes', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    body: {
+      action: 'listDishes',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 2)
+  assert.equal(state.writes, 0)
+})
+
+test('web admin token in query string parameters can list dishes', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    queryStringParameters: {
+      action: 'listDishes',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 2)
+  assert.equal(state.writes, 0)
+})
+
+test('invalid http body json does not crash', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    body: '{"action":'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+  assert.equal(state.writes, 0)
+})
+
+test('web list dishes requires merchant_id', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'listDishes',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+  assert.equal(state.writes, 0)
+})
+
+test('web token cannot call write dish actions in this phase', async () => {
+  const writeActions = ['create', 'update', 'onSale', 'offSale', 'sort']
+
+  for (const action of writeActions) {
+    const { state, deps } = createDependencies({
+      openid: ''
+    })
+    const handler = createManageDishHandler(deps)
+
+    const result = await handler({
+      action,
+      merchant_id: 'merchant_001',
+      dish_id: 'dish_001',
+      data: {
+        category_id: 'category_001',
+        name: 'Blocked',
+        price_cent: 1990,
+        dishes: [
+          {
+            dish_id: 'dish_001',
+            sort_order: 9
+          }
+        ]
+      },
+      admin_token: createWebToken()
+    })
+
+    assert.equal(result.success, false)
+    assert.equal(result.code, 'FORBIDDEN')
+    assert.equal(state.writes, 0)
+  }
 })
 
 test('user without active merchant staff permission cannot manage dishes', async () => {

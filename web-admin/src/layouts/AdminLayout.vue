@@ -1,22 +1,46 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { logoutWebAdmin } from '../services/auth'
 
 const route = useRoute()
 const router = useRouter()
+const MERCHANT_CONTEXT_KEY = 'xiaochu_current_merchant_id'
+const FALLBACK_MERCHANT_ID = 'xiaochu'
 
-const navItems = [
+function getRouteMerchantId() {
+  const value = route.params.merchantId
+  return Array.isArray(value) ? value[0] || '' : String(value || '')
+}
+
+function getStoredMerchantId() {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  return window.localStorage.getItem(MERCHANT_CONTEXT_KEY) || ''
+}
+
+const currentMerchantId = computed(() => getRouteMerchantId() || getStoredMerchantId() || FALLBACK_MERCHANT_ID)
+
+watchEffect(() => {
+  const routeMerchantId = getRouteMerchantId()
+  if (routeMerchantId && typeof window !== 'undefined') {
+    window.localStorage.setItem(MERCHANT_CONTEXT_KEY, routeMerchantId)
+  }
+})
+
+const navItems = computed(() => [
   { label: '概览', path: '/', key: 'dashboard', icon: '总' },
   { label: '商户管理', path: '/merchants', key: 'merchants', icon: '商' },
-  { label: '成员邀请', path: '/merchants/xiaochu/staff', key: 'staff', icon: '员' },
-  { label: '餐品管理', path: '/dishes', key: 'dishes', icon: '餐' },
+  { label: '成员邀请', path: `/merchants/${currentMerchantId.value}/staff`, key: 'staff', icon: '员' },
+  { label: '餐品管理', path: `/merchants/${currentMerchantId.value}/dishes`, key: 'dishes', icon: '餐' },
   { label: '分类管理', path: '/categories', key: 'categories', icon: '类' },
   { label: '订单管理', path: '/orders', key: 'orders', icon: '单' },
   { label: '今日备料', path: '/prep-summary', key: 'prep-summary', icon: '备' },
   { label: '数据检查', path: '/data-health', key: 'data-health', icon: '检' },
   { label: '系统设置', path: '/settings', key: 'settings', icon: '设' }
-]
+])
 
 const activePath = computed(() => route.path)
 

@@ -683,6 +683,18 @@ button {
     minmax(170px, 0.95fr);
 }
 
+.dish-table__row {
+  grid-template-columns:
+    minmax(180px, 1.25fr)
+    minmax(110px, 0.75fr)
+    minmax(86px, 0.55fr)
+    minmax(90px, 0.55fr)
+    minmax(70px, 0.45fr)
+    minmax(92px, 0.58fr)
+    minmax(82px, 0.52fr)
+    minmax(210px, 1.25fr);
+}
+
 .invite-create-card {
   border-color: rgba(255, 255, 255, 0.94);
 }
