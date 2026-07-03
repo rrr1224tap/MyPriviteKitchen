@@ -703,14 +703,98 @@ button {
 
 .dish-table__row {
   grid-template-columns:
-    minmax(180px, 1.25fr)
+    minmax(220px, 1.35fr)
     minmax(110px, 0.75fr)
     minmax(86px, 0.55fr)
     minmax(90px, 0.55fr)
     minmax(70px, 0.45fr)
     minmax(92px, 0.58fr)
     minmax(82px, 0.52fr)
-    minmax(210px, 1.25fr);
+    minmax(280px, 1.55fr);
+}
+
+.dish-info-cell {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dish-title {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 950;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dish-desc {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.tutorial-editor {
+  display: grid;
+  gap: 18px;
+}
+
+.tutorial-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.tutorial-editor__empty {
+  padding: 18px;
+  border: 1px dashed rgba(126, 90, 45, 0.18);
+  border-radius: 20px;
+  color: var(--color-muted);
+  background: rgba(255, 255, 255, 0.5);
+  font-weight: 850;
+  text-align: center;
+}
+
+.tutorial-editor__list {
+  display: grid;
+  gap: 16px;
+}
+
+.tutorial-editor__item {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(126, 90, 45, 0.1);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.tutorial-editor__item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tutorial-editor__item-head strong {
+  color: var(--color-text);
+  font-weight: 950;
+}
+
+.tutorial-editor__grid {
+  gap: 14px;
+}
+
+.compact-button {
+  min-height: 34px;
+  padding: 0 14px;
 }
 
 .invite-create-card {

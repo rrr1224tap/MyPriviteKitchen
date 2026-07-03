@@ -13,14 +13,24 @@ import {
   fetchDishes,
   updateDish,
   updateDishStatus,
+  updateDishTutorials,
   type DishListItem,
-  type DishStatus
+  type DishStatus,
+  type DishTutorial,
+  type DishTutorialPlatform
 } from '../services/dishes'
 import type { AdminApiError } from '../types/api'
 
 const route = useRoute()
 const MERCHANT_CONTEXT_KEY = 'xiaochu_current_merchant_id'
 const FALLBACK_MERCHANT_ID = 'xiaochu'
+const MAX_TUTORIAL_COUNT = 3
+const tutorialPlatformOptions: Array<{ value: DishTutorialPlatform; label: string }> = [
+  { value: 'douyin', label: '抖音' },
+  { value: 'xiaohongshu', label: '小红书' },
+  { value: 'bilibili', label: 'Bilibili' },
+  { value: 'other', label: '其它' }
+]
 
 const dishes = ref<DishListItem[]>([])
 const categories = ref<CategoryListItem[]>([])
@@ -56,6 +66,12 @@ const editForm = ref({
 const statusActionDishId = ref('')
 const statusSuccessMessage = ref('')
 const statusErrorMessage = ref('')
+const isTutorialFormOpen = ref(false)
+const isSavingTutorials = ref(false)
+const tutorialErrorMessage = ref('')
+const tutorialSuccessMessage = ref('')
+const tutorialDish = ref<DishListItem | null>(null)
+const tutorialForm = ref<DishTutorial[]>([])
 
 function getRouteMerchantId() {
   const value = route.params.merchantId
@@ -96,7 +112,70 @@ function getDishTone(status: DishStatus) {
 }
 
 function showPendingTip() {
-  window.alert('删除、做法参考和食材配置会在后续版本接入，本阶段不执行真实删除。')
+  window.alert('删除、食材配置和规格加料会在后续版本接入，本阶段不执行这些真实写入。')
+}
+
+function createEmptyTutorial(index: number): DishTutorial {
+  return {
+    title: '',
+    platform: 'other',
+    url: '',
+    note: '',
+    enabled: true,
+    sort_order: index + 1
+  }
+}
+
+function resetTutorialForm() {
+  tutorialForm.value = []
+  tutorialErrorMessage.value = ''
+  tutorialDish.value = null
+}
+
+function openTutorialForm(item: DishListItem) {
+  tutorialSuccessMessage.value = ''
+  tutorialErrorMessage.value = ''
+  tutorialDish.value = item
+  tutorialForm.value = item.tutorials.map((tutorial, index) => ({
+    title: tutorial.title,
+    platform: tutorial.platform,
+    url: tutorial.url,
+    note: tutorial.note,
+    enabled: tutorial.enabled,
+    sort_order: index + 1
+  }))
+  isTutorialFormOpen.value = true
+}
+
+function closeTutorialForm() {
+  if (isSavingTutorials.value) return
+
+  isTutorialFormOpen.value = false
+  resetTutorialForm()
+}
+
+function addTutorial() {
+  tutorialErrorMessage.value = ''
+  if (tutorialForm.value.length >= MAX_TUTORIAL_COUNT) {
+    tutorialErrorMessage.value = `做法参考最多配置 ${MAX_TUTORIAL_COUNT} 条`
+    return
+  }
+
+  tutorialForm.value.push(createEmptyTutorial(tutorialForm.value.length))
+}
+
+function removeTutorial(index: number) {
+  tutorialErrorMessage.value = ''
+  tutorialForm.value.splice(index, 1)
+  tutorialForm.value = tutorialForm.value.map((item, itemIndex) => ({
+    ...item,
+    sort_order: itemIndex + 1
+  }))
+}
+
+function clearTutorials() {
+  tutorialErrorMessage.value = ''
+  tutorialForm.value = []
 }
 
 function formatPriceInput(priceCent: number) {
@@ -243,6 +322,46 @@ function validateEditForm() {
   }
 }
 
+function validateTutorialForm() {
+  if (tutorialForm.value.length > MAX_TUTORIAL_COUNT) {
+    return {
+      error: `做法参考最多配置 ${MAX_TUTORIAL_COUNT} 条`
+    }
+  }
+
+  const tutorials: DishTutorial[] = []
+  for (const [index, item] of tutorialForm.value.entries()) {
+    const title = item.title.trim()
+    const url = item.url.trim()
+    const note = item.note.trim()
+
+    if (!title) {
+      return {
+        error: `第 ${index + 1} 条做法参考标题不能为空`
+      }
+    }
+
+    if (!url) {
+      return {
+        error: `第 ${index + 1} 条做法参考链接不能为空`
+      }
+    }
+
+    tutorials.push({
+      title,
+      platform: item.platform,
+      url,
+      note,
+      enabled: true,
+      sort_order: index + 1
+    })
+  }
+
+  return {
+    payload: tutorials
+  }
+}
+
 async function submitCreateDish() {
   if (isCreating.value) return
 
@@ -292,6 +411,32 @@ async function submitUpdateDish() {
     editErrorMessage.value = adminError.message || '餐品编辑失败，请稍后重试'
   } finally {
     isUpdating.value = false
+  }
+}
+
+async function submitTutorials() {
+  if (isSavingTutorials.value || !tutorialDish.value) return
+
+  tutorialErrorMessage.value = ''
+  tutorialSuccessMessage.value = ''
+  const validation = validateTutorialForm()
+  if (validation.error || !validation.payload) {
+    tutorialErrorMessage.value = validation.error || '请检查做法参考表单'
+    return
+  }
+
+  isSavingTutorials.value = true
+  try {
+    await updateDishTutorials(merchantId.value, tutorialDish.value.dish_id, validation.payload)
+    await loadDishes()
+    tutorialSuccessMessage.value = '做法参考已更新，列表已刷新'
+    isTutorialFormOpen.value = false
+    resetTutorialForm()
+  } catch (error) {
+    const adminError = error as Partial<AdminApiError>
+    tutorialErrorMessage.value = adminError.message || '做法参考更新失败，请稍后重试'
+  } finally {
+    isSavingTutorials.value = false
   }
 }
 
@@ -385,7 +530,7 @@ watch(merchantId, loadPageData)
     <PageHeader
       eyebrow="Dishes"
       title="餐品管理"
-      :description="`当前商户：${merchantId}。餐品列表、新增、编辑和上下架已接入真实云函数；删除、做法参考和食材配置仍为后续接入。`"
+      :description="`当前商户：${merchantId}。餐品列表、新增、编辑、上下架和做法参考已接入真实云函数；删除、食材配置和规格加料仍为后续接入。`"
     >
       <template #actions>
         <ActionButton variant="ghost" :disabled="isLoading" @click="loadPageData">刷新</ActionButton>
@@ -432,6 +577,15 @@ watch(merchantId, loadPageData)
         <div>
           <strong>餐品状态更新失败</strong>
           <span>{{ statusErrorMessage }}</span>
+        </div>
+      </div>
+    </GlassCard>
+
+    <GlassCard v-if="tutorialSuccessMessage">
+      <div class="section-heading compact-section-heading">
+        <div>
+          <h2>做法参考已更新</h2>
+          <p>{{ tutorialSuccessMessage }}</p>
         </div>
       </div>
     </GlassCard>
@@ -582,12 +736,91 @@ watch(merchantId, loadPageData)
       </form>
     </GlassCard>
 
+    <GlassCard v-if="isTutorialFormOpen">
+      <div class="section-heading">
+        <div>
+          <h2>编辑做法参考</h2>
+          <p>{{ tutorialDish?.name || '当前餐品' }}，最多配置 {{ MAX_TUTORIAL_COUNT }} 条做法参考；保存空列表会清空现有做法参考。</p>
+        </div>
+        <ActionButton variant="ghost" :disabled="isSavingTutorials" @click="closeTutorialForm">收起</ActionButton>
+      </div>
+
+      <form class="tutorial-editor" @submit.prevent="submitTutorials">
+        <div class="tutorial-editor__toolbar">
+          <ActionButton
+            variant="ghost"
+            :disabled="isSavingTutorials || tutorialForm.length >= MAX_TUTORIAL_COUNT"
+            @click="addTutorial"
+          >
+            添加做法
+          </ActionButton>
+          <ActionButton
+            variant="danger"
+            :disabled="isSavingTutorials || tutorialForm.length === 0"
+            @click="clearTutorials"
+          >
+            清空做法
+          </ActionButton>
+        </div>
+
+        <div v-if="tutorialForm.length === 0" class="tutorial-editor__empty">
+          当前没有做法参考，直接保存可清空云端做法参考。
+        </div>
+
+        <div v-else class="tutorial-editor__list">
+          <div v-for="(item, index) in tutorialForm" :key="index" class="tutorial-editor__item">
+            <div class="tutorial-editor__item-head">
+              <strong>做法参考 {{ index + 1 }}</strong>
+              <button class="ghost-button compact-button" type="button" :disabled="isSavingTutorials" @click="removeTutorial(index)">
+                移除
+              </button>
+            </div>
+
+            <div class="admin-form tutorial-editor__grid">
+              <label class="form-field">
+                <span>标题 <b>*</b></span>
+                <input v-model="item.title" autocomplete="off" placeholder="例如 番茄炒蛋家常做法" :disabled="isSavingTutorials" />
+              </label>
+
+              <label class="form-field">
+                <span>平台</span>
+                <select v-model="item.platform" :disabled="isSavingTutorials">
+                  <option v-for="option in tutorialPlatformOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+
+              <label class="form-field form-field--wide">
+                <span>链接或口令 <b>*</b></span>
+                <input v-model="item.url" autocomplete="off" placeholder="https://example.com/video 或平台口令" :disabled="isSavingTutorials" />
+              </label>
+
+              <label class="form-field form-field--wide">
+                <span>备注</span>
+                <textarea v-model="item.note" rows="2" placeholder="例如 适合新手，注意火候" :disabled="isSavingTutorials" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <p v-if="tutorialErrorMessage" class="form-error">{{ tutorialErrorMessage }}</p>
+
+        <div class="form-actions">
+          <button class="ghost-button" type="button" :disabled="isSavingTutorials" @click="closeTutorialForm">取消</button>
+          <button class="primary-button" type="submit" :disabled="isSavingTutorials">
+            {{ isSavingTutorials ? '正在保存...' : '保存做法参考' }}
+          </button>
+        </div>
+      </form>
+    </GlassCard>
+
     <section class="content-grid">
       <GlassCard>
         <div class="section-heading">
           <div>
             <h2>餐品列表</h2>
-            <p>数据来自 manageDish.listDishes，新增、编辑和上下架成功后会自动刷新。</p>
+            <p>数据来自 manageDish.listDishes，新增、编辑、上下架和做法参考保存成功后会自动刷新。</p>
           </div>
           <StatusBadge label="真实数据" tone="green" />
         </div>
@@ -609,7 +842,7 @@ watch(merchantId, loadPageData)
 
         <div v-else class="mock-table dish-table">
           <div class="mock-table__head mock-table__row dish-table__row">
-            <span>餐品名称</span>
+            <span>餐品信息</span>
             <span>分类</span>
             <span>价格</span>
             <span>状态</span>
@@ -619,9 +852,9 @@ watch(merchantId, loadPageData)
             <span>操作</span>
           </div>
           <div v-for="item in dishes" :key="item.id || item.dish_id" class="mock-table__row dish-table__row">
-            <span>
-              <strong>{{ item.name }}</strong>
-              <small>{{ item.description || '暂无描述' }}</small>
+            <span class="dish-info-cell">
+              <strong class="dish-title">{{ item.name }}</strong>
+              <small v-if="item.description" class="dish-desc">{{ item.description }}</small>
             </span>
             <span>{{ item.category_id || '-' }}</span>
             <span>{{ item.price_text }}</span>
@@ -633,6 +866,7 @@ watch(merchantId, loadPageData)
             <span>{{ item.ingredients.length }} 项</span>
             <span class="table-action-group">
               <ActionButton variant="ghost" @click="openEditForm(item)">编辑</ActionButton>
+              <ActionButton variant="ghost" @click="openTutorialForm(item)">做法参考</ActionButton>
               <ActionButton
                 :variant="item.status === 'on_sale' ? 'danger' : 'ghost'"
                 :disabled="Boolean(statusActionDishId)"
@@ -650,14 +884,14 @@ watch(merchantId, loadPageData)
         <div class="section-heading">
           <div>
             <h2>后续接入范围</h2>
-            <p>删除、做法参考和食材配置仍为后续接入。</p>
+            <p>删除、食材配置和规格加料仍为后续接入。</p>
           </div>
           <StatusBadge label="基础信息" tone="orange" />
         </div>
         <div class="form-preview">
           <div class="form-preview__group">
             <strong>已接入</strong>
-            <span>新增 / 编辑基础信息，上架 / 下架状态切换</span>
+            <span>新增 / 编辑基础信息，上架 / 下架状态切换，做法参考编辑</span>
           </div>
           <div class="form-preview__group">
             <strong>规格配置</strong>
@@ -669,7 +903,7 @@ watch(merchantId, loadPageData)
           </div>
           <div class="form-preview__group">
             <strong>做法参考</strong>
-            <span>标题、平台、链接、口令、备注</span>
+            <span>标题、平台、链接、口令、备注已接入，最多 3 条</span>
           </div>
         </div>
       </GlassCard>

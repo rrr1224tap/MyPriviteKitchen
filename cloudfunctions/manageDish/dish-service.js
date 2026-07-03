@@ -1,5 +1,5 @@
-const VALID_ACTIONS = ['list', 'listDishes', 'create', 'createDish', 'update', 'updateDish', 'updateDishStatus', 'onSale', 'offSale', 'sort']
-const WEB_ALLOWED_ACTIONS = ['listDishes', 'createDish', 'updateDish', 'updateDishStatus']
+const VALID_ACTIONS = ['list', 'listDishes', 'create', 'createDish', 'update', 'updateDish', 'updateDishStatus', 'updateDishTutorials', 'onSale', 'offSale', 'sort']
+const WEB_ALLOWED_ACTIONS = ['listDishes', 'createDish', 'updateDish', 'updateDishStatus', 'updateDishTutorials']
 const VALID_DISH_STATUSES = ['on_sale', 'off_sale']
 const VALID_TUTORIAL_PLATFORMS = ['douyin', 'xiaohongshu', 'bilibili', 'other']
 const MAX_TUTORIAL_COUNT = 3
@@ -183,6 +183,29 @@ function normalizeWebDishStatusData(event = {}) {
   return {
     status: status === undefined ? undefined : status
   }
+}
+
+function normalizeJsonArrayValue(value) {
+  if (typeof value !== 'string') {
+    return value
+  }
+
+  try {
+    return JSON.parse(value)
+  } catch (error) {
+    return value
+  }
+}
+
+function normalizeWebDishTutorialsData(event = {}) {
+  const tutorials = getPayloadValue(event, 'tutorials')
+  const data = {}
+
+  if (tutorials !== undefined) {
+    data.tutorials = normalizeJsonArrayValue(tutorials)
+  }
+
+  return data
 }
 
 function normalizeTags(value) {
@@ -1107,6 +1130,54 @@ async function handleWebStatusUpdate(deps, merchantId, dishId, data) {
   return handleStatusUpdate(deps, merchantId, dishId, status)
 }
 
+async function handleWebTutorialsUpdate(deps, merchantId, dishId, data) {
+  if (!dishId) {
+    return failure('INVALID_PARAMS', '椁愬搧 ID 涓嶈兘涓虹┖')
+  }
+
+  if (!hasOwn(data, 'tutorials')) {
+    return failure('VALIDATION_ERROR', '鍋氭硶鍙傝€冧笉鑳戒负绌?')
+  }
+
+  const tutorialError = validateTutorialList(data.tutorials)
+  if (tutorialError) {
+    return tutorialError
+  }
+
+  let dishResult
+  try {
+    dishResult = await assertDishBelongsToMerchant(deps, dishId, merchantId)
+  } catch (error) {
+    deps.logger.error('manageDish web tutorials query database error', error)
+    return failure('DATABASE_ERROR', '鏌ヨ椁愬搧澶辫触锛岃绋嶅悗閲嶈瘯')
+  }
+
+  if (dishResult.error) {
+    return dishResult.error
+  }
+
+  const updateData = {
+    tutorials: normalizeTutorialList(data.tutorials),
+    updated_at: deps.now()
+  }
+
+  try {
+    const updatedDish = await deps.updateDish({
+      dish_id: dishResult.dish.dish_id || dishId,
+      updateData
+    })
+    return success('鍋氭硶鍙傝€冨凡鏇存柊', {
+      dish: formatDish({
+        ...dishResult.dish,
+        ...(updatedDish || updateData)
+      })
+    })
+  } catch (error) {
+    deps.logger.error('manageDish web tutorials update database error', error)
+    return failure('DATABASE_ERROR', '鍋氭硶鍙傝€冩洿鏂板け璐ワ紝璇风◢鍚庨噸璇?')
+  }
+}
+
 async function handleUpdate(deps, merchantId, dishId, data) {
   if (!dishId) {
     return failure('INVALID_PARAMS', '餐品 ID 不能为空')
@@ -1344,6 +1415,15 @@ function createManageDishHandler(dependencies) {
             merchantId,
             dishId,
             normalizeWebDishStatusData(normalizedEvent)
+          )
+        }
+
+        if (action === 'updateDishTutorials') {
+          return handleWebTutorialsUpdate(
+            deps,
+            merchantId,
+            dishId,
+            normalizeWebDishTutorialsData(normalizedEvent)
           )
         }
 

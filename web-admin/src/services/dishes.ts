@@ -1,6 +1,16 @@
 import { callAdminFunction } from './cloud'
 
 export type DishStatus = 'on_sale' | 'off_sale' | 'sold_out'
+export type DishTutorialPlatform = 'douyin' | 'xiaohongshu' | 'bilibili' | 'other'
+
+export interface DishTutorial {
+  title: string
+  platform: DishTutorialPlatform
+  url: string
+  note: string
+  enabled: boolean
+  sort_order: number
+}
 
 export interface DishListItem {
   id: string
@@ -16,7 +26,7 @@ export interface DishListItem {
   status_text: string
   sort_order: number
   sales_count: number
-  tutorials: unknown[]
+  tutorials: DishTutorial[]
   ingredients: unknown[]
   created_at: string
   updated_at: string
@@ -87,6 +97,14 @@ function toArray(value: unknown) {
   return Array.isArray(value) ? value : []
 }
 
+function toTutorialPlatform(value: unknown): DishTutorialPlatform {
+  if (value === 'douyin' || value === 'xiaohongshu' || value === 'bilibili') {
+    return value
+  }
+
+  return 'other'
+}
+
 function toStatus(value: unknown): DishStatus {
   if (value === 'on_sale' || value === 'sold_out') {
     return value
@@ -105,6 +123,37 @@ function toStatusText(status: DishStatus) {
   }
 
   return '已下架'
+}
+
+function normalizeTutorial(item: unknown, index: number): DishTutorial | null {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return null
+  }
+
+  const source = item as Record<string, unknown>
+  const title = toText(source.title).trim()
+  const url = toText(source.url).trim()
+  const note = toText(source.note).trim()
+
+  if (!title && !url && !note) {
+    return null
+  }
+
+  return {
+    title: title || `做法参考 ${index + 1}`,
+    platform: toTutorialPlatform(source.platform),
+    url,
+    note,
+    enabled: typeof source.enabled === 'boolean' ? source.enabled : true,
+    sort_order: toNumber(source.sort_order, index + 1)
+  }
+}
+
+function normalizeTutorials(value: unknown): DishTutorial[] {
+  return toArray(value)
+    .map((item, index) => normalizeTutorial(item, index))
+    .filter((item): item is DishTutorial => Boolean(item))
+    .slice(0, 3)
 }
 
 function normalizeDish(item: RawDishItem): DishListItem {
@@ -126,7 +175,7 @@ function normalizeDish(item: RawDishItem): DishListItem {
     status_text: toStatusText(status),
     sort_order: toNumber(item.sort_order),
     sales_count: toNumber(item.sales_count),
-    tutorials: toArray(item.tutorials),
+    tutorials: normalizeTutorials(item.tutorials),
     ingredients: toArray(item.ingredients),
     created_at: toText(item.created_at),
     updated_at: toText(item.updated_at)
@@ -178,6 +227,21 @@ export async function updateDishStatus(
     merchant_id: merchantId,
     dish_id: dishId,
     status
+  })
+
+  return result.dish ? normalizeDish(result.dish) : null
+}
+
+export async function updateDishTutorials(
+  merchantId: string,
+  dishId: string,
+  tutorials: DishTutorial[]
+) {
+  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', {
+    action: 'updateDishTutorials',
+    merchant_id: merchantId,
+    dish_id: dishId,
+    tutorials
   })
 
   return result.dish ? normalizeDish(result.dish) : null

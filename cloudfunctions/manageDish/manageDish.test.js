@@ -1816,6 +1816,358 @@ test('web update dish status only updates status and updated_at', async () => {
   ])
 })
 
+test('web valid admin token can update dish tutorials', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+  const tutorials = createValidTutorials(2)
+
+  const result = await handler({
+    action: 'updateDishTutorials',
+    merchant_id: 'merchant_001',
+    dish_id: 'dish_001',
+    tutorials,
+    admin_token: createWebToken()
+  })
+
+  const updatedDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.deepEqual(result.data.dish.tutorials, tutorials)
+  assert.deepEqual(updatedDish.tutorials, tutorials)
+  assert.equal(updatedDish.updated_at, FIXED_NOW)
+  assert.equal(state.writes, 1)
+})
+
+test('web valid admin token can clear dish tutorials with empty array', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+  const originalDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+  originalDish.tutorials = createValidTutorials(2)
+
+  const result = await handler({
+    action: 'updateDishTutorials',
+    merchant_id: 'merchant_001',
+    dish_id: 'dish_001',
+    tutorials: [],
+    admin_token: createWebToken()
+  })
+
+  const updatedDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.deepEqual(result.data.dish.tutorials, [])
+  assert.deepEqual(updatedDish.tutorials, [])
+  assert.equal(updatedDish.updated_at, FIXED_NOW)
+})
+
+test('index entry accepts web updateDishTutorials action', async () => {
+  const previousSecret = process.env.WEB_ADMIN_TOKEN_SECRET
+  process.env.WEB_ADMIN_TOKEN_SECRET = 'manage-dish-test-secret'
+  const { state, cloud } = createIndexCloudMock()
+  const handler = loadManageDishIndexWithCloudMock(cloud)
+  const tutorials = createValidTutorials(1)
+
+  try {
+    const result = await handler({
+      action: 'updateDishTutorials',
+      merchant_id: 'merchant_001',
+      dish_id: 'dish_001',
+      tutorials,
+      admin_token: createWebToken({ now: new Date() })
+    })
+
+    const updatedDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+    assert.equal(result.success, true)
+    assert.equal(result.code, 'SUCCESS')
+    assert.deepEqual(updatedDish.tutorials, tutorials)
+  } finally {
+    process.env.WEB_ADMIN_TOKEN_SECRET = previousSecret
+  }
+})
+
+test('web token validation rejects updateDishTutorials writes', async () => {
+  const cases = [
+    {
+      title: 'empty token',
+      token: '',
+      expectedCode: 'UNAUTHORIZED'
+    },
+    {
+      title: 'tampered token',
+      token: `${createWebToken()}x`,
+      expectedCode: 'UNAUTHORIZED'
+    },
+    {
+      title: 'expired token',
+      token: createWebToken({
+        now: new Date('2026-06-24T10:00:00.000Z'),
+        ttlMinutes: 60
+      }),
+      expectedCode: 'TOKEN_EXPIRED'
+    },
+    {
+      title: 'non super admin',
+      token: createWebToken({
+        role: 'viewer'
+      }),
+      expectedCode: 'UNAUTHORIZED'
+    }
+  ]
+
+  for (const item of cases) {
+    const { state, deps } = createDependencies({
+      openid: ''
+    })
+    const handler = createManageDishHandler(deps)
+
+    const result = await handler({
+      action: 'updateDishTutorials',
+      merchant_id: 'merchant_001',
+      dish_id: 'dish_001',
+      tutorials: createValidTutorials(1),
+      admin_token: item.token
+    })
+
+    assert.equal(result.success, false, item.title)
+    assert.equal(result.code, item.expectedCode, item.title)
+    assert.equal(state.writes, 0, item.title)
+  }
+})
+
+test('web http payloads can update dish tutorials', async () => {
+  const cases = [
+    {
+      title: 'body string',
+      buildEvent: (tutorials) => ({
+        body: JSON.stringify({
+          action: 'updateDishTutorials',
+          merchant_id: 'merchant_001',
+          dish_id: 'dish_001',
+          tutorials,
+          admin_token: createWebToken()
+        })
+      })
+    },
+    {
+      title: 'body object',
+      buildEvent: (tutorials) => ({
+        body: {
+          action: 'updateDishTutorials',
+          merchant_id: 'merchant_001',
+          dish_id: 'dish_001',
+          tutorials,
+          admin_token: createWebToken()
+        }
+      })
+    },
+    {
+      title: 'query string parameters',
+      buildEvent: (tutorials) => ({
+        queryStringParameters: {
+          action: 'updateDishTutorials',
+          merchant_id: 'merchant_001',
+          dish_id: 'dish_001',
+          tutorials: JSON.stringify(tutorials),
+          admin_token: createWebToken()
+        }
+      })
+    }
+  ]
+
+  for (const item of cases) {
+    const { state, deps } = createDependencies({
+      openid: ''
+    })
+    const handler = createManageDishHandler(deps)
+    const tutorials = createValidTutorials(1, {
+      title: item.title
+    })
+
+    const result = await handler(item.buildEvent(tutorials))
+    const updatedDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+
+    assert.equal(result.success, true, item.title)
+    assert.deepEqual(updatedDish.tutorials, tutorials, item.title)
+  }
+})
+
+test('web invalid json body for updateDishTutorials does not crash', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    body: '{"action":'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+  assert.equal(state.writes, 0)
+})
+
+test('web update dish tutorials validates required params and tutorial data', async () => {
+  const cases = [
+    {
+      title: 'missing merchant',
+      payload: { dish_id: 'dish_001', tutorials: createValidTutorials(1) },
+      expectedCode: 'INVALID_PARAMS'
+    },
+    {
+      title: 'missing dish',
+      payload: { merchant_id: 'merchant_001', tutorials: createValidTutorials(1) },
+      expectedCode: 'INVALID_PARAMS'
+    },
+    {
+      title: 'missing tutorials',
+      payload: { merchant_id: 'merchant_001', dish_id: 'dish_001' },
+      expectedCode: 'VALIDATION_ERROR'
+    },
+    {
+      title: 'tutorials not array',
+      payload: { merchant_id: 'merchant_001', dish_id: 'dish_001', tutorials: {} },
+      expectedCode: 'VALIDATION_ERROR'
+    },
+    {
+      title: 'too many tutorials',
+      payload: { merchant_id: 'merchant_001', dish_id: 'dish_001', tutorials: createValidTutorials(4) },
+      expectedCode: 'VALIDATION_ERROR'
+    },
+    {
+      title: 'invalid tutorial item',
+      payload: {
+        merchant_id: 'merchant_001',
+        dish_id: 'dish_001',
+        tutorials: createValidTutorials(1, { platform: 'wechat' })
+      },
+      expectedCode: 'VALIDATION_ERROR'
+    }
+  ]
+
+  for (const item of cases) {
+    const { state, deps } = createDependencies({
+      openid: ''
+    })
+    const handler = createManageDishHandler(deps)
+
+    const result = await handler({
+      action: 'updateDishTutorials',
+      admin_token: createWebToken(),
+      ...item.payload
+    })
+
+    assert.equal(result.success, false, item.title)
+    assert.equal(result.code, item.expectedCode, item.title)
+    assert.equal(state.writes, 0, item.title)
+  }
+})
+
+test('web update dish tutorials validates existing dish ownership', async () => {
+  const cases = [
+    {
+      title: 'missing dish',
+      dish_id: 'missing_dish',
+      expectedCode: 'NOT_FOUND'
+    },
+    {
+      title: 'other merchant dish',
+      dish_id: 'dish_other',
+      expectedCode: 'FORBIDDEN'
+    }
+  ]
+
+  for (const item of cases) {
+    const { state, deps } = createDependencies({
+      openid: ''
+    })
+    const handler = createManageDishHandler(deps)
+
+    const result = await handler({
+      action: 'updateDishTutorials',
+      merchant_id: 'merchant_001',
+      dish_id: item.dish_id,
+      tutorials: createValidTutorials(1),
+      admin_token: createWebToken()
+    })
+
+    assert.equal(result.success, false, item.title)
+    assert.equal(result.code, item.expectedCode, item.title)
+    assert.equal(state.writes, 0, item.title)
+  }
+})
+
+test('web update dish tutorials only updates tutorials and updated_at', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+  const originalDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+  const originalCreatedAt = new Date('2020-01-01T00:00:00.000Z')
+  originalDish.created_at = originalCreatedAt
+  originalDish.status = 'on_sale'
+  originalDish.name = 'Original Name'
+  originalDish.category_id = 'category_001'
+  originalDish.price_cent = 2990
+  originalDish.description = 'Original Description'
+  originalDish.image_url = 'https://example.com/original.jpg'
+  originalDish.ingredients = createValidIngredients(1)
+  originalDish.spec_groups = createValidSpecGroups()
+  originalDish.addon_groups = createValidAddonGroups()
+  const tutorials = createValidTutorials(1, {
+    title: 'Only Tutorials'
+  })
+
+  const result = await handler({
+    action: 'updateDishTutorials',
+    merchant_id: 'merchant_001',
+    dish_id: 'dish_001',
+    tutorials,
+    name: 'Injected Name',
+    category_id: 'category_other',
+    price_cent: 1,
+    description: 'Injected Description',
+    image_url: 'https://example.com/injected.jpg',
+    status: 'off_sale',
+    sort_order: 99,
+    created_at: new Date('2000-01-01T00:00:00.000Z'),
+    data: {
+      merchant_id: 'merchant_002',
+      dish_id: 'evil_dish',
+      name: 'Nested Name',
+      category_id: 'category_other',
+      price_cent: 2,
+      ingredients: [],
+      spec_groups: [],
+      addon_groups: []
+    },
+    admin_token: createWebToken()
+  })
+
+  const updatedDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.deepEqual(updatedDish.tutorials, tutorials)
+  assert.equal(updatedDish.updated_at, FIXED_NOW)
+  assert.equal(updatedDish.merchant_id, 'merchant_001')
+  assert.equal(updatedDish.dish_id, 'dish_001')
+  assert.equal(updatedDish.created_at, originalCreatedAt)
+  assert.equal(updatedDish.status, 'on_sale')
+  assert.equal(updatedDish.name, 'Original Name')
+  assert.equal(updatedDish.category_id, 'category_001')
+  assert.equal(updatedDish.price_cent, 2990)
+  assert.equal(updatedDish.description, 'Original Description')
+  assert.equal(updatedDish.image_url, 'https://example.com/original.jpg')
+  assert.deepEqual(updatedDish.ingredients, createValidIngredients(1))
+  assert.deepEqual(updatedDish.spec_groups, createValidSpecGroups())
+  assert.deepEqual(updatedDish.addon_groups, createValidAddonGroups())
+  assert.deepEqual(Object.keys(state.updateCalls[0].updateData).sort(), [
+    'tutorials',
+    'updated_at'
+  ])
+})
+
 test('web token cannot call unexposed dish write actions in this phase', async () => {
   const writeActions = ['create', 'update', 'onSale', 'offSale', 'sort']
 
