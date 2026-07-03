@@ -117,6 +117,15 @@ interface OrderDetailResponse {
   items?: RawOrderDetailItem[]
 }
 
+interface UpdateOrderStatusResponse {
+  order_id?: unknown
+  order_no?: unknown
+  merchant_id?: unknown
+  old_status?: unknown
+  new_status?: unknown
+  updated_at?: unknown
+}
+
 function toText(value: unknown, fallback = '') {
   if (value === null || value === undefined) {
     return fallback
@@ -272,5 +281,23 @@ export async function getOrderDetail(merchantId: string, orderId: string): Promi
   return {
     order: normalizeOrderDetail(result.order),
     items: Array.isArray(result.items) ? result.items.map(normalizeOrderDetailItem) : []
+  }
+}
+
+export async function updateOrderStatus(merchantId: string, orderId: string, status: string) {
+  const result = await callAdminFunction<UpdateOrderStatusResponse>('updateOrderStatus', {
+    action: 'updateOrderStatus',
+    merchant_id: merchantId,
+    order_id: orderId,
+    status
+  })
+
+  return {
+    order_id: toText(result.order_id ?? orderId),
+    order_no: toText(result.order_no),
+    merchant_id: toText(result.merchant_id ?? merchantId),
+    old_status: toText(result.old_status),
+    new_status: toText(result.new_status ?? status),
+    updated_at: toDateText(result.updated_at)
   }
 }

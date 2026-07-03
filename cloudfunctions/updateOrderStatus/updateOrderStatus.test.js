@@ -2,8 +2,10 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 
 const { createUpdateOrderStatusHandler } = require('./order-status-service')
+const crypto = require('node:crypto')
 
 const NOW = new Date('2026-06-17T12:00:00.000Z')
+const WEB_TOKEN_SECRET = 'test-web-token-secret'
 
 const BASE_ORDERS = [
   {
@@ -12,6 +14,11 @@ const BASE_ORDERS = [
     order_no: '20260617103000123',
     merchant_id: 'merchant_001',
     status: 'pending',
+    items: [{ dish_id: 'dish_001', quantity: 2 }],
+    total_amount_cent: 5600,
+    contact_phone: '13800000000',
+    contact_name: '测试用户',
+    remark: '不要葱',
     updated_at: new Date('2026-06-17T10:30:00.000Z')
   },
   {
@@ -89,6 +96,7 @@ function createDependencies(overrides = {}) {
   const dependencies = {
     logError: () => {},
     getOpenid: () => 'openid_staff_001',
+    getTokenSecret: () => WEB_TOKEN_SECRET,
     now: () => NOW,
     findMerchantStaff: async ({ merchant_id, openid }) =>
       STAFF.find((staff) => staff.merchant_id === merchant_id && staff.openid === openid) || null,
@@ -114,6 +122,287 @@ function createDependencies(overrides = {}) {
 
   return { dependencies, calls, orders }
 }
+
+function base64urlEncode(value) {
+  const buffer = Buffer.isBuffer(value) ? value : Buffer.from(String(value))
+  return buffer
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+}
+
+function createWebToken(payload = {}) {
+  const payloadSegment = base64urlEncode(JSON.stringify({
+    role: 'super_admin',
+    expires_at: '2026-06-17T13:00:00.000Z',
+    ...payload
+  }))
+  const signatureSegment = base64urlEncode(
+    crypto.createHmac('sha256', WEB_TOKEN_SECRET).update(payloadSegment).digest()
+  )
+
+  return `${payloadSegment}.${signatureSegment}`
+}
+
+function createWebEvent(overrides = {}) {
+  return {
+    admin_token: createWebToken(),
+    action: 'updateOrderStatus',
+    merchant_id: 'merchant_001',
+    order_id: 'order_001',
+    status: 'accepted',
+    ...overrides
+  }
+}
+
+test('web admin token can update pending order to accepted', async () => {
+  const { dependencies, calls, orders } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent())
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.data.old_status, 'pending')
+  assert.equal(result.data.new_status, 'accepted')
+  assert.equal(calls.update.order_id, 'order_001')
+  assert.equal(calls.update.current_status, 'pending')
+  assert.deepEqual(Object.keys(calls.update.updateData).sort(), ['status', 'updated_at'])
+  assert.equal(calls.update.updateData.status, 'accepted')
+  assert.equal(calls.update.updateData.updated_at, NOW)
+  assert.equal(orders[0].status, 'accepted')
+  assert.deepEqual(orders[0].items, [{ dish_id: 'dish_001', quantity: 2 }])
+  assert.equal(orders[0].total_amount_cent, 5600)
+  assert.equal(orders[0].contact_phone, '13800000000')
+  assert.equal(orders[0].contact_name, '测试用户')
+  assert.equal(orders[0].remark, '不要葱')
+})
+
+test('web empty token cannot update order status', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({ admin_token: '' }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web tampered token cannot update order status', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+  const token = createWebToken()
+
+  const result = await updateOrderStatus(createWebEvent({ admin_token: `${token}x` }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web expired token cannot update order status', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({
+    admin_token: createWebToken({ expires_at: '2026-06-17T11:00:00.000Z' })
+  }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'TOKEN_EXPIRED')
+})
+
+test('web non super admin token cannot update order status', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({
+    admin_token: createWebToken({ role: 'operator' })
+  }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('http body string can update order status for web admin', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus({
+    body: JSON.stringify(createWebEvent())
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.new_status, 'accepted')
+})
+
+test('http body object can update order status for web admin', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus({
+    body: createWebEvent()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.new_status, 'accepted')
+})
+
+test('query string parameters can update order status for web admin', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus({
+    queryStringParameters: createWebEvent()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.new_status, 'accepted')
+})
+
+test('invalid json body does not crash', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus({
+    body: '{invalid-json'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web missing merchant id is rejected', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({ merchant_id: '' }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+})
+
+test('web missing order id is rejected', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({ order_id: '' }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+})
+
+test('web missing status is rejected', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({ status: '' }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+})
+
+test('web invalid status is rejected', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({ status: 'paid' }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_STATUS')
+})
+
+test('web order not found is rejected', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({ order_id: 'order_missing' }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'NOT_FOUND')
+})
+
+test('web cannot update another merchant order', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({
+    merchant_id: 'merchant_002',
+    order_id: 'order_001'
+  }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'FORBIDDEN')
+})
+
+test('web illegal status jump is rejected', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({ status: 'finished' }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'STATUS_CONFLICT')
+})
+
+test('web finished order cannot move back', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({
+    order_id: 'order_finished',
+    status: 'accepted'
+  }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'STATUS_CONFLICT')
+})
+
+test('web cannot update order to cancelled', async () => {
+  const { dependencies } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({ status: 'cancelled' }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'STATUS_CONFLICT')
+})
 
 test('active merchant staff can update pending order to accepted', async () => {
   const { dependencies, calls, orders } = createDependencies()

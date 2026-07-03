@@ -807,6 +807,19 @@ button {
   line-height: 1.55;
 }
 
+.order-status-note {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(126, 90, 45, 0.1);
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: rgba(255, 248, 238, 0.72);
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .order-items-list {
   display: grid;
   gap: 10px;

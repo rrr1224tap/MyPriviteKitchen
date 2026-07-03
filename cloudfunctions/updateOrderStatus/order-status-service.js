@@ -3,6 +3,8 @@ const ORDER_STATUS_ACCEPTED = 'accepted'
 const ORDER_STATUS_COOKING = 'cooking'
 const ORDER_STATUS_FINISHED = 'finished'
 const ORDER_STATUS_CANCELLED = 'cancelled'
+const WEB_ALLOWED_ACTIONS = ['updateOrderStatus']
+const { verifyWebAdminToken } = require('./web-admin-token-helper')
 
 const VALID_ORDER_STATUSES = [
   ORDER_STATUS_PENDING,
@@ -15,6 +17,14 @@ const VALID_ORDER_STATUSES = [
 const ALLOWED_STATUS_FLOW = {
   [ORDER_STATUS_PENDING]: [ORDER_STATUS_ACCEPTED, ORDER_STATUS_CANCELLED],
   [ORDER_STATUS_ACCEPTED]: [ORDER_STATUS_COOKING, ORDER_STATUS_CANCELLED],
+  [ORDER_STATUS_COOKING]: [ORDER_STATUS_FINISHED],
+  [ORDER_STATUS_FINISHED]: [],
+  [ORDER_STATUS_CANCELLED]: []
+}
+
+const WEB_ALLOWED_STATUS_FLOW = {
+  [ORDER_STATUS_PENDING]: [ORDER_STATUS_ACCEPTED],
+  [ORDER_STATUS_ACCEPTED]: [ORDER_STATUS_COOKING],
   [ORDER_STATUS_COOKING]: [ORDER_STATUS_FINISHED],
   [ORDER_STATUS_FINISHED]: [],
   [ORDER_STATUS_CANCELLED]: []
@@ -57,6 +67,10 @@ function isStatusFlowAllowed(currentStatus, nextStatus) {
   return (ALLOWED_STATUS_FLOW[currentStatus] || []).includes(nextStatus)
 }
 
+function isWebStatusFlowAllowed(currentStatus, nextStatus) {
+  return (WEB_ALLOWED_STATUS_FLOW[currentStatus] || []).includes(nextStatus)
+}
+
 function isStatusConflictError(error) {
   return error && error.code === 'STATUS_CONFLICT'
 }
@@ -74,11 +88,93 @@ function getOrderId(order = {}) {
   return order.order_id || order._id || ''
 }
 
-function buildUpdateData(nextStatus, now) {
+function parseJsonBody(body) {
+  if (!body) {
+    return {}
+  }
+
+  if (typeof body === 'object' && !Array.isArray(body)) {
+    return body
+  }
+
+  if (typeof body !== 'string') {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(body)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch (error) {
+    return {}
+  }
+}
+
+function normalizeEventPayload(event = {}) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) {
+    return {}
+  }
+
+  if (Object.prototype.hasOwnProperty.call(event, 'merchant_id') ||
+    Object.prototype.hasOwnProperty.call(event, 'admin_token')) {
+    return event
+  }
+
+  const bodyPayload = parseJsonBody(event.body)
+  if (Object.keys(bodyPayload).length > 0) {
+    return bodyPayload
+  }
+
+  const queryPayload = event.queryStringParameters
+  if (queryPayload && typeof queryPayload === 'object' && !Array.isArray(queryPayload)) {
+    return queryPayload
+  }
+
+  return {}
+}
+
+function isWebAdminRequest(event = {}) {
+  return Boolean(event && Object.prototype.hasOwnProperty.call(event, 'admin_token'))
+}
+
+function assertWebAdmin(event, action, dependencies) {
+  const verifyResult = verifyWebAdminToken(event.admin_token, {
+    secret: dependencies.getTokenSecret
+      ? dependencies.getTokenSecret()
+      : process.env.WEB_ADMIN_TOKEN_SECRET,
+    now: dependencies.now ? dependencies.now() : new Date()
+  })
+
+  if (!verifyResult.ok) {
+    return {
+      error: failure(
+        verifyResult.code,
+        verifyResult.code === 'TOKEN_EXPIRED' ? '登录状态已过期' : '登录状态无效或已过期'
+      )
+    }
+  }
+
+  if (action && !WEB_ALLOWED_ACTIONS.includes(action)) {
+    return {
+      error: failure('INVALID_PARAMS', '订单操作类型不合法')
+    }
+  }
+
+  return {
+    is_web_admin: true,
+    role: verifyResult.role
+  }
+}
+
+function buildUpdateData(nextStatus, now, isWebAdmin = false) {
   const updateData = {
     status: nextStatus,
     updated_at: now
   }
+
+  if (isWebAdmin) {
+    return updateData
+  }
+
   const timeField = STATUS_TIME_FIELD[nextStatus]
 
   if (timeField) {
@@ -91,15 +187,27 @@ function buildUpdateData(nextStatus, now) {
 function createUpdateOrderStatusHandler(dependencies) {
   return async function updateOrderStatus(event = {}) {
     try {
-      const openid = dependencies.getOpenid()
+      const normalizedEvent = normalizeEventPayload(event)
+      const action = normalizeText(normalizedEvent.action)
+      const isWebAdmin = isWebAdminRequest(normalizedEvent)
+      let openid = ''
 
-      if (!openid) {
-        return failure('UNAUTHORIZED', '无法获取用户身份')
+      if (isWebAdmin) {
+        const webAdminResult = assertWebAdmin(normalizedEvent, action, dependencies)
+        if (webAdminResult.error) {
+          return webAdminResult.error
+        }
+      } else {
+        openid = dependencies.getOpenid()
+
+        if (!openid) {
+          return failure('UNAUTHORIZED', '无法获取用户身份')
+        }
       }
 
-      const merchantId = normalizeText(event.merchant_id)
-      const orderId = normalizeText(event.order_id)
-      const nextStatus = normalizeText(event.next_status)
+      const merchantId = normalizeText(normalizedEvent.merchant_id)
+      const orderId = normalizeText(normalizedEvent.order_id)
+      const nextStatus = normalizeText(normalizedEvent.status || normalizedEvent.next_status)
 
       if (!merchantId || !orderId || !nextStatus) {
         return failure('INVALID_PARAMS', '商家 ID、订单 ID 和目标状态不能为空')
@@ -109,13 +217,15 @@ function createUpdateOrderStatusHandler(dependencies) {
         return failure('INVALID_STATUS', '订单目标状态不合法')
       }
 
-      const staff = await dependencies.findMerchantStaff({
-        merchant_id: merchantId,
-        openid
-      })
+      if (!isWebAdmin) {
+        const staff = await dependencies.findMerchantStaff({
+          merchant_id: merchantId,
+          openid
+        })
 
-      if (!isActiveMerchantStaff(staff, merchantId, openid)) {
-        return failure('FORBIDDEN', '没有修改订单状态的权限')
+        if (!isActiveMerchantStaff(staff, merchantId, openid)) {
+          return failure('FORBIDDEN', '没有修改订单状态的权限')
+        }
       }
 
       const order = await dependencies.findOrderById(orderId)
@@ -134,12 +244,16 @@ function createUpdateOrderStatusHandler(dependencies) {
         return failure('INVALID_STATUS', '订单当前状态不合法')
       }
 
-      if (!isStatusFlowAllowed(oldStatus, nextStatus)) {
+      const isAllowed = isWebAdmin
+        ? isWebStatusFlowAllowed(oldStatus, nextStatus)
+        : isStatusFlowAllowed(oldStatus, nextStatus)
+
+      if (!isAllowed) {
         return failure('STATUS_CONFLICT', '订单当前状态不允许执行该操作')
       }
 
       const now = dependencies.now()
-      const updateData = buildUpdateData(nextStatus, now)
+      const updateData = buildUpdateData(nextStatus, now, isWebAdmin)
 
       try {
         await dependencies.updateOrderStatus({

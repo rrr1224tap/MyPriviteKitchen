@@ -10,6 +10,7 @@ import {
   getOrderDetail,
   getOrderStatusText,
   listOrders,
+  updateOrderStatus,
   type OrderDetail,
   type OrderDetailItem,
   type OrderListItem,
@@ -22,6 +23,13 @@ const MERCHANT_CONTEXT_KEY = 'xiaochu_current_merchant_id'
 const FALLBACK_MERCHANT_ID = 'xiaochu'
 const PAGE_SIZE = 20
 
+interface OrderStatusAction {
+  from: 'pending' | 'accepted' | 'cooking'
+  to: 'accepted' | 'cooking' | 'finished'
+  label: string
+  confirmText: string
+}
+
 const statusOptions = [
   { value: '', label: '全部' },
   { value: 'pending', label: '待接单' },
@@ -30,6 +38,27 @@ const statusOptions = [
   { value: 'finished', label: '已完成' },
   { value: 'cancelled', label: '已取消' }
 ]
+
+const statusActions: Record<string, OrderStatusAction> = {
+  pending: {
+    from: 'pending',
+    to: 'accepted',
+    label: '确认接单',
+    confirmText: '确认接单这个订单吗？确认后订单将进入已接单状态。'
+  },
+  accepted: {
+    from: 'accepted',
+    to: 'cooking',
+    label: '开始备餐',
+    confirmText: '确认开始备餐吗？确认后订单将进入制作中状态。'
+  },
+  cooking: {
+    from: 'cooking',
+    to: 'finished',
+    label: '标记完成',
+    confirmText: '确认将这个订单标记为已完成吗？确认后订单将进入已完成状态。'
+  }
+}
 
 const orders = ref<OrderListItem[]>([])
 const pagination = ref<OrderPagination>({
@@ -48,6 +77,8 @@ const orderDetail = ref<OrderDetail | null>(null)
 const isDetailLoading = ref(false)
 const detailErrorMessage = ref('')
 const detailErrorCode = ref('')
+const isStatusUpdating = ref(false)
+const statusActionError = ref('')
 
 const pendingCount = computed(() => orders.value.filter((item) => item.status === 'pending').length)
 const processingCount = computed(() =>
@@ -62,6 +93,10 @@ const selectedOrder = computed(() =>
   orders.value.find((item) => getOrderKey(item) === selectedOrderId.value) || null
 )
 const detailOrder = computed(() => orderDetail.value?.order || selectedOrder.value)
+const currentStatusAction = computed(() => {
+  const status = detailOrder.value?.status || ''
+  return statusActions[String(status)] || null
+})
 
 function getStoredMerchantId() {
   if (typeof window === 'undefined') {
@@ -125,15 +160,12 @@ function getRemarkText(value: string) {
   return value || '-'
 }
 
-function showPendingTip() {
-  window.alert('订单状态流转、取消、删除和退款会在后续版本接入，本阶段只开放订单详情真实读取。')
-}
-
 function clearDetail() {
   selectedOrderId.value = ''
   orderDetail.value = null
   detailErrorMessage.value = ''
   detailErrorCode.value = ''
+  statusActionError.value = ''
 }
 
 async function loadOrderDetail(orderId = selectedOrderId.value) {
@@ -162,6 +194,7 @@ async function loadOrderDetail(orderId = selectedOrderId.value) {
 function openOrderDetail(item: OrderListItem) {
   selectedOrderId.value = getOrderKey(item)
   orderDetail.value = null
+  statusActionError.value = ''
   loadOrderDetail(selectedOrderId.value)
 }
 
@@ -228,6 +261,41 @@ async function loadOrders(page = 1) {
   }
 }
 
+async function handleStatusUpdate() {
+  const action = currentStatusAction.value
+  const order = detailOrder.value
+  const orderId = order ? getOrderKey(order) : ''
+
+  if (!action || !orderId || isStatusUpdating.value) {
+    return
+  }
+
+  const confirmed = window.confirm(action.confirmText)
+  if (!confirmed) {
+    return
+  }
+
+  isStatusUpdating.value = true
+  statusActionError.value = ''
+
+  try {
+    await updateOrderStatus(merchantId.value, orderId, action.to)
+    const detailOrderId = selectedOrderId.value
+    await loadOrders(pagination.value.page)
+    if (detailOrderId) {
+      selectedOrderId.value = detailOrderId
+      await loadOrderDetail(detailOrderId)
+    }
+    window.alert('订单状态已更新，列表已刷新')
+  } catch (error) {
+    const apiError = error as AdminApiError
+    statusActionError.value = apiError.message || '订单状态更新失败，请稍后重试'
+    window.alert('订单状态更新失败，请稍后重试')
+  } finally {
+    isStatusUpdating.value = false
+  }
+}
+
 function changeStatus(value: string) {
   if (selectedStatus.value === value || isLoading.value) {
     return
@@ -247,7 +315,7 @@ onMounted(() => {
     <PageHeader
       eyebrow="Orders"
       title="订单管理"
-      :description="`当前商户：${merchantId}。订单列表已接入 getMerchantOrders.listOrders；详情和状态流转暂不执行真实写入。`"
+      :description="`当前商户：${merchantId}。订单列表和详情已接入真实数据，状态流转通过 updateOrderStatus 写入。`"
     >
       <template #actions>
         <ActionButton variant="ghost" :disabled="isLoading" @click="loadOrders(pagination.page)">
@@ -267,7 +335,7 @@ onMounted(() => {
       <div class="section-heading">
         <div>
           <h2>订单列表</h2>
-          <p>数据来自 getMerchantOrders.listOrders，仅做真实读取，不开放详情和状态流转。</p>
+          <p>数据来自 getMerchantOrders.listOrders，支持分页、筛选、刷新和查看详情。</p>
         </div>
         <StatusBadge label="真实数据" tone="green" />
       </div>
@@ -460,9 +528,18 @@ onMounted(() => {
         </div>
 
         <div class="card-actions">
-          <ActionButton variant="ghost" @click="showPendingTip">状态流转后续接入</ActionButton>
+          <ActionButton
+            v-if="currentStatusAction"
+            variant="primary"
+            :disabled="isStatusUpdating || isDetailLoading"
+            @click="handleStatusUpdate"
+          >
+            {{ isStatusUpdating ? '更新中...' : currentStatusAction.label }}
+          </ActionButton>
+          <span v-else class="order-status-note">当前状态暂无下一步流转操作</span>
           <ActionButton variant="ghost" @click="clearDetail">关闭详情</ActionButton>
         </div>
+        <p v-if="statusActionError" class="form-error">{{ statusActionError }}</p>
       </div>
     </GlassCard>
   </section>
