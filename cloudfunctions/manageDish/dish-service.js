@@ -1,5 +1,5 @@
-const VALID_ACTIONS = ['list', 'listDishes', 'create', 'createDish', 'update', 'updateDish', 'updateDishStatus', 'updateDishTutorials', 'onSale', 'offSale', 'sort']
-const WEB_ALLOWED_ACTIONS = ['listDishes', 'createDish', 'updateDish', 'updateDishStatus', 'updateDishTutorials']
+const VALID_ACTIONS = ['list', 'listDishes', 'create', 'createDish', 'update', 'updateDish', 'updateDishStatus', 'updateDishTutorials', 'updateDishIngredients', 'onSale', 'offSale', 'sort']
+const WEB_ALLOWED_ACTIONS = ['listDishes', 'createDish', 'updateDish', 'updateDishStatus', 'updateDishTutorials', 'updateDishIngredients']
 const VALID_DISH_STATUSES = ['on_sale', 'off_sale']
 const VALID_TUTORIAL_PLATFORMS = ['douyin', 'xiaohongshu', 'bilibili', 'other']
 const MAX_TUTORIAL_COUNT = 3
@@ -203,6 +203,17 @@ function normalizeWebDishTutorialsData(event = {}) {
 
   if (tutorials !== undefined) {
     data.tutorials = normalizeJsonArrayValue(tutorials)
+  }
+
+  return data
+}
+
+function normalizeWebDishIngredientsData(event = {}) {
+  const ingredients = getPayloadValue(event, 'ingredients')
+  const data = {}
+
+  if (ingredients !== undefined) {
+    data.ingredients = normalizeJsonArrayValue(ingredients)
   }
 
   return data
@@ -529,6 +540,30 @@ function validateIngredientList(value) {
 
     if (item.enabled !== undefined && typeof item.enabled !== 'boolean') {
       return failure('VALIDATION_ERROR', '食材启用状态必须是布尔值')
+    }
+  }
+
+  return null
+}
+
+function validateWebIngredientList(value) {
+  const listError = validateIngredientList(value)
+  if (listError) {
+    return listError
+  }
+
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return failure('VALIDATION_ERROR', '食材配置不合法')
+    }
+
+    if (!normalizeString(item.name)) {
+      return failure('VALIDATION_ERROR', '食材名称不能为空')
+    }
+
+    const amount = Number(item.amount)
+    if (!Number.isFinite(amount) || amount < 0) {
+      return failure('VALIDATION_ERROR', '食材用量必须是非负数字')
     }
   }
 
@@ -1178,6 +1213,54 @@ async function handleWebTutorialsUpdate(deps, merchantId, dishId, data) {
   }
 }
 
+async function handleWebIngredientsUpdate(deps, merchantId, dishId, data) {
+  if (!dishId) {
+    return failure('INVALID_PARAMS', '餐品 ID 不能为空')
+  }
+
+  if (!hasOwn(data, 'ingredients')) {
+    return failure('VALIDATION_ERROR', '食材配置不能为空')
+  }
+
+  const ingredientError = validateWebIngredientList(data.ingredients)
+  if (ingredientError) {
+    return ingredientError
+  }
+
+  let dishResult
+  try {
+    dishResult = await assertDishBelongsToMerchant(deps, dishId, merchantId)
+  } catch (error) {
+    deps.logger.error('manageDish web ingredients query database error', error)
+    return failure('DATABASE_ERROR', '查询餐品失败，请稍后重试')
+  }
+
+  if (dishResult.error) {
+    return dishResult.error
+  }
+
+  const updateData = {
+    ingredients: normalizeIngredientList(data.ingredients),
+    updated_at: deps.now()
+  }
+
+  try {
+    const updatedDish = await deps.updateDish({
+      dish_id: dishResult.dish.dish_id || dishId,
+      updateData
+    })
+    return success('食材配置已更新', {
+      dish: formatDish({
+        ...dishResult.dish,
+        ...(updatedDish || updateData)
+      })
+    })
+  } catch (error) {
+    deps.logger.error('manageDish web ingredients update database error', error)
+    return failure('DATABASE_ERROR', '食材配置更新失败，请稍后重试')
+  }
+}
+
 async function handleUpdate(deps, merchantId, dishId, data) {
   if (!dishId) {
     return failure('INVALID_PARAMS', '餐品 ID 不能为空')
@@ -1424,6 +1507,15 @@ function createManageDishHandler(dependencies) {
             merchantId,
             dishId,
             normalizeWebDishTutorialsData(normalizedEvent)
+          )
+        }
+
+        if (action === 'updateDishIngredients') {
+          return handleWebIngredientsUpdate(
+            deps,
+            merchantId,
+            dishId,
+            normalizeWebDishIngredientsData(normalizedEvent)
           )
         }
 

@@ -12,6 +12,16 @@ export interface DishTutorial {
   sort_order: number
 }
 
+export interface DishIngredient {
+  name: string
+  amount: number
+  unit: string
+  category: string
+  note: string
+  enabled: boolean
+  sort_order: number
+}
+
 export interface DishListItem {
   id: string
   dish_id: string
@@ -27,7 +37,7 @@ export interface DishListItem {
   sort_order: number
   sales_count: number
   tutorials: DishTutorial[]
-  ingredients: unknown[]
+  ingredients: DishIngredient[]
   created_at: string
   updated_at: string
 }
@@ -156,6 +166,38 @@ function normalizeTutorials(value: unknown): DishTutorial[] {
     .slice(0, 3)
 }
 
+function normalizeIngredient(item: unknown, index: number): DishIngredient | null {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return null
+  }
+
+  const source = item as Record<string, unknown>
+  const name = toText(source.name).trim()
+  if (!name) {
+    return null
+  }
+
+  return {
+    name,
+    amount: toNumber(source.amount),
+    unit: toText(source.unit).trim(),
+    category: toText(source.category, '其他').trim() || '其他',
+    note: toText(source.note).trim(),
+    enabled: typeof source.enabled === 'boolean' ? source.enabled : true,
+    sort_order: toNumber(source.sort_order, index + 1)
+  }
+}
+
+function normalizeIngredients(value: unknown): DishIngredient[] {
+  return toArray(value)
+    .map((item, index) => normalizeIngredient(item, index))
+    .filter((item): item is DishIngredient => Boolean(item))
+    .map((item, index) => ({
+      ...item,
+      sort_order: index + 1
+    }))
+}
+
 function normalizeDish(item: RawDishItem): DishListItem {
   const priceCent = toNumber(item.price_cent ?? item.price)
   const status = toStatus(item.status)
@@ -176,7 +218,7 @@ function normalizeDish(item: RawDishItem): DishListItem {
     sort_order: toNumber(item.sort_order),
     sales_count: toNumber(item.sales_count),
     tutorials: normalizeTutorials(item.tutorials),
-    ingredients: toArray(item.ingredients),
+    ingredients: normalizeIngredients(item.ingredients),
     created_at: toText(item.created_at),
     updated_at: toText(item.updated_at)
   }
@@ -242,6 +284,21 @@ export async function updateDishTutorials(
     merchant_id: merchantId,
     dish_id: dishId,
     tutorials
+  })
+
+  return result.dish ? normalizeDish(result.dish) : null
+}
+
+export async function updateDishIngredients(
+  merchantId: string,
+  dishId: string,
+  ingredients: DishIngredient[]
+) {
+  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', {
+    action: 'updateDishIngredients',
+    merchant_id: merchantId,
+    dish_id: dishId,
+    ingredients
   })
 
   return result.dish ? normalizeDish(result.dish) : null

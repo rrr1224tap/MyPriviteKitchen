@@ -12,8 +12,10 @@ import {
   createDish,
   fetchDishes,
   updateDish,
+  updateDishIngredients,
   updateDishStatus,
   updateDishTutorials,
+  type DishIngredient,
   type DishListItem,
   type DishStatus,
   type DishTutorial,
@@ -39,6 +41,7 @@ const isCategoryLoading = ref(false)
 const errorMessage = ref('')
 const errorCode = ref('')
 const categoryErrorMessage = ref('')
+const selectedDishId = ref('')
 
 const isCreateFormOpen = ref(false)
 const isCreating = ref(false)
@@ -72,6 +75,12 @@ const tutorialErrorMessage = ref('')
 const tutorialSuccessMessage = ref('')
 const tutorialDish = ref<DishListItem | null>(null)
 const tutorialForm = ref<DishTutorial[]>([])
+const isIngredientFormOpen = ref(false)
+const isSavingIngredients = ref(false)
+const ingredientErrorMessage = ref('')
+const ingredientSuccessMessage = ref('')
+const ingredientDish = ref<DishListItem | null>(null)
+const ingredientForm = ref<DishIngredient[]>([])
 
 function getRouteMerchantId() {
   const value = route.params.merchantId
@@ -98,6 +107,49 @@ const onSaleCount = computed(() => dishes.value.filter((item) => item.status ===
 const offSaleCount = computed(() => dishes.value.filter((item) => item.status === 'off_sale').length)
 const missingIngredientCount = computed(() => dishes.value.filter((item) => item.ingredients.length === 0).length)
 const activeCategories = computed(() => categories.value.filter((item) => item.status === 'active'))
+const selectedDish = computed(() => {
+  return dishes.value.find((item) => getDishKey(item) === selectedDishId.value) || null
+})
+
+function getDishKey(item: DishListItem) {
+  return item.dish_id || item.id
+}
+
+function selectDish(item: DishListItem) {
+  selectedDishId.value = getDishKey(item)
+}
+
+function ensureSelectedDish(list: DishListItem[]) {
+  if (!list.length) {
+    selectedDishId.value = ''
+    return
+  }
+
+  const currentExists = list.some((item) => getDishKey(item) === selectedDishId.value)
+  if (!currentExists) {
+    selectedDishId.value = getDishKey(list[0])
+  }
+}
+
+function getDetailStatusText(status: DishStatus) {
+  if (status === 'on_sale') {
+    return '已上架'
+  }
+
+  if (status === 'sold_out') {
+    return '已售罄'
+  }
+
+  return '已下架'
+}
+
+function getTutorialPlatformLabel(platform: DishTutorialPlatform) {
+  return tutorialPlatformOptions.find((item) => item.value === platform)?.label || '其它'
+}
+
+function getIngredientEnabledText(item: DishIngredient) {
+  return item.enabled ? '启用' : '停用'
+}
 
 function getDishTone(status: DishStatus) {
   if (status === 'on_sale') {
@@ -112,7 +164,19 @@ function getDishTone(status: DishStatus) {
 }
 
 function showPendingTip() {
-  window.alert('删除、食材配置和规格加料会在后续版本接入，本阶段不执行这些真实写入。')
+  window.alert('删除和规格加料会在后续版本接入，本阶段不执行这些真实写入。')
+}
+
+function createEmptyIngredient(index: number): DishIngredient {
+  return {
+    name: '',
+    amount: 0,
+    unit: '',
+    category: '其他',
+    note: '',
+    enabled: true,
+    sort_order: index + 1
+  }
 }
 
 function createEmptyTutorial(index: number): DishTutorial {
@@ -124,6 +188,54 @@ function createEmptyTutorial(index: number): DishTutorial {
     enabled: true,
     sort_order: index + 1
   }
+}
+
+function resetIngredientForm() {
+  ingredientForm.value = []
+  ingredientErrorMessage.value = ''
+  ingredientDish.value = null
+}
+
+function openIngredientForm(item: DishListItem) {
+  ingredientSuccessMessage.value = ''
+  ingredientErrorMessage.value = ''
+  ingredientDish.value = item
+  ingredientForm.value = item.ingredients.map((ingredient, index) => ({
+    name: ingredient.name,
+    amount: ingredient.amount,
+    unit: ingredient.unit,
+    category: ingredient.category || '其他',
+    note: ingredient.note,
+    enabled: ingredient.enabled,
+    sort_order: index + 1
+  }))
+  isIngredientFormOpen.value = true
+}
+
+function closeIngredientForm() {
+  if (isSavingIngredients.value) return
+
+  isIngredientFormOpen.value = false
+  resetIngredientForm()
+}
+
+function addIngredient() {
+  ingredientErrorMessage.value = ''
+  ingredientForm.value.push(createEmptyIngredient(ingredientForm.value.length))
+}
+
+function removeIngredient(index: number) {
+  ingredientErrorMessage.value = ''
+  ingredientForm.value.splice(index, 1)
+  ingredientForm.value = ingredientForm.value.map((item, itemIndex) => ({
+    ...item,
+    sort_order: itemIndex + 1
+  }))
+}
+
+function clearIngredients() {
+  ingredientErrorMessage.value = ''
+  ingredientForm.value = []
 }
 
 function resetTutorialForm() {
@@ -362,6 +474,44 @@ function validateTutorialForm() {
   }
 }
 
+function validateIngredientForm() {
+  const ingredients: DishIngredient[] = []
+  for (const [index, item] of ingredientForm.value.entries()) {
+    const name = item.name.trim()
+    const amountText = String(item.amount).trim()
+    const amount = Number(item.amount)
+    const unit = item.unit.trim()
+    const category = item.category.trim() || '其他'
+    const note = item.note.trim()
+
+    if (!name) {
+      return {
+        error: `第 ${index + 1} 条食材名称不能为空`
+      }
+    }
+
+    if (!amountText || !Number.isFinite(amount) || amount < 0) {
+      return {
+        error: `第 ${index + 1} 条食材用量必须是大于等于 0 的数字`
+      }
+    }
+
+    ingredients.push({
+      name,
+      amount,
+      unit,
+      category,
+      note,
+      enabled: item.enabled,
+      sort_order: index + 1
+    })
+  }
+
+  return {
+    payload: ingredients
+  }
+}
+
 async function submitCreateDish() {
   if (isCreating.value) return
 
@@ -411,6 +561,32 @@ async function submitUpdateDish() {
     editErrorMessage.value = adminError.message || '餐品编辑失败，请稍后重试'
   } finally {
     isUpdating.value = false
+  }
+}
+
+async function submitIngredients() {
+  if (isSavingIngredients.value || !ingredientDish.value) return
+
+  ingredientErrorMessage.value = ''
+  ingredientSuccessMessage.value = ''
+  const validation = validateIngredientForm()
+  if (validation.error || !validation.payload) {
+    ingredientErrorMessage.value = validation.error || '请检查食材配置表单'
+    return
+  }
+
+  isSavingIngredients.value = true
+  try {
+    await updateDishIngredients(merchantId.value, ingredientDish.value.dish_id, validation.payload)
+    await loadDishes()
+    ingredientSuccessMessage.value = '食材配置已更新，列表已刷新'
+    isIngredientFormOpen.value = false
+    resetIngredientForm()
+  } catch (error) {
+    const adminError = error as Partial<AdminApiError>
+    ingredientErrorMessage.value = adminError.message || '食材配置更新失败，请稍后重试'
+  } finally {
+    isSavingIngredients.value = false
   }
 }
 
@@ -487,8 +663,10 @@ async function loadDishes() {
     rememberMerchantId(merchantId.value)
     const result = await fetchDishes(merchantId.value)
     dishes.value = result.list
+    ensureSelectedDish(result.list)
   } catch (error) {
     dishes.value = []
+    selectedDishId.value = ''
     const adminError = error as Partial<AdminApiError>
     errorCode.value = adminError.code || 'UNKNOWN_ERROR'
     errorMessage.value = adminError.message || '餐品列表读取失败，请稍后重试'
@@ -530,7 +708,7 @@ watch(merchantId, loadPageData)
     <PageHeader
       eyebrow="Dishes"
       title="餐品管理"
-      :description="`当前商户：${merchantId}。餐品列表、新增、编辑、上下架和做法参考已接入真实云函数；删除、食材配置和规格加料仍为后续接入。`"
+      :description="`当前商户：${merchantId}。餐品列表、新增、编辑、上下架、做法参考和食材配置已接入真实云函数；删除和规格加料仍为后续接入。`"
     >
       <template #actions>
         <ActionButton variant="ghost" :disabled="isLoading" @click="loadPageData">刷新</ActionButton>
@@ -586,6 +764,15 @@ watch(merchantId, loadPageData)
         <div>
           <h2>做法参考已更新</h2>
           <p>{{ tutorialSuccessMessage }}</p>
+        </div>
+      </div>
+    </GlassCard>
+
+    <GlassCard v-if="ingredientSuccessMessage">
+      <div class="section-heading compact-section-heading">
+        <div>
+          <h2>食材配置已更新</h2>
+          <p>{{ ingredientSuccessMessage }}</p>
         </div>
       </div>
     </GlassCard>
@@ -736,6 +923,85 @@ watch(merchantId, loadPageData)
       </form>
     </GlassCard>
 
+    <GlassCard v-if="isIngredientFormOpen">
+      <div class="section-heading">
+        <div>
+          <h2>编辑食材配置</h2>
+          <p>{{ ingredientDish?.name || '当前餐品' }}，用于今日备料汇总；保存空列表会清空现有食材配置。</p>
+        </div>
+        <ActionButton variant="ghost" :disabled="isSavingIngredients" @click="closeIngredientForm">收起</ActionButton>
+      </div>
+
+      <form class="tutorial-editor ingredient-editor" @submit.prevent="submitIngredients">
+        <div class="tutorial-editor__toolbar">
+          <ActionButton variant="ghost" :disabled="isSavingIngredients" @click="addIngredient">添加食材</ActionButton>
+          <ActionButton
+            variant="danger"
+            :disabled="isSavingIngredients || ingredientForm.length === 0"
+            @click="clearIngredients"
+          >
+            清空食材
+          </ActionButton>
+        </div>
+
+        <div v-if="ingredientForm.length === 0" class="tutorial-editor__empty">
+          当前没有食材配置，直接保存可清空云端食材配置。
+        </div>
+
+        <div v-else class="tutorial-editor__list">
+          <div v-for="(item, index) in ingredientForm" :key="index" class="tutorial-editor__item">
+            <div class="tutorial-editor__item-head">
+              <strong>食材 {{ index + 1 }}</strong>
+              <button class="ghost-button compact-button" type="button" :disabled="isSavingIngredients" @click="removeIngredient(index)">
+                移除
+              </button>
+            </div>
+
+            <div class="admin-form tutorial-editor__grid">
+              <label class="form-field">
+                <span>食材名称 <b>*</b></span>
+                <input v-model="item.name" autocomplete="off" placeholder="例如 番茄" :disabled="isSavingIngredients" />
+              </label>
+
+              <label class="form-field">
+                <span>用量 <b>*</b></span>
+                <input v-model.number="item.amount" inputmode="decimal" autocomplete="off" placeholder="例如 2" :disabled="isSavingIngredients" />
+              </label>
+
+              <label class="form-field">
+                <span>单位</span>
+                <input v-model="item.unit" autocomplete="off" placeholder="例如 个 / g / 份" :disabled="isSavingIngredients" />
+              </label>
+
+              <label class="form-field">
+                <span>分类</span>
+                <input v-model="item.category" autocomplete="off" placeholder="例如 蔬菜 / 肉类 / 调料" :disabled="isSavingIngredients" />
+              </label>
+
+              <label class="form-field form-field--wide">
+                <span>备注</span>
+                <textarea v-model="item.note" rows="2" placeholder="例如 中等大小，可提前切块" :disabled="isSavingIngredients" />
+              </label>
+
+              <label class="ingredient-toggle form-field--wide">
+                <input v-model="item.enabled" type="checkbox" :disabled="isSavingIngredients" />
+                <span>启用此食材，参与今日备料汇总</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <p v-if="ingredientErrorMessage" class="form-error">{{ ingredientErrorMessage }}</p>
+
+        <div class="form-actions">
+          <button class="ghost-button" type="button" :disabled="isSavingIngredients" @click="closeIngredientForm">取消</button>
+          <button class="primary-button" type="submit" :disabled="isSavingIngredients">
+            {{ isSavingIngredients ? '正在保存...' : '保存食材配置' }}
+          </button>
+        </div>
+      </form>
+    </GlassCard>
+
     <GlassCard v-if="isTutorialFormOpen">
       <div class="section-heading">
         <div>
@@ -820,7 +1086,7 @@ watch(merchantId, loadPageData)
         <div class="section-heading">
           <div>
             <h2>餐品列表</h2>
-            <p>数据来自 manageDish.listDishes，新增、编辑、上下架和做法参考保存成功后会自动刷新。</p>
+            <p>数据来自 manageDish.listDishes，新增、编辑、上下架、做法参考和食材配置保存成功后会自动刷新。</p>
           </div>
           <StatusBadge label="真实数据" tone="green" />
         </div>
@@ -851,7 +1117,13 @@ watch(merchantId, loadPageData)
             <span>食材</span>
             <span>操作</span>
           </div>
-          <div v-for="item in dishes" :key="item.id || item.dish_id" class="mock-table__row dish-table__row">
+          <div
+            v-for="item in dishes"
+            :key="getDishKey(item)"
+            class="mock-table__row dish-table__row"
+            :class="{ 'dish-table__row--selected': getDishKey(item) === selectedDishId }"
+            @click="selectDish(item)"
+          >
             <span class="dish-info-cell">
               <strong class="dish-title">{{ item.name }}</strong>
               <small v-if="item.description" class="dish-desc">{{ item.description }}</small>
@@ -864,8 +1136,9 @@ watch(merchantId, loadPageData)
             <span>{{ item.sort_order }}</span>
             <span>{{ item.tutorials.length }} 条</span>
             <span>{{ item.ingredients.length }} 项</span>
-            <span class="table-action-group">
+            <span class="table-action-group" @click.stop>
               <ActionButton variant="ghost" @click="openEditForm(item)">编辑</ActionButton>
+              <ActionButton variant="ghost" @click="openIngredientForm(item)">食材配置</ActionButton>
               <ActionButton variant="ghost" @click="openTutorialForm(item)">做法参考</ActionButton>
               <ActionButton
                 :variant="item.status === 'on_sale' ? 'danger' : 'ghost'"
@@ -883,27 +1156,67 @@ watch(merchantId, loadPageData)
       <GlassCard>
         <div class="section-heading">
           <div>
-            <h2>后续接入范围</h2>
-            <p>删除、食材配置和规格加料仍为后续接入。</p>
+            <h2>选中餐品详情</h2>
+            <p>点击左侧餐品行查看基础信息、做法参考和食材配置摘要。</p>
           </div>
-          <StatusBadge label="基础信息" tone="orange" />
+          <StatusBadge :label="selectedDish ? getDetailStatusText(selectedDish.status) : '未选择'" :tone="selectedDish ? getDishTone(selectedDish.status) : 'muted'" />
         </div>
-        <div class="form-preview">
-          <div class="form-preview__group">
-            <strong>已接入</strong>
-            <span>新增 / 编辑基础信息，上架 / 下架状态切换，做法参考编辑</span>
+
+        <div v-if="!selectedDish" class="dish-detail-empty">
+          请选择左侧餐品查看详情
+        </div>
+
+        <div v-else class="dish-detail-panel">
+          <div class="dish-detail-section">
+            <div class="dish-detail-title">
+              <strong>{{ selectedDish.name }}</strong>
+              <StatusBadge :label="getDetailStatusText(selectedDish.status)" :tone="getDishTone(selectedDish.status)" />
+            </div>
+            <div class="dish-detail-meta">
+              <span>分类：{{ selectedDish.category_id || '-' }}</span>
+              <span>价格：{{ selectedDish.price_text }}</span>
+              <span>排序：{{ selectedDish.sort_order }}</span>
+              <span>
+                图片：
+                <a v-if="selectedDish.image_url" :href="selectedDish.image_url" target="_blank" rel="noreferrer">
+                  查看图片
+                </a>
+                <template v-else>未填写</template>
+              </span>
+            </div>
           </div>
-          <div class="form-preview__group">
-            <strong>规格配置</strong>
-            <span>标准份、大份、双拼等规格项</span>
+
+          <div class="dish-detail-section">
+            <strong>餐品描述</strong>
+            <p class="dish-detail-text">{{ selectedDish.description || '暂无描述' }}</p>
           </div>
-          <div class="form-preview__group">
-            <strong>食材配置</strong>
-            <span>食材名称、数量、单位、启用状态</span>
+
+          <div class="dish-detail-section">
+            <div class="dish-detail-title compact">
+              <strong>做法参考</strong>
+              <span>{{ selectedDish.tutorials.length }} 条</span>
+            </div>
+            <div v-if="selectedDish.tutorials.length" class="dish-mini-list">
+              <div v-for="tutorial in selectedDish.tutorials.slice(0, 3)" :key="`${tutorial.title}-${tutorial.sort_order}`" class="dish-mini-item">
+                <strong>{{ tutorial.title }}</strong>
+                <span>{{ getTutorialPlatformLabel(tutorial.platform) }} · {{ tutorial.url || '未填写链接' }}</span>
+              </div>
+            </div>
+            <p v-else class="dish-detail-muted">暂无做法参考</p>
           </div>
-          <div class="form-preview__group">
-            <strong>做法参考</strong>
-            <span>标题、平台、链接、口令、备注已接入，最多 3 条</span>
+
+          <div class="dish-detail-section">
+            <div class="dish-detail-title compact">
+              <strong>食材配置</strong>
+              <span>{{ selectedDish.ingredients.length }} 项</span>
+            </div>
+            <div v-if="selectedDish.ingredients.length" class="dish-mini-list">
+              <div v-for="ingredient in selectedDish.ingredients.slice(0, 6)" :key="`${ingredient.name}-${ingredient.sort_order}`" class="dish-mini-item">
+                <strong>{{ ingredient.name }}</strong>
+                <span>{{ ingredient.amount }}{{ ingredient.unit }} · {{ getIngredientEnabledText(ingredient) }}</span>
+              </div>
+            </div>
+            <p v-else class="dish-detail-muted">暂无食材配置</p>
           </div>
         </div>
       </GlassCard>
