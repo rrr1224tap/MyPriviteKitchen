@@ -1,5 +1,5 @@
-const VALID_ACTIONS = ['list', 'listDishes', 'create', 'update', 'onSale', 'offSale', 'sort']
-const WEB_ALLOWED_ACTIONS = ['listDishes']
+const VALID_ACTIONS = ['list', 'listDishes', 'create', 'createDish', 'update', 'onSale', 'offSale', 'sort']
+const WEB_ALLOWED_ACTIONS = ['listDishes', 'createDish']
 const VALID_DISH_STATUSES = ['on_sale', 'off_sale']
 const VALID_TUTORIAL_PLATFORMS = ['douyin', 'xiaohongshu', 'bilibili', 'other']
 const MAX_TUTORIAL_COUNT = 3
@@ -111,6 +111,65 @@ function normalizeEventData(event = {}) {
   }
 }
 
+function getPayloadValue(event, field) {
+  if (hasOwn(event, field)) {
+    return event[field]
+  }
+
+  const data = normalizeData(event.data)
+  if (hasOwn(data, field)) {
+    return data[field]
+  }
+
+  const dish = normalizeData(event.dish)
+  if (hasOwn(dish, field)) {
+    return dish[field]
+  }
+
+  return undefined
+}
+
+function normalizePriceYuanToCent(value) {
+  const numberValue = Number(value)
+  if (!Number.isFinite(numberValue) || numberValue < 0) {
+    return null
+  }
+
+  return Math.round(numberValue * 100)
+}
+
+function normalizeWebDishCreateData(event = {}) {
+  const data = {}
+
+  if (getPayloadValue(event, 'name') !== undefined) {
+    data.name = getPayloadValue(event, 'name')
+  }
+
+  if (getPayloadValue(event, 'category_id') !== undefined) {
+    data.category_id = getPayloadValue(event, 'category_id')
+  }
+
+  if (getPayloadValue(event, 'description') !== undefined) {
+    data.description = getPayloadValue(event, 'description')
+  }
+
+  const imageUrl = getPayloadValue(event, 'image_url')
+  const image = getPayloadValue(event, 'image')
+  if (imageUrl !== undefined || image !== undefined) {
+    data.image_url = imageUrl !== undefined ? imageUrl : image
+  }
+
+  const price = getPayloadValue(event, 'price')
+  const priceCent = getPayloadValue(event, 'price_cent')
+  if (price !== undefined || priceCent !== undefined) {
+    data.price_cent = price !== undefined
+      ? normalizePriceYuanToCent(price)
+      : normalizePriceCent(priceCent)
+  }
+
+  return data
+}
+
 function normalizeTags(value) {
   if (!Array.isArray(value)) {
     return []
@@ -130,6 +189,10 @@ function normalizeSortOrder(value) {
 }
 
 function normalizePriceCent(value) {
+  if (value === null || value === '') {
+    return null
+  }
+
   const numberValue = Number(value)
   if (!Number.isInteger(numberValue) || numberValue < 0) {
     return null
@@ -615,6 +678,27 @@ function buildDishCreateData(deps, merchantId, data, now, dishId, sortOrder) {
   }
 }
 
+function buildWebDishCreateData(merchantId, data, now, dishId, sortOrder) {
+  return {
+    dish_id: dishId,
+    merchant_id: merchantId,
+    category_id: normalizeString(data.category_id),
+    name: normalizeString(data.name),
+    description: normalizeString(data.description),
+    image_url: normalizeString(data.image_url),
+    price_cent: normalizePriceCent(data.price_cent),
+    original_price_cent: 0,
+    tags: [],
+    status: 'on_sale',
+    stock_enabled: false,
+    stock_count: 0,
+    sold_out: false,
+    sort_order: sortOrder,
+    created_at: now,
+    updated_at: now
+  }
+}
+
 function applyDishUpdateData(updateData, data) {
   if (data.category_id !== undefined) {
     updateData.category_id = normalizeString(data.category_id)
@@ -865,6 +949,60 @@ async function handleCreate(deps, merchantId, data) {
   }
 }
 
+async function handleWebCreate(deps, merchantId, data) {
+  const validationError = validateDishData(data, {
+    requireCategory: true,
+    requireName: true,
+    requirePrice: true
+  })
+  if (validationError) {
+    return validationError
+  }
+
+  let categoryResult
+  try {
+    categoryResult = await assertCategoryBelongsToMerchant(
+      deps,
+      normalizeString(data.category_id),
+      merchantId
+    )
+  } catch (error) {
+    deps.logger.error('manageDish web create category query error', error)
+    return failure('DATABASE_ERROR', '查询分类失败，请稍后重试')
+  }
+
+  if (categoryResult.error) {
+    return categoryResult.error
+  }
+
+  let sortOrder
+  try {
+    sortOrder = await deps.getNextSortOrder(merchantId)
+  } catch (error) {
+    deps.logger.error('manageDish web get next sort order error', error)
+    return failure('DATABASE_ERROR', '生成餐品排序失败，请稍后重试')
+  }
+
+  const now = deps.now()
+  const dish = buildWebDishCreateData(
+    merchantId,
+    data,
+    now,
+    deps.createDishId(),
+    sortOrder
+  )
+
+  try {
+    const createdDish = await deps.createDish(dish)
+    return success('新增餐品成功', {
+      dish: formatDish(createdDish || dish)
+    })
+  } catch (error) {
+    deps.logger.error('manageDish web create database error', error)
+    return failure('DATABASE_ERROR', '新增餐品失败，请稍后重试')
+  }
+}
+
 async function handleUpdate(deps, merchantId, dishId, data) {
   if (!dishId) {
     return failure('INVALID_PARAMS', '餐品 ID 不能为空')
@@ -1079,7 +1217,15 @@ function createManageDishHandler(dependencies) {
           return webAdminResult.error
         }
 
-        return handleList(deps, merchantId, data)
+        if (action === 'listDishes') {
+          return handleList(deps, merchantId, data)
+        }
+
+        if (action === 'createDish') {
+          return handleWebCreate(deps, merchantId, normalizeWebDishCreateData(normalizedEvent))
+        }
+
+        return failure('FORBIDDEN', 'Web 后台当前仅开放餐品列表读取和新增餐品')
       }
 
       if (!openid) {

@@ -1,5 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const Module = require('node:module')
 
 const { createManageDishHandler } = require('./dish-service')
 const {
@@ -254,6 +255,186 @@ function createWebToken(options = {}) {
   }).token
 }
 
+function matchesQuery(record, query = {}) {
+  return Object.entries(query).every(([key, value]) => {
+    if (value && typeof value === 'object' && Array.isArray(value.values)) {
+      return value.values.includes(record[key])
+    }
+
+    return record[key] === value
+  })
+}
+
+function createIndexCloudMock(options = {}) {
+  const state = {
+    openid: options.openid || '',
+    categories: options.categories || [
+      {
+        _id: 'doc_category_001',
+        category_id: 'category_001',
+        merchant_id: 'merchant_001',
+        name: 'Entry Category',
+        sort_order: 1,
+        status: 'active'
+      }
+    ],
+    dishes: options.dishes || [
+      {
+        _id: 'doc_dish_001',
+        dish_id: 'dish_001',
+        merchant_id: 'merchant_001',
+        category_id: 'category_001',
+        name: 'Entry Dish',
+        price_cent: 1200,
+        status: 'on_sale',
+        sort_order: 1
+      }
+    ],
+    merchantStaff: options.merchantStaff || []
+  }
+
+  function createQuery(collectionName, query = {}) {
+    const queryState = {
+      sortField: '',
+      sortDirection: 'asc',
+      limitSize: null
+    }
+
+    const queryApi = {
+      where(nextQuery) {
+        return createQuery(collectionName, nextQuery)
+      },
+      orderBy(field, direction) {
+        queryState.sortField = field
+        queryState.sortDirection = direction
+        return queryApi
+      },
+      limit(size) {
+        queryState.limitSize = size
+        return queryApi
+      },
+      async get() {
+        const source = collectionName === 'dishes'
+          ? state.dishes
+          : collectionName === 'categories'
+            ? state.categories
+            : state.merchantStaff
+        let data = source.filter((record) => matchesQuery(record, query))
+        if (queryState.sortField) {
+          data = data.slice().sort((left, right) => {
+            const leftValue = Number(left[queryState.sortField]) || 0
+            const rightValue = Number(right[queryState.sortField]) || 0
+            return queryState.sortDirection === 'desc'
+              ? rightValue - leftValue
+              : leftValue - rightValue
+          })
+        }
+        if (queryState.limitSize !== null) {
+          data = data.slice(0, queryState.limitSize)
+        }
+        return { data }
+      },
+      async update({ data }) {
+        const source = collectionName === 'dishes'
+          ? state.dishes
+          : collectionName === 'categories'
+            ? state.categories
+            : state.merchantStaff
+        let updated = 0
+        source.forEach((record) => {
+          if (matchesQuery(record, query)) {
+            Object.assign(record, data)
+            updated += 1
+          }
+        })
+        return {
+          stats: {
+            updated
+          }
+        }
+      }
+    }
+
+    return queryApi
+  }
+
+  const db = {
+    command: {
+      in: (values) => ({ values })
+    },
+    collection(collectionName) {
+      return {
+        where(query) {
+          return createQuery(collectionName, query)
+        },
+        doc(documentId) {
+          return {
+            async get() {
+              const source = collectionName === 'dishes' ? state.dishes : state.categories
+              const record = source.find((item) => {
+                return item._id === documentId ||
+                  item.dish_id === documentId ||
+                  item.category_id === documentId
+              })
+              if (!record) {
+                throw new Error('DOCUMENT_NOT_FOUND')
+              }
+              return { data: record }
+            }
+          }
+        },
+        async add({ data }) {
+          const id = `doc_${data.dish_id || data.category_id || Date.now()}`
+          const record = {
+            _id: id,
+            ...data
+          }
+          if (collectionName === 'dishes') {
+            state.dishes.push(record)
+          } else if (collectionName === 'categories') {
+            state.categories.push(record)
+          }
+          return {
+            _id: id
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    state,
+    cloud: {
+      DYNAMIC_CURRENT_ENV: 'test-env',
+      init: () => {},
+      database: () => db,
+      getWXContext: () => ({
+        OPENID: state.openid
+      })
+    }
+  }
+}
+
+function loadManageDishIndexWithCloudMock(cloudMock) {
+  const indexPath = require.resolve('./index')
+  delete require.cache[indexPath]
+
+  const originalLoad = Module._load
+  Module._load = function loadMockedModule(request, parent, isMain) {
+    if (request === 'wx-server-sdk') {
+      return cloudMock
+    }
+
+    return originalLoad.call(this, request, parent, isMain)
+  }
+
+  try {
+    return require('./index').main
+  } finally {
+    Module._load = originalLoad
+  }
+}
+
 test('active merchant staff can list dishes for their merchant only', async () => {
   const { deps } = createDependencies()
   const handler = createManageDishHandler(deps)
@@ -460,6 +641,371 @@ test('web list dishes requires merchant_id', async () => {
   assert.equal(result.success, false)
   assert.equal(result.code, 'INVALID_PARAMS')
   assert.equal(state.writes, 0)
+})
+
+test('web valid admin token can create basic dish', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'createDish',
+    merchant_id: 'merchant_001',
+    name: 'Tomato Egg',
+    category_id: 'category_001',
+    price: 18,
+    description: 'Home style dish',
+    image_url: 'https://example.com/dish.jpg',
+    admin_token: createWebToken()
+  })
+
+  const createdDish = state.dishes.find((dish) => dish.dish_id === 'dish_new_1')
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.data.dish.dish_id, 'dish_new_1')
+  assert.equal(result.data.dish.merchant_id, 'merchant_001')
+  assert.equal(result.data.dish.name, 'Tomato Egg')
+  assert.equal(result.data.dish.category_id, 'category_001')
+  assert.equal(result.data.dish.price_cent, 1800)
+  assert.equal(result.data.dish.description, 'Home style dish')
+  assert.equal(result.data.dish.image_url, 'https://example.com/dish.jpg')
+  assert.equal(result.data.dish.status, 'on_sale')
+  assert.equal(createdDish.price_cent, 1800)
+  assert.equal(Object.prototype.hasOwnProperty.call(createdDish, 'tutorials'), false)
+  assert.equal(Object.prototype.hasOwnProperty.call(createdDish, 'ingredients'), false)
+  assert.equal(state.writes, 1)
+})
+
+test('index entry accepts web createDish action', async () => {
+  const previousSecret = process.env.WEB_ADMIN_TOKEN_SECRET
+  process.env.WEB_ADMIN_TOKEN_SECRET = 'manage-dish-test-secret'
+  const { state, cloud } = createIndexCloudMock()
+  const handler = loadManageDishIndexWithCloudMock(cloud)
+
+  try {
+    const result = await handler({
+      action: 'createDish',
+      merchant_id: 'merchant_001',
+      name: 'Entry Created Dish',
+      category_id: 'category_001',
+      price: 22,
+      admin_token: createWebToken({ now: new Date() })
+    })
+
+    const createdDish = state.dishes.find((dish) => dish.name === 'Entry Created Dish')
+    assert.equal(result.success, true)
+    assert.equal(result.code, 'SUCCESS')
+    assert.equal(createdDish.merchant_id, 'merchant_001')
+    assert.equal(createdDish.price_cent, 2200)
+  } finally {
+    process.env.WEB_ADMIN_TOKEN_SECRET = previousSecret
+  }
+})
+
+test('web empty token cannot create dish', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'createDish',
+    merchant_id: 'merchant_001',
+    name: 'Blocked',
+    category_id: 'category_001',
+    price: 18,
+    admin_token: ''
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.writes, 0)
+})
+
+test('web tampered token cannot create dish', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'createDish',
+    merchant_id: 'merchant_001',
+    name: 'Blocked',
+    category_id: 'category_001',
+    price: 18,
+    admin_token: `${createWebToken()}x`
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.writes, 0)
+})
+
+test('web expired token cannot create dish', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'createDish',
+    merchant_id: 'merchant_001',
+    name: 'Blocked',
+    category_id: 'category_001',
+    price: 18,
+    admin_token: createWebToken({
+      now: new Date('2026-06-24T10:00:00.000Z'),
+      ttlMinutes: 60
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'TOKEN_EXPIRED')
+  assert.equal(state.writes, 0)
+})
+
+test('web non super admin role cannot create dish', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'createDish',
+    merchant_id: 'merchant_001',
+    name: 'Blocked',
+    category_id: 'category_001',
+    price: 18,
+    admin_token: createWebToken({
+      role: 'viewer'
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(state.writes, 0)
+})
+
+test('web http string body can create dish', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    body: JSON.stringify({
+      action: 'createDish',
+      merchant_id: 'merchant_001',
+      name: 'Body String Dish',
+      category_id: 'category_001',
+      price: 19,
+      admin_token: createWebToken()
+    })
+  })
+
+  const createdDish = state.dishes.find((dish) => dish.name === 'Body String Dish')
+  assert.equal(result.success, true)
+  assert.equal(createdDish.price_cent, 1900)
+})
+
+test('index entry http string body accepts web createDish action', async () => {
+  const previousSecret = process.env.WEB_ADMIN_TOKEN_SECRET
+  process.env.WEB_ADMIN_TOKEN_SECRET = 'manage-dish-test-secret'
+  const { state, cloud } = createIndexCloudMock()
+  const handler = loadManageDishIndexWithCloudMock(cloud)
+
+  try {
+    const result = await handler({
+      body: JSON.stringify({
+        action: 'createDish',
+        merchant_id: 'merchant_001',
+        name: 'Entry Body Dish',
+        category_id: 'category_001',
+        price: 21,
+        admin_token: createWebToken({ now: new Date() })
+      })
+    })
+
+    const createdDish = state.dishes.find((dish) => dish.name === 'Entry Body Dish')
+    assert.equal(result.success, true)
+    assert.equal(createdDish.price_cent, 2100)
+  } finally {
+    process.env.WEB_ADMIN_TOKEN_SECRET = previousSecret
+  }
+})
+
+test('web http object body can create dish', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    body: {
+      action: 'createDish',
+      merchant_id: 'merchant_001',
+      name: 'Body Object Dish',
+      category_id: 'category_001',
+      price: 20,
+      admin_token: createWebToken()
+    }
+  })
+
+  const createdDish = state.dishes.find((dish) => dish.name === 'Body Object Dish')
+  assert.equal(result.success, true)
+  assert.equal(createdDish.price_cent, 2000)
+})
+
+test('web query string parameters can create dish', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    queryStringParameters: {
+      action: 'createDish',
+      merchant_id: 'merchant_001',
+      name: 'Query Dish',
+      category_id: 'category_001',
+      price: '23',
+      admin_token: createWebToken()
+    }
+  })
+
+  const createdDish = state.dishes.find((dish) => dish.name === 'Query Dish')
+  assert.equal(result.success, true)
+  assert.equal(createdDish.price_cent, 2300)
+})
+
+test('web create dish requires merchant_id', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'createDish',
+    name: 'Missing Merchant',
+    category_id: 'category_001',
+    price: 18,
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+  assert.equal(state.writes, 0)
+})
+
+test('web create dish validates required basic fields', async () => {
+  const cases = [
+    {
+      title: 'missing name',
+      payload: { category_id: 'category_001', price: 18 }
+    },
+    {
+      title: 'empty name',
+      payload: { name: '   ', category_id: 'category_001', price: 18 }
+    },
+    {
+      title: 'missing category',
+      payload: { name: 'Missing Category', price: 18 }
+    },
+    {
+      title: 'missing price',
+      payload: { name: 'Missing Price', category_id: 'category_001' }
+    },
+    {
+      title: 'non numeric price',
+      payload: { name: 'Bad Price', category_id: 'category_001', price: 'abc' }
+    },
+    {
+      title: 'negative price',
+      payload: { name: 'Negative Price', category_id: 'category_001', price: -1 }
+    }
+  ]
+
+  for (const item of cases) {
+    const { state, deps } = createDependencies({
+      openid: ''
+    })
+    const handler = createManageDishHandler(deps)
+
+    const result = await handler({
+      action: 'createDish',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken(),
+      ...item.payload
+    })
+
+    assert.equal(result.success, false, item.title)
+    assert.equal(result.code, 'VALIDATION_ERROR', item.title)
+    assert.equal(state.writes, 0, item.title)
+  }
+})
+
+test('web create dish rejects category from another merchant', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'createDish',
+    merchant_id: 'merchant_001',
+    name: 'Wrong Category',
+    category_id: 'category_other',
+    price: 18,
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'VALIDATION_ERROR')
+  assert.equal(state.writes, 0)
+})
+
+test('web create dish cannot override system or advanced fields', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+  const createdAt = new Date('2000-01-01T00:00:00.000Z')
+  const updatedAt = new Date('2001-01-01T00:00:00.000Z')
+
+  const result = await handler({
+    action: 'createDish',
+    merchant_id: 'merchant_001',
+    dish_id: 'evil_dish',
+    name: 'Protected Fields Dish',
+    category_id: 'category_001',
+    price: 18,
+    created_at: createdAt,
+    updated_at: updatedAt,
+    data: {
+      merchant_id: 'merchant_002',
+      dish_id: 'evil_nested',
+      created_at: createdAt,
+      updated_at: updatedAt,
+      tutorials: createValidTutorials(1),
+      ingredients: createValidIngredients(1),
+      spec_groups: createValidSpecGroups(),
+      addon_groups: createValidAddonGroups()
+    },
+    admin_token: createWebToken()
+  })
+
+  const createdDish = state.dishes.find((dish) => dish.dish_id === 'dish_new_1')
+  assert.equal(result.success, true)
+  assert.equal(createdDish.merchant_id, 'merchant_001')
+  assert.equal(createdDish.dish_id, 'dish_new_1')
+  assert.equal(createdDish.created_at, FIXED_NOW)
+  assert.equal(createdDish.updated_at, FIXED_NOW)
+  assert.equal(Object.prototype.hasOwnProperty.call(createdDish, 'tutorials'), false)
+  assert.equal(Object.prototype.hasOwnProperty.call(createdDish, 'ingredients'), false)
+  assert.equal(Object.prototype.hasOwnProperty.call(createdDish, 'spec_groups'), false)
+  assert.equal(Object.prototype.hasOwnProperty.call(createdDish, 'addon_groups'), false)
 })
 
 test('web token cannot call write dish actions in this phase', async () => {
