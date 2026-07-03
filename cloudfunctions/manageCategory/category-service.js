@@ -1,6 +1,6 @@
-const VALID_ACTIONS = ['list', 'listCategories', 'create', 'update', 'disable', 'sort']
-const WEB_ALLOWED_ACTIONS = ['listCategories']
-const VALID_CATEGORY_STATUSES = ['active', 'inactive', 'deleted']
+const VALID_ACTIONS = ['list', 'listCategories', 'create', 'createCategory', 'update', 'updateCategory', 'disable', 'sort']
+const WEB_ALLOWED_ACTIONS = ['listCategories', 'createCategory', 'updateCategory']
+const VALID_CATEGORY_STATUSES = ['active', 'disabled', 'inactive', 'deleted']
 const { verifyWebAdminToken } = require('./web-admin-token-helper')
 
 function success(message, data = {}) {
@@ -27,6 +27,29 @@ function normalizeString(value) {
 
 function normalizeData(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+}
+
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key)
+}
+
+function normalizeCategoryPayload(event = {}) {
+  const data = normalizeData(event.data)
+  const payload = {}
+
+  if (hasOwn(data, 'name') || hasOwn(event, 'name')) {
+    payload.name = hasOwn(event, 'name') ? event.name : data.name
+  }
+
+  if (hasOwn(data, 'sort_order') || hasOwn(event, 'sort_order')) {
+    payload.sort_order = hasOwn(event, 'sort_order') ? event.sort_order : data.sort_order
+  }
+
+  if (hasOwn(data, 'status') || hasOwn(event, 'status')) {
+    payload.status = hasOwn(event, 'status') ? event.status : data.status
+  }
+
+  return payload
 }
 
 function parseJsonBody(body) {
@@ -95,6 +118,14 @@ function getCategoryStatus(category = {}) {
     return category.status
   }
   return category.enabled === false ? 'inactive' : 'active'
+}
+
+function normalizeCategoryStatus(value, fallback = 'active') {
+  const status = normalizeString(value) || fallback
+  if (!VALID_CATEGORY_STATUSES.includes(status)) {
+    return null
+  }
+  return status
 }
 
 function formatCategory(category = {}) {
@@ -235,14 +266,19 @@ async function handleCreate(deps, merchantId, data) {
     }
   }
 
+  const status = normalizeCategoryStatus(data.status)
+  if (!status) {
+    return failure('VALIDATION_ERROR', '分类状态不合法')
+  }
+
   const now = deps.now()
   const category = {
     category_id: deps.createCategoryId(),
     merchant_id: merchantId,
     name,
     sort_order: sortOrder,
-    status: 'active',
-    enabled: true,
+    status,
+    enabled: status === 'active',
     created_at: now,
     updated_at: now
   }
@@ -293,8 +329,8 @@ async function handleUpdate(deps, merchantId, categoryId, data) {
   }
 
   if (data.status !== undefined) {
-    const status = normalizeString(data.status)
-    if (!VALID_CATEGORY_STATUSES.includes(status)) {
+    const status = normalizeCategoryStatus(data.status, '')
+    if (!status) {
       return failure('VALIDATION_ERROR', '分类状态不合法')
     }
     Object.assign(updateData, buildStatusUpdate(status))
@@ -448,6 +484,7 @@ function createManageCategoryHandler(dependencies) {
       const action = normalizeString(normalizedEvent.action)
       const categoryId = normalizeString(normalizedEvent.category_id)
       const data = normalizeData(normalizedEvent.data)
+      const categoryData = normalizeCategoryPayload(normalizedEvent)
 
       if (!merchantId || !action) {
         return failure('INVALID_PARAMS', '商家 ID 和操作类型不能为空')
@@ -463,7 +500,19 @@ function createManageCategoryHandler(dependencies) {
           return webAdminResult.error
         }
 
-        return handleList(deps, merchantId)
+        if (action === 'listCategories') {
+          return handleList(deps, merchantId)
+        }
+
+        if (action === 'createCategory') {
+          return handleCreate(deps, merchantId, categoryData)
+        }
+
+        if (action === 'updateCategory') {
+          return handleUpdate(deps, merchantId, categoryId, categoryData)
+        }
+
+        return failure('FORBIDDEN', 'Web 后台当前仅开放分类列表读取和新增 / 编辑分类')
       }
 
       let staff

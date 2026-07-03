@@ -224,7 +224,8 @@ button {
 }
 
 .form-field input,
-.form-field textarea {
+.form-field textarea,
+.form-field select {
   width: 100%;
   border: 1px solid rgba(126, 90, 45, 0.13);
   border-radius: 18px;
@@ -233,9 +234,14 @@ button {
   background: rgba(255, 255, 255, 0.78);
 }
 
-.form-field input {
+.form-field input,
+.form-field select {
   height: 54px;
   padding: 0 18px;
+}
+
+.form-field select {
+  font-weight: 850;
 }
 
 .form-field textarea {
@@ -246,13 +252,15 @@ button {
 }
 
 .form-field input:focus,
-.form-field textarea:focus {
+.form-field textarea:focus,
+.form-field select:focus {
   border-color: rgba(239, 63, 56, 0.55);
   box-shadow: 0 0 0 4px rgba(239, 63, 56, 0.08);
 }
 
 .form-field input:disabled,
-.form-field textarea:disabled {
+.form-field textarea:disabled,
+.form-field select:disabled {
   cursor: not-allowed;
   opacity: 0.68;
 }
@@ -659,6 +667,16 @@ button {
     minmax(150px, 1fr)
     140px
     150px;
+}
+
+.category-table__row {
+  grid-template-columns:
+    minmax(150px, 1fr)
+    minmax(90px, 0.55fr)
+    minmax(70px, 0.45fr)
+    minmax(150px, 1fr)
+    minmax(150px, 0.95fr)
+    minmax(180px, 1.05fr);
 }
 
 .staff-table__row {

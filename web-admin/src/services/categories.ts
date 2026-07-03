@@ -1,6 +1,7 @@
 import { callAdminFunction } from './cloud'
 
-export type CategoryStatus = 'active' | 'inactive' | 'deleted'
+export type CategoryStatus = 'active' | 'disabled' | 'inactive' | 'deleted'
+export type EditableCategoryStatus = 'active' | 'disabled'
 
 export interface CategoryListItem {
   id: string
@@ -66,7 +67,7 @@ function toNumber(value: unknown) {
 }
 
 function toStatus(value: unknown, enabled: unknown): CategoryStatus {
-  if (value === 'inactive' || value === 'deleted') {
+  if (value === 'disabled' || value === 'inactive' || value === 'deleted') {
     return value
   }
 
@@ -82,7 +83,7 @@ function getStatusText(status: CategoryStatus) {
     return '已删除'
   }
 
-  return status === 'inactive' ? '停用' : '启用'
+  return status === 'inactive' || status === 'disabled' ? '停用' : '启用'
 }
 
 function normalizeCategory(raw: RawCategoryItem): CategoryListItem {
@@ -115,4 +116,31 @@ export async function fetchCategories(merchantId: string) {
     list,
     total: Number.isFinite(Number(data.total)) ? Number(data.total) : list.length
   }
+}
+
+export interface CategoryMutationPayload {
+  name?: string
+  sort_order?: number
+  status?: EditableCategoryStatus
+}
+
+export async function createCategory(merchantId: string, payload: CategoryMutationPayload) {
+  const data = await callAdminFunction<{ category?: RawCategoryItem }>('manageCategory', {
+    action: 'createCategory',
+    merchant_id: merchantId,
+    ...payload
+  })
+
+  return data.category ? normalizeCategory(data.category) : null
+}
+
+export async function updateCategory(merchantId: string, categoryId: string, payload: CategoryMutationPayload) {
+  const data = await callAdminFunction<{ category?: RawCategoryItem }>('manageCategory', {
+    action: 'updateCategory',
+    merchant_id: merchantId,
+    category_id: categoryId,
+    ...payload
+  })
+
+  return data.category ? normalizeCategory(data.category) : null
 }
