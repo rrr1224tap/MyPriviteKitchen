@@ -1,7 +1,10 @@
+export type AdminRole = 'super_admin' | 'merchant_admin'
+
 export interface AdminSession {
   token: string
-  role: string
+  role: AdminRole
   expires_at: string
+  merchant_id?: string
 }
 
 const SESSION_KEY = 'xiaochu_web_admin_session'
@@ -35,10 +38,21 @@ export function getSession(): AdminSession | null {
       return null
     }
 
+    if (parsed.role !== 'super_admin' && parsed.role !== 'merchant_admin') {
+      clearSession()
+      return null
+    }
+
+    if (parsed.role === 'merchant_admin' && !parsed.merchant_id) {
+      clearSession()
+      return null
+    }
+
     return {
       token: parsed.token,
       role: parsed.role,
-      expires_at: parsed.expires_at
+      expires_at: parsed.expires_at,
+      merchant_id: parsed.merchant_id
     }
   } catch (error) {
     clearSession()

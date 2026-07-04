@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { computed, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { logoutWebAdmin } from '../services/auth'
+import { logoutWebAdmin, roleText } from '../services/auth'
+import { getSession } from '../stores/session'
 
 const route = useRoute()
 const router = useRouter()
 const MERCHANT_CONTEXT_KEY = 'xiaochu_current_merchant_id'
 const FALLBACK_MERCHANT_ID = 'xiaochu'
+
+const session = computed(() => getSession())
+const isMerchantAdmin = computed(() => session.value?.role === 'merchant_admin')
 
 function getRouteMerchantId() {
   const value = route.params.merchantId
@@ -21,16 +25,22 @@ function getStoredMerchantId() {
   return window.localStorage.getItem(MERCHANT_CONTEXT_KEY) || ''
 }
 
-const currentMerchantId = computed(() => getRouteMerchantId() || getStoredMerchantId() || FALLBACK_MERCHANT_ID)
+const currentMerchantId = computed(() => {
+  if (isMerchantAdmin.value) {
+    return session.value?.merchant_id || ''
+  }
+
+  return getRouteMerchantId() || getStoredMerchantId() || FALLBACK_MERCHANT_ID
+})
 
 watchEffect(() => {
   const routeMerchantId = getRouteMerchantId()
-  if (routeMerchantId && typeof window !== 'undefined') {
+  if (!isMerchantAdmin.value && routeMerchantId && typeof window !== 'undefined') {
     window.localStorage.setItem(MERCHANT_CONTEXT_KEY, routeMerchantId)
   }
 })
 
-const navItems = computed(() => [
+const superAdminNavItems = computed(() => [
   { label: '概览', path: '/', key: 'dashboard', icon: '总' },
   { label: '商户管理', path: '/merchants', key: 'merchants', icon: '商' },
   { label: '成员邀请', path: `/merchants/${currentMerchantId.value}/staff`, key: 'staff', icon: '员' },
@@ -42,7 +52,19 @@ const navItems = computed(() => [
   { label: '系统设置', path: '/settings', key: 'settings', icon: '设' }
 ])
 
+const merchantAdminNavItems = [
+  { label: '商户首页', path: '/merchant', key: 'merchant-home', icon: '店' }
+]
+
+const navItems = computed(() => {
+  return isMerchantAdmin.value ? merchantAdminNavItems : superAdminNavItems.value
+})
+
 const activePath = computed(() => route.path)
+const currentRoleText = computed(() => roleText(session.value?.role))
+const profileDesc = computed(() => {
+  return isMerchantAdmin.value ? `商户：${currentMerchantId.value || '未识别'}` : '本地静态预览'
+})
 
 function handleNav(path: string) {
   router.push(path)
@@ -84,8 +106,8 @@ function logout() {
 
       <div class="sidebar-profile">
         <div class="sidebar-profile__label">当前身份</div>
-        <div class="sidebar-profile__name">超级管理员</div>
-        <div class="sidebar-profile__desc">本地静态预览</div>
+        <div class="sidebar-profile__name">{{ currentRoleText }}</div>
+        <div class="sidebar-profile__desc">{{ profileDesc }}</div>
       </div>
     </aside>
 
@@ -93,7 +115,10 @@ function logout() {
       <header class="topbar glass-card">
         <div>
           <div class="topbar__eyebrow">当前环境：本地预览</div>
-          <div class="topbar__title">当前身份：超级管理员</div>
+          <div class="topbar__title">
+            当前身份：{{ currentRoleText }}
+            <span v-if="isMerchantAdmin"> · {{ currentMerchantId }}</span>
+          </div>
         </div>
         <button class="ghost-button" type="button" @click="logout">退出</button>
       </header>

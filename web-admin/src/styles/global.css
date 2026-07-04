@@ -212,6 +212,42 @@ button {
   line-height: 1.1;
 }
 
+.login-mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 6px;
+  margin-bottom: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.login-mode-tabs__button {
+  min-height: 40px;
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: transparent;
+  font-weight: 950;
+}
+
+.login-mode-tabs__button.is-active {
+  color: var(--color-brand);
+  background: rgba(255, 239, 235, 0.94);
+  box-shadow: 0 10px 22px rgba(226, 49, 37, 0.12);
+}
+
+.login-mode-tabs__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.login-form-stack {
+  display: grid;
+  gap: 16px;
+}
+
 .form-field {
   display: grid;
   gap: 10px;
@@ -1556,6 +1592,16 @@ button {
   margin-top: 22px;
 }
 
+.merchant-home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 22px;
+}
+
+.merchant-home-checklist {
+  margin-bottom: 0;
+}
+
 .panel {
   padding: 26px;
   border-radius: var(--radius-xxl);
@@ -1727,6 +1773,10 @@ button {
   .content-grid {
     grid-template-columns: 1fr;
   }
+
+  .merchant-home-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {
@@ -1767,6 +1817,7 @@ button {
 
   .stat-grid,
   .module-grid,
+  .merchant-home-grid,
   .tag-grid,
   .checklist-grid,
   .admin-form {
