@@ -4,7 +4,10 @@ const ORDER_STATUS_COOKING = 'cooking'
 const ORDER_STATUS_FINISHED = 'finished'
 const ORDER_STATUS_CANCELLED = 'cancelled'
 const WEB_ALLOWED_ACTIONS = ['updateOrderStatus']
-const { verifyWebAdminToken } = require('./web-admin-token-helper')
+const {
+  verifyWebAdminToken,
+  resolveAuthorizedMerchantId
+} = require('./web-admin-token-helper')
 
 const VALID_ORDER_STATUSES = [
   ORDER_STATUS_PENDING,
@@ -161,7 +164,8 @@ function assertWebAdmin(event, action, dependencies) {
 
   return {
     is_web_admin: true,
-    role: verifyResult.role
+    role: verifyResult.role,
+    auth_context: verifyResult
   }
 }
 
@@ -197,6 +201,11 @@ function createUpdateOrderStatusHandler(dependencies) {
         if (webAdminResult.error) {
           return webAdminResult.error
         }
+        const merchantResult = resolveAuthorizedMerchantId(webAdminResult.auth_context, normalizedEvent.merchant_id)
+        if (!merchantResult.ok) {
+          return failure(merchantResult.code, '鍟嗗鏉冮檺涓嶈冻')
+        }
+        normalizedEvent.merchant_id = merchantResult.merchant_id
       } else {
         openid = dependencies.getOpenid()
 

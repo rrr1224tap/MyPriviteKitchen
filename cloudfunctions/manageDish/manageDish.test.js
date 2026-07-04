@@ -1,6 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const Module = require('node:module')
+const crypto = require('node:crypto')
 
 const { createManageDishHandler } = require('./dish-service')
 const {
@@ -255,6 +256,37 @@ function createWebToken(options = {}) {
   }).token
 }
 
+function base64urlEncode(value) {
+  return Buffer.from(value)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+}
+
+function createMerchantAdminToken(options = {}) {
+  const secret = options.secret || 'manage-dish-test-secret'
+  const now = options.now || FIXED_NOW
+  const expiresAt = new Date(now.getTime() + (options.ttlMinutes || 60) * 60 * 1000)
+  const staffId = options.staff_id || 'staff_merchant_admin'
+  const payload = {
+    role: 'merchant_admin',
+    merchant_id: options.merchant_id === undefined ? 'merchant_001' : options.merchant_id,
+    staff_id: staffId,
+    account_id: options.account_id || staffId,
+    login_name: options.login_name || 'owner',
+    issued_at: now.toISOString(),
+    expires_at: expiresAt.toISOString(),
+    token_version: options.token_version || 1,
+    nonce: options.nonce || 'manage-dish-merchant-admin-nonce'
+  }
+  const payloadSegment = base64urlEncode(JSON.stringify(payload))
+  const signatureSegment = base64urlEncode(
+    crypto.createHmac('sha256', secret).update(payloadSegment).digest()
+  )
+  return `${payloadSegment}.${signatureSegment}`
+}
+
 function matchesQuery(record, query = {}) {
   return Object.entries(query).every(([key, value]) => {
     if (value && typeof value === 'object' && Array.isArray(value.values)) {
@@ -482,6 +514,44 @@ test('web valid admin token can list dishes without openid', async () => {
   assert.equal(state.writes, 0)
 })
 
+test('merchant_admin dish list uses merchant_id from token when request omits merchant_id', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'listDishes',
+    admin_token: createMerchantAdminToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.deepEqual(result.data.list.map((dish) => dish.dish_id), [
+    'dish_001',
+    'dish_002'
+  ])
+  assert.equal(result.data.list.every((dish) => dish.merchant_id === 'merchant_001'), true)
+  assert.equal(state.writes, 0)
+})
+
+test('merchant_admin dish list rejects another requested merchant_id', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'listDishes',
+    merchant_id: 'merchant_002',
+    admin_token: createMerchantAdminToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'MERCHANT_SCOPE_FORBIDDEN')
+  assert.equal(state.writes, 0)
+})
+
 test('web empty token cannot list dishes', async () => {
   const { state, deps } = createDependencies({
     openid: ''
@@ -512,7 +582,7 @@ test('web tampered token cannot list dishes', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'TOKEN_INVALID')
   assert.equal(state.writes, 0)
 })
 
@@ -551,7 +621,7 @@ test('web non super admin role cannot list dishes', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'FORBIDDEN')
   assert.equal(state.writes, 0)
 })
 
@@ -739,7 +809,7 @@ test('web tampered token cannot create dish', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'TOKEN_INVALID')
   assert.equal(state.writes, 0)
 })
 
@@ -784,7 +854,7 @@ test('web non super admin role cannot create dish', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'FORBIDDEN')
   assert.equal(state.writes, 0)
 })
 
@@ -1106,7 +1176,7 @@ test('web tampered token cannot update dish', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'TOKEN_INVALID')
   assert.equal(state.writes, 0)
 })
 
@@ -1153,7 +1223,7 @@ test('web non super admin role cannot update dish', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'FORBIDDEN')
   assert.equal(state.writes, 0)
 })
 
@@ -1564,7 +1634,7 @@ test('web tampered token cannot update dish status', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'TOKEN_INVALID')
   assert.equal(state.writes, 0)
 })
 
@@ -1607,7 +1677,7 @@ test('web non super admin role cannot update dish status', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'FORBIDDEN')
   assert.equal(state.writes, 0)
 })
 
@@ -1898,7 +1968,7 @@ test('web token validation rejects updateDishTutorials writes', async () => {
     {
       title: 'tampered token',
       token: `${createWebToken()}x`,
-      expectedCode: 'UNAUTHORIZED'
+      expectedCode: 'TOKEN_INVALID'
     },
     {
       title: 'expired token',
@@ -1913,7 +1983,7 @@ test('web token validation rejects updateDishTutorials writes', async () => {
       token: createWebToken({
         role: 'viewer'
       }),
-      expectedCode: 'UNAUTHORIZED'
+      expectedCode: 'FORBIDDEN'
     }
   ]
 
@@ -2250,7 +2320,7 @@ test('web token validation rejects updateDishIngredients writes', async () => {
     {
       title: 'tampered token',
       token: `${createWebToken()}x`,
-      expectedCode: 'UNAUTHORIZED'
+      expectedCode: 'TOKEN_INVALID'
     },
     {
       title: 'expired token',
@@ -2265,7 +2335,7 @@ test('web token validation rejects updateDishIngredients writes', async () => {
       token: createWebToken({
         role: 'viewer'
       }),
-      expectedCode: 'UNAUTHORIZED'
+      expectedCode: 'FORBIDDEN'
     }
   ]
 

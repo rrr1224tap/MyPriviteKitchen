@@ -145,6 +145,18 @@ function createWebToken(payload = {}) {
   return `${payloadSegment}.${signatureSegment}`
 }
 
+function createMerchantAdminToken(payload = {}) {
+  return createWebToken({
+    role: 'merchant_admin',
+    merchant_id: payload.merchant_id === undefined ? 'merchant_001' : payload.merchant_id,
+    staff_id: payload.staff_id || 'staff_merchant_admin',
+    account_id: payload.account_id || payload.staff_id || 'staff_merchant_admin',
+    login_name: payload.login_name || 'owner',
+    token_version: payload.token_version || 1,
+    ...payload
+  })
+}
+
 function createWebEvent(overrides = {}) {
   return {
     admin_token: createWebToken(),
@@ -181,6 +193,39 @@ test('web admin token can update pending order to accepted', async () => {
   assert.equal(orders[0].remark, '不要葱')
 })
 
+test('merchant_admin order status uses merchant_id from token when request omits merchant_id', async () => {
+  const { dependencies, calls, orders } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({
+    merchant_id: '',
+    admin_token: createMerchantAdminToken()
+  }))
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.merchant_id, 'merchant_001')
+  assert.equal(calls.update.order_id, 'order_001')
+  assert.equal(orders[0].status, 'accepted')
+})
+
+test('merchant_admin order status rejects another requested merchant_id', async () => {
+  const { dependencies, calls } = createDependencies({
+    getOpenid: () => ''
+  })
+  const updateOrderStatus = createUpdateOrderStatusHandler(dependencies)
+
+  const result = await updateOrderStatus(createWebEvent({
+    merchant_id: 'merchant_002',
+    admin_token: createMerchantAdminToken()
+  }))
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'MERCHANT_SCOPE_FORBIDDEN')
+  assert.equal(calls.update, null)
+})
+
 test('web empty token cannot update order status', async () => {
   const { dependencies } = createDependencies({
     getOpenid: () => ''
@@ -203,7 +248,7 @@ test('web tampered token cannot update order status', async () => {
   const result = await updateOrderStatus(createWebEvent({ admin_token: `${token}x` }))
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'TOKEN_INVALID')
 })
 
 test('web expired token cannot update order status', async () => {
@@ -231,7 +276,7 @@ test('web non super admin token cannot update order status', async () => {
   }))
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'FORBIDDEN')
 })
 
 test('http body string can update order status for web admin', async () => {

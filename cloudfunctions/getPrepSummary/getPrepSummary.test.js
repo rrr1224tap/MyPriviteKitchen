@@ -1,6 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const Module = require('node:module')
+const crypto = require('node:crypto')
 
 const { createGetPrepSummaryHandler } = require('./prep-summary-service')
 const {
@@ -21,6 +22,37 @@ function createWebToken(options = {}) {
     nonce: options.nonce || 'prep-summary-test-nonce',
     secret: options.secret || WEB_TOKEN_SECRET
   }).token
+}
+
+function base64urlEncode(value) {
+  return Buffer.from(value)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+}
+
+function createMerchantAdminToken(options = {}) {
+  const secret = options.secret || WEB_TOKEN_SECRET
+  const now = options.now || FIXED_NOW
+  const expiresAt = new Date(now.getTime() + (options.ttlMinutes || 60) * 60 * 1000)
+  const staffId = options.staff_id || 'staff_merchant_admin'
+  const payload = {
+    role: 'merchant_admin',
+    merchant_id: options.merchant_id === undefined ? 'merchant_001' : options.merchant_id,
+    staff_id: staffId,
+    account_id: options.account_id || staffId,
+    login_name: options.login_name || 'owner',
+    issued_at: now.toISOString(),
+    expires_at: expiresAt.toISOString(),
+    token_version: options.token_version || 1,
+    nonce: options.nonce || 'prep-summary-merchant-admin-nonce'
+  }
+  const payloadSegment = base64urlEncode(JSON.stringify(payload))
+  const signatureSegment = base64urlEncode(
+    crypto.createHmac('sha256', secret).update(payloadSegment).digest()
+  )
+  return `${payloadSegment}.${signatureSegment}`
 }
 
 function makeDate(value) {
@@ -424,6 +456,39 @@ test('web valid admin token can read prep summary without openid', async () => {
   assert.equal(result.data.ingredient_count, 5)
 })
 
+test('merchant_admin prep summary uses merchant_id from token when request omits merchant_id', async () => {
+  const result = await runSummary({
+    openid: '',
+    orders: baseOrders(),
+    orderItems: baseItems(),
+    dishes: baseDishes()
+  }, {
+    action: 'getPrepSummary',
+    admin_token: createMerchantAdminToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.data.order_count, 2)
+  assert.equal(result.data.ingredient_count, 5)
+})
+
+test('merchant_admin prep summary rejects another requested merchant_id', async () => {
+  const result = await runSummary({
+    openid: '',
+    orders: baseOrders(),
+    orderItems: baseItems(),
+    dishes: baseDishes()
+  }, {
+    action: 'getPrepSummary',
+    merchant_id: 'merchant_002',
+    admin_token: createMerchantAdminToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'MERCHANT_SCOPE_FORBIDDEN')
+})
+
 test('web empty token cannot read prep summary', async () => {
   const result = await runSummary({ openid: '' }, {
     action: 'getPrepSummary',
@@ -443,7 +508,7 @@ test('web tampered token cannot read prep summary', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'TOKEN_INVALID')
 })
 
 test('web expired token cannot read prep summary', async () => {
@@ -468,7 +533,7 @@ test('web non super admin token cannot read prep summary', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'FORBIDDEN')
 })
 
 test('web http string body can read prep summary', async () => {

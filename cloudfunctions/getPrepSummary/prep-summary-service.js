@@ -1,5 +1,8 @@
 const WEB_ALLOWED_ACTIONS = ['getPrepSummary']
-const { verifyWebAdminToken } = require('./web-admin-token-helper')
+const {
+  verifyWebAdminToken,
+  resolveAuthorizedMerchantId
+} = require('./web-admin-token-helper')
 
 function success(message, data) {
   return {
@@ -292,7 +295,8 @@ function assertWebAdmin(event, action, dependencies) {
 
   return {
     is_web_admin: true,
-    role: verifyResult.role
+    role: verifyResult.role,
+    auth_context: verifyResult
   }
 }
 
@@ -385,8 +389,8 @@ function createGetPrepSummaryHandler(dependencies) {
       const isWebAdmin = isWebAdminRequest(normalizedEvent)
       let openid = ''
 
-      const merchantId = normalizeText(normalizedEvent.merchant_id)
-      if (!merchantId) {
+      let merchantId = normalizeText(normalizedEvent.merchant_id)
+      if (!merchantId && !isWebAdmin) {
         return failure('INVALID_PARAMS', '商家 ID 不能为空')
       }
 
@@ -395,6 +399,11 @@ function createGetPrepSummaryHandler(dependencies) {
         if (webAdminResult.error) {
           return webAdminResult.error
         }
+        const merchantResult = resolveAuthorizedMerchantId(webAdminResult.auth_context, merchantId)
+        if (!merchantResult.ok) {
+          return failure(merchantResult.code, '鍟嗗鏉冮檺涓嶈冻')
+        }
+        merchantId = merchantResult.merchant_id
       } else {
         openid = dependencies.getOpenid ? dependencies.getOpenid() : ''
 
@@ -412,6 +421,10 @@ function createGetPrepSummaryHandler(dependencies) {
         if (!isActiveMerchantStaff(staff, merchantId, openid)) {
           return failure('FORBIDDEN', '没有查看今日备料的权限')
         }
+      }
+
+      if (!merchantId) {
+        return failure('INVALID_PARAMS', '鍟嗗 ID 涓嶈兘涓虹┖')
       }
 
       const now = dependencies.now ? dependencies.now() : new Date()

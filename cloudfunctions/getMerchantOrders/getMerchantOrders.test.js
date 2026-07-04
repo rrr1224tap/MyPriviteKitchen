@@ -1,6 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const Module = require('node:module')
+const crypto = require('node:crypto')
 
 const { createGetMerchantOrdersHandler } = require('./merchant-orders-service')
 const {
@@ -19,6 +20,37 @@ function createWebToken(options = {}) {
     nonce: options.nonce || 'merchant-orders-test-nonce',
     secret: options.secret || 'merchant-orders-test-secret'
   }).token
+}
+
+function base64urlEncode(value) {
+  return Buffer.from(value)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+}
+
+function createMerchantAdminToken(options = {}) {
+  const secret = options.secret || 'merchant-orders-test-secret'
+  const now = options.now || FIXED_NOW
+  const expiresAt = new Date(now.getTime() + (options.ttlMinutes || 60) * 60 * 1000)
+  const staffId = options.staff_id || 'staff_merchant_admin'
+  const payload = {
+    role: 'merchant_admin',
+    merchant_id: options.merchant_id === undefined ? 'merchant_001' : options.merchant_id,
+    staff_id: staffId,
+    account_id: options.account_id || staffId,
+    login_name: options.login_name || 'owner',
+    issued_at: now.toISOString(),
+    expires_at: expiresAt.toISOString(),
+    token_version: options.token_version || 1,
+    nonce: options.nonce || 'merchant-orders-merchant-admin-nonce'
+  }
+  const payloadSegment = base64urlEncode(JSON.stringify(payload))
+  const signatureSegment = base64urlEncode(
+    crypto.createHmac('sha256', secret).update(payloadSegment).digest()
+  )
+  return `${payloadSegment}.${signatureSegment}`
 }
 
 const ORDERS = [
@@ -392,6 +424,39 @@ test('web valid admin token can list merchant orders without openid', async () =
   assert.equal(orderItemReads, 0)
 })
 
+test('merchant_admin order list uses merchant_id from token when request omits merchant_id', async () => {
+  const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
+    getOpenid: () => ''
+  }))
+
+  const result = await getMerchantOrders({
+    action: 'listOrders',
+    admin_token: createMerchantAdminToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.deepEqual(
+    result.data.list.map((order) => order.order_id),
+    ['order_001', 'order_002']
+  )
+  assert.equal(result.data.list.every((order) => order.merchant_id === 'merchant_001'), true)
+})
+
+test('merchant_admin order list rejects another requested merchant_id', async () => {
+  const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
+    getOpenid: () => ''
+  }))
+
+  const result = await getMerchantOrders({
+    action: 'listOrders',
+    merchant_id: 'merchant_002',
+    admin_token: createMerchantAdminToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'MERCHANT_SCOPE_FORBIDDEN')
+})
+
 test('web empty token cannot list merchant orders', async () => {
   const getMerchantOrders = createGetMerchantOrdersHandler(createDependencies({
     getOpenid: () => ''
@@ -419,7 +484,7 @@ test('web tampered token cannot list merchant orders', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'TOKEN_INVALID')
 })
 
 test('web expired token cannot list merchant orders', async () => {
@@ -452,7 +517,7 @@ test('web non super admin role cannot list merchant orders', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'FORBIDDEN')
 })
 
 test('web http string body can list merchant orders', async () => {
@@ -464,7 +529,7 @@ test('web http string body can list merchant orders', async () => {
     body: JSON.stringify({
       action: 'listOrders',
       merchant_id: 'merchant_001',
-      admin_token: createWebToken()
+      admin_token: createWebToken({ now: new Date() })
     })
   })
 
@@ -481,7 +546,7 @@ test('web http object body can list merchant orders', async () => {
     body: {
       action: 'listOrders',
       merchant_id: 'merchant_001',
-      admin_token: createWebToken()
+      admin_token: createWebToken({ now: new Date() })
     }
   })
 
@@ -544,7 +609,7 @@ test('index entry accepts web listOrders action', async () => {
     const result = await main({
       action: 'listOrders',
       merchant_id: 'merchant_001',
-      admin_token: createWebToken()
+      admin_token: createWebToken({ now: new Date() })
     })
 
     assert.equal(result.success, true)

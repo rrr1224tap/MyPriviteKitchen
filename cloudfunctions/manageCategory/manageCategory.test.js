@@ -1,6 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const Module = require('node:module')
+const crypto = require('node:crypto')
 
 const { createManageCategoryHandler } = require('./category-service')
 const {
@@ -131,6 +132,40 @@ function createWebToken(options = {}) {
     ttlMinutes: options.ttlMinutes || 60,
     nonce: options.nonce || 'manage-category-test-nonce'
   }).token
+}
+
+function base64urlEncode(value) {
+  return Buffer.from(value)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+}
+
+function createMerchantAdminToken(options = {}) {
+  const secret = options.secret || 'manage-category-test-secret'
+  const now = options.now || FIXED_NOW
+  const expiresAt = new Date(now.getTime() + (options.ttlMinutes || 60) * 60 * 1000)
+  const staffId = options.staff_id || 'staff_merchant_admin'
+  const payload = {
+    role: 'merchant_admin',
+    merchant_id: options.merchant_id === undefined ? 'merchant_001' : options.merchant_id,
+    staff_id: staffId,
+    account_id: options.account_id || staffId,
+    login_name: options.login_name || 'owner',
+    issued_at: now.toISOString(),
+    expires_at: expiresAt.toISOString(),
+    token_version: options.token_version || 1,
+    nonce: options.nonce || 'manage-category-merchant-admin-nonce'
+  }
+  const payloadSegment = base64urlEncode(JSON.stringify(payload))
+  const signatureSegment = base64urlEncode(
+    crypto
+      .createHmac('sha256', secret)
+      .update(payloadSegment)
+      .digest()
+  )
+  return `${payloadSegment}.${signatureSegment}`
 }
 
 function matchesQuery(record, query = {}) {
@@ -311,6 +346,41 @@ test('web valid admin token can list categories without openid', async () => {
   assert.equal(state.writes, 0)
 })
 
+test('merchant_admin category list uses merchant_id from token when request omits merchant_id', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    action: 'listCategories',
+    admin_token: createMerchantAdminToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.data.total, 2)
+  assert.equal(result.data.list.every((category) => category.merchant_id === 'merchant_001'), true)
+  assert.equal(state.writes, 0)
+})
+
+test('merchant_admin category list rejects another requested merchant_id', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    action: 'listCategories',
+    merchant_id: 'merchant_002',
+    admin_token: createMerchantAdminToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'MERCHANT_SCOPE_FORBIDDEN')
+  assert.equal(state.writes, 0)
+})
+
 test('web empty token cannot list categories', async () => {
   const { state, deps } = createDependencies({
     openid: ''
@@ -341,7 +411,7 @@ test('web tampered token cannot list categories', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'TOKEN_INVALID')
   assert.equal(state.writes, 0)
 })
 
@@ -380,7 +450,7 @@ test('web non super admin role cannot list categories', async () => {
   })
 
   assert.equal(result.success, false)
-  assert.equal(result.code, 'UNAUTHORIZED')
+  assert.equal(result.code, 'FORBIDDEN')
   assert.equal(state.writes, 0)
 })
 
@@ -619,7 +689,7 @@ test('web tampered token cannot create or update category', async () => {
     })
 
     assert.equal(result.success, false)
-    assert.equal(result.code, 'UNAUTHORIZED')
+    assert.equal(result.code, 'TOKEN_INVALID')
     assert.equal(state.writes, 0)
   }
 })
@@ -666,7 +736,7 @@ test('web non super admin role cannot create or update category', async () => {
     })
 
     assert.equal(result.success, false)
-    assert.equal(result.code, 'UNAUTHORIZED')
+    assert.equal(result.code, 'FORBIDDEN')
     assert.equal(state.writes, 0)
   }
 })

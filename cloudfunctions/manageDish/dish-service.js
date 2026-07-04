@@ -3,7 +3,10 @@ const WEB_ALLOWED_ACTIONS = ['listDishes', 'createDish', 'updateDish', 'updateDi
 const VALID_DISH_STATUSES = ['on_sale', 'off_sale']
 const VALID_TUTORIAL_PLATFORMS = ['douyin', 'xiaohongshu', 'bilibili', 'other']
 const MAX_TUTORIAL_COUNT = 3
-const { verifyWebAdminToken } = require('./web-admin-token-helper')
+const {
+  verifyWebAdminToken,
+  resolveAuthorizedMerchantId
+} = require('./web-admin-token-helper')
 
 function success(message, data = {}) {
   return {
@@ -671,7 +674,8 @@ function assertWebAdmin(event, action, deps) {
 
   return {
     is_web_admin: true,
-    role: verifyResult.role
+    role: verifyResult.role,
+    auth_context: verifyResult
   }
 }
 
@@ -1456,12 +1460,12 @@ function createManageDishHandler(dependencies) {
     try {
       const normalizedEvent = normalizeEventPayload(event)
       const openid = deps.getOpenid ? deps.getOpenid() : ''
-      const merchantId = normalizeString(normalizedEvent.merchant_id)
+      let merchantId = normalizeString(normalizedEvent.merchant_id)
       const action = normalizeString(normalizedEvent.action)
       const dishId = normalizeString(normalizedEvent.dish_id)
       const data = normalizeEventData(normalizedEvent)
 
-      if (!merchantId || !action) {
+      if (!action) {
         return failure('INVALID_PARAMS', '商家 ID 和操作类型不能为空')
       }
 
@@ -1473,6 +1477,15 @@ function createManageDishHandler(dependencies) {
         const webAdminResult = assertWebAdmin(normalizedEvent, action, deps)
         if (webAdminResult.error) {
           return webAdminResult.error
+        }
+
+        const merchantResult = resolveAuthorizedMerchantId(webAdminResult.auth_context, merchantId)
+        if (!merchantResult.ok) {
+          return failure(merchantResult.code, '鍟嗗鏉冮檺涓嶈冻')
+        }
+        merchantId = merchantResult.merchant_id
+        if (!merchantId) {
+          return failure('INVALID_PARAMS', '鍟嗗 ID 鍜屾搷浣滅被鍨嬩笉鑳戒负绌?')
         }
 
         if (action === 'listDishes') {
@@ -1520,6 +1533,10 @@ function createManageDishHandler(dependencies) {
         }
 
         return failure('FORBIDDEN', 'Web 后台当前仅开放餐品列表读取、新增餐品、编辑餐品基础信息和上下架')
+      }
+
+      if (!merchantId) {
+        return failure('INVALID_PARAMS', '鍟嗗 ID 鍜屾搷浣滅被鍨嬩笉鑳戒负绌?')
       }
 
       if (!openid) {

@@ -1,7 +1,10 @@
 const VALID_ACTIONS = ['list', 'listCategories', 'create', 'createCategory', 'update', 'updateCategory', 'disable', 'sort']
 const WEB_ALLOWED_ACTIONS = ['listCategories', 'createCategory', 'updateCategory']
 const VALID_CATEGORY_STATUSES = ['active', 'disabled', 'inactive', 'deleted']
-const { verifyWebAdminToken } = require('./web-admin-token-helper')
+const {
+  verifyWebAdminToken,
+  resolveAuthorizedMerchantId
+} = require('./web-admin-token-helper')
 
 function success(message, data = {}) {
   return {
@@ -201,7 +204,8 @@ function assertWebAdmin(event, action, deps) {
 
   return {
     is_web_admin: true,
-    role: verifyResult.role
+    role: verifyResult.role,
+    auth_context: verifyResult
   }
 }
 
@@ -480,13 +484,13 @@ function createManageCategoryHandler(dependencies) {
         return failure('UNAUTHORIZED', '无法获取用户身份')
       }
 
-      const merchantId = normalizeString(normalizedEvent.merchant_id)
+      let merchantId = normalizeString(normalizedEvent.merchant_id)
       const action = normalizeString(normalizedEvent.action)
       const categoryId = normalizeString(normalizedEvent.category_id)
       const data = normalizeData(normalizedEvent.data)
       const categoryData = normalizeCategoryPayload(normalizedEvent)
 
-      if (!merchantId || !action) {
+      if (!action) {
         return failure('INVALID_PARAMS', '商家 ID 和操作类型不能为空')
       }
 
@@ -498,6 +502,15 @@ function createManageCategoryHandler(dependencies) {
         const webAdminResult = assertWebAdmin(normalizedEvent, action, deps)
         if (webAdminResult.error) {
           return webAdminResult.error
+        }
+
+        const merchantResult = resolveAuthorizedMerchantId(webAdminResult.auth_context, merchantId)
+        if (!merchantResult.ok) {
+          return failure(merchantResult.code, '鍟嗗鏉冮檺涓嶈冻')
+        }
+        merchantId = merchantResult.merchant_id
+        if (!merchantId) {
+          return failure('INVALID_PARAMS', '鍟嗗 ID 鍜屾搷浣滅被鍨嬩笉鑳戒负绌?')
         }
 
         if (action === 'listCategories') {
@@ -513,6 +526,10 @@ function createManageCategoryHandler(dependencies) {
         }
 
         return failure('FORBIDDEN', 'Web 后台当前仅开放分类列表读取和新增 / 编辑分类')
+      }
+
+      if (!merchantId) {
+        return failure('INVALID_PARAMS', '鍟嗗 ID 鍜屾搷浣滅被鍨嬩笉鑳戒负绌?')
       }
 
       let staff

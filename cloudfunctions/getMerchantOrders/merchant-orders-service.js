@@ -2,7 +2,10 @@ const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
 const WEB_ALLOWED_ACTIONS = ['listOrders']
-const { verifyWebAdminToken } = require('./web-admin-token-helper')
+const {
+  verifyWebAdminToken,
+  resolveAuthorizedMerchantId
+} = require('./web-admin-token-helper')
 
 function success(message, data) {
   return {
@@ -141,7 +144,8 @@ function assertWebAdmin(event, action, dependencies) {
 
   return {
     is_web_admin: true,
-    role: verifyResult.role
+    role: verifyResult.role,
+    auth_context: verifyResult
   }
 }
 
@@ -225,9 +229,9 @@ function createGetMerchantOrdersHandler(dependencies) {
     try {
       const normalizedEvent = normalizeEventPayload(event)
 
-      const merchantId = normalizeText(normalizedEvent.merchant_id)
+      let merchantId = normalizeText(normalizedEvent.merchant_id)
 
-      if (!merchantId) {
+      if (!merchantId && !isWebAdminRequest(normalizedEvent)) {
         return failure('INVALID_PARAMS', '商家 ID 不能为空')
       }
 
@@ -238,6 +242,12 @@ function createGetMerchantOrdersHandler(dependencies) {
         if (webAdminResult.error) {
           return webAdminResult.error
         }
+
+        const merchantResult = resolveAuthorizedMerchantId(webAdminResult.auth_context, merchantId)
+        if (!merchantResult.ok) {
+          return failure(merchantResult.code, '鍟嗗鏉冮檺涓嶈冻')
+        }
+        merchantId = merchantResult.merchant_id
       } else {
         const openid = dependencies.getOpenid()
 
@@ -253,6 +263,10 @@ function createGetMerchantOrdersHandler(dependencies) {
         if (!isActiveMerchantStaff(staff, merchantId, openid)) {
           return failure('FORBIDDEN', '没有商家订单查看权限')
         }
+      }
+
+      if (!merchantId) {
+        return failure('INVALID_PARAMS', '鍟嗗 ID 涓嶈兘涓虹┖')
       }
 
       const status = normalizeText(normalizedEvent.status)
