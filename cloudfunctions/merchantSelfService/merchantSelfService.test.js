@@ -1782,7 +1782,7 @@ test('index entry creates merchant signup invite through cloud database', async 
 
     const result = await main({
       action: 'createMerchantSignupInvite',
-      admin_token: createWebToken(),
+      admin_token: createWebToken({ now: new Date() }),
       expires_in_days: 3,
       remark: 'index entry'
     })
