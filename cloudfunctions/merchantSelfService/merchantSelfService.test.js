@@ -28,6 +28,7 @@ function createDeps(options = {}) {
     codeIndex: 0,
     codeSequence: options.codeSequence || ['ABCD2345', 'JKLM6789', 'PQRS2345', 'WXYZ6789', 'BCDF2345', 'GHJK6789'],
     invites: options.invites || [],
+    inviteWrites: 0,
     merchantWrites: 0,
     staffWrites: 0
   }
@@ -42,6 +43,7 @@ function createDeps(options = {}) {
         return state.invites.find((invite) => invite.code === code) || null
       }),
       createInvite: options.createInvite || (async (invite) => {
+        state.inviteWrites += 1
         const record = {
           _id: `invite_${invite.code}`,
           ...invite
@@ -56,6 +58,14 @@ function createDeps(options = {}) {
       createStaff: async () => {
         state.staffWrites += 1
         throw new Error('SHOULD_NOT_CREATE_STAFF')
+      },
+      updateInvite: async () => {
+        state.inviteWrites += 1
+        throw new Error('SHOULD_NOT_UPDATE_INVITE')
+      },
+      removeInvite: async () => {
+        state.inviteWrites += 1
+        throw new Error('SHOULD_NOT_REMOVE_INVITE')
       },
       logger: {
         error: () => {}
@@ -86,6 +96,49 @@ async function createInviteWithDeps(event = {}, options = {}) {
   const result = await handler({
     action: 'createMerchantSignupInvite',
     admin_token: createWebToken(),
+    ...event
+  })
+
+  return {
+    state,
+    result
+  }
+}
+
+function createPreviewInvite(overrides = {}) {
+  return {
+    _id: 'invite_preview_001',
+    code: 'ABCD2345',
+    invite_type: 'merchant_signup',
+    merchant_id: '',
+    used_merchant_id: '',
+    role: 'owner',
+    status: 'unused',
+    remark: 'private remark',
+    created_by_role: 'super_admin',
+    created_by_openid: 'admin_openid_should_not_leak',
+    created_by_account_id: 'admin_account_should_not_leak',
+    used_by_openid: 'used_openid_should_not_leak',
+    used_by_account_id: 'used_account_should_not_leak',
+    expires_at: new Date(FIXED_NOW.getTime() + 3 * DAY_MS),
+    created_at: new Date('2026-07-01T10:00:00.000Z'),
+    updated_at: new Date('2026-07-01T10:00:00.000Z'),
+    used_at: null,
+    disabled_at: null,
+    ...overrides
+  }
+}
+
+async function previewInviteWithDeps(event = {}, options = {}) {
+  const { state, deps } = createDeps({
+    invites: [createPreviewInvite()],
+    ...options
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+  const result = await handler({
+    action: 'previewMerchantSignupInvite',
+    code: 'ABCD2345',
     ...event
   })
 
@@ -237,12 +290,255 @@ test('unknown action fails with INVALID_ACTION', async () => {
   const handler = createMerchantSelfServiceHandler(deps)
 
   const result = await handler({
-    action: 'previewMerchantSignupInvite',
+    action: 'redeemMerchantSignupInvite',
     admin_token: createWebToken()
   })
 
   assert.equal(result.success, false)
   assert.equal(result.code, 'INVALID_ACTION')
+})
+
+test('previewMerchantSignupInvite succeeds for available merchant signup invite', async () => {
+  const { state, result } = await previewInviteWithDeps()
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.message, '邀请码可用')
+  assert.equal(result.data.invite.code, 'ABCD2345')
+  assert.equal(result.data.invite.invite_type, 'merchant_signup')
+  assert.equal(result.data.invite.status, 'unused')
+  assert.equal(result.data.invite.can_use, true)
+  assert.equal(result.data.invite.expires_at, state.invites[0].expires_at)
+  assert.equal(state.inviteWrites, 0)
+})
+
+test('previewMerchantSignupInvite response does not leak sensitive fields', async () => {
+  const { result } = await previewInviteWithDeps()
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.invite.created_by_openid, undefined)
+  assert.equal(result.data.invite.created_by_account_id, undefined)
+  assert.equal(result.data.invite.used_by_openid, undefined)
+  assert.equal(result.data.invite.used_by_account_id, undefined)
+  assert.equal(result.data.session, undefined)
+  assert.equal(result.data.token, undefined)
+  assertResponseDoesNotLeak(result, [
+    'admin_openid_should_not_leak',
+    'admin_account_should_not_leak',
+    'used_openid_should_not_leak',
+    'used_account_should_not_leak'
+  ])
+})
+
+test('previewMerchantSignupInvite requires code', async () => {
+  const { result } = await previewInviteWithDeps({
+    code: ''
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_INVITE_CODE')
+})
+
+test('previewMerchantSignupInvite rejects invalid code format', async () => {
+  const { result } = await previewInviteWithDeps({
+    code: 'BAD_CODE!'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_INVITE_CODE')
+})
+
+test('previewMerchantSignupInvite fails when invite does not exist', async () => {
+  const { result } = await previewInviteWithDeps({}, {
+    invites: []
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVITE_NOT_FOUND')
+})
+
+test('previewMerchantSignupInvite rejects staff join invite', async () => {
+  const { result } = await previewInviteWithDeps({}, {
+    invites: [
+      createPreviewInvite({
+        invite_type: 'staff_join',
+        merchant_id: 'merchant_001'
+      })
+    ]
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVITE_TYPE_MISMATCH')
+})
+
+test('previewMerchantSignupInvite rejects legacy invite without invite_type', async () => {
+  const legacyInvite = createPreviewInvite()
+  delete legacyInvite.invite_type
+  legacyInvite.merchant_id = 'merchant_001'
+
+  const { result } = await previewInviteWithDeps({}, {
+    invites: [legacyInvite]
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVITE_TYPE_MISMATCH')
+})
+
+test('previewMerchantSignupInvite rejects used invite', async () => {
+  const { result } = await previewInviteWithDeps({}, {
+    invites: [
+      createPreviewInvite({
+        status: 'used'
+      })
+    ]
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVITE_USED')
+})
+
+test('previewMerchantSignupInvite rejects disabled invite', async () => {
+  const { result } = await previewInviteWithDeps({}, {
+    invites: [
+      createPreviewInvite({
+        status: 'disabled'
+      })
+    ]
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVITE_DISABLED')
+})
+
+test('previewMerchantSignupInvite rejects expired status invite', async () => {
+  const { result } = await previewInviteWithDeps({}, {
+    invites: [
+      createPreviewInvite({
+        status: 'expired'
+      })
+    ]
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVITE_EXPIRED')
+})
+
+test('previewMerchantSignupInvite rejects date expired unused invite', async () => {
+  const { result } = await previewInviteWithDeps({}, {
+    invites: [
+      createPreviewInvite({
+        status: 'unused',
+        expires_at: new Date(FIXED_NOW.getTime() - DAY_MS)
+      })
+    ]
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVITE_EXPIRED')
+})
+
+test('previewMerchantSignupInvite works with http body string', async () => {
+  const { state, deps } = createDeps({
+    invites: [createPreviewInvite()]
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+
+  const result = await handler({
+    body: JSON.stringify({
+      action: 'previewMerchantSignupInvite',
+      code: 'ABCD2345'
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.invite.can_use, true)
+  assert.equal(state.inviteWrites, 0)
+})
+
+test('previewMerchantSignupInvite works with http body object', async () => {
+  const { state, deps } = createDeps({
+    invites: [createPreviewInvite()]
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+
+  const result = await handler({
+    body: {
+      action: 'previewMerchantSignupInvite',
+      code: 'ABCD2345'
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.invite.can_use, true)
+  assert.equal(state.inviteWrites, 0)
+})
+
+test('previewMerchantSignupInvite works with queryStringParameters', async () => {
+  const { state, deps } = createDeps({
+    invites: [createPreviewInvite()]
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+
+  const result = await handler({
+    queryStringParameters: {
+      action: 'previewMerchantSignupInvite',
+      code: 'ABCD2345'
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.invite.can_use, true)
+  assert.equal(state.inviteWrites, 0)
+})
+
+test('previewMerchantSignupInvite invalid json body does not crash', async () => {
+  const { deps } = createDeps({
+    invites: [createPreviewInvite()]
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+
+  const result = await handler({
+    body: '{"action":'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_ACTION')
+})
+
+test('previewMerchantSignupInvite is read only and creates no merchant admin token', async () => {
+  const { state, result } = await previewInviteWithDeps()
+
+  assert.equal(result.success, true)
+  assert.equal(state.inviteWrites, 0)
+  assert.equal(state.merchantWrites, 0)
+  assert.equal(state.staffWrites, 0)
+  assert.equal(result.data.session, undefined)
+  assert.equal(result.data.token, undefined)
+})
+
+test('previewMerchantSignupInvite internal error response does not leak stack details', async () => {
+  const { deps } = createDeps({
+    findInviteByCode: async () => {
+      const error = new Error(INTERNAL_STACK_MARKER)
+      error.stack = `Error: ${INTERNAL_STACK_MARKER}\n    at private-file.js:1:1`
+      throw error
+    }
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+
+  const result = await handler({
+    action: 'previewMerchantSignupInvite',
+    code: 'ABCD2345'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INTERNAL_ERROR')
+  assertResponseDoesNotLeak(result, [INTERNAL_STACK_MARKER])
 })
 
 test('http body string can create merchant signup invite', async () => {
@@ -458,6 +754,8 @@ function matchesQuery(record, query = {}) {
 function createIndexCloudMock(options = {}) {
   const state = {
     invites: options.invites || [],
+    inviteUpdates: 0,
+    inviteRemoves: 0,
     merchantAdds: 0,
     staffAdds: 0
   }
@@ -484,8 +782,20 @@ function createIndexCloudMock(options = {}) {
   const db = {
     collection(collectionName) {
       return {
-        where(query) {
+      where(query) {
           return createQuery(collectionName, query)
+        },
+        doc() {
+          return {
+            async update() {
+              state.inviteUpdates += 1
+              throw new Error('SHOULD_NOT_UPDATE_INVITE')
+            },
+            async remove() {
+              state.inviteRemoves += 1
+              throw new Error('SHOULD_NOT_REMOVE_INVITE')
+            }
+          }
         },
         async add({ data }) {
           if (collectionName === 'merchants') {
@@ -570,6 +880,38 @@ test('index entry creates merchant signup invite through cloud database', async 
     assert.equal(state.invites[0].role, 'owner')
     assert.equal(state.invites[0].status, 'unused')
     assert.equal(state.invites[0].remark, 'index entry')
+    assert.equal(state.merchantAdds, 0)
+    assert.equal(state.staffAdds, 0)
+  } finally {
+    if (originalSecret === undefined) {
+      delete process.env.WEB_ADMIN_TOKEN_SECRET
+    } else {
+      process.env.WEB_ADMIN_TOKEN_SECRET = originalSecret
+    }
+  }
+})
+
+test('index entry previews merchant signup invite through cloud database without writes', async () => {
+  const originalSecret = process.env.WEB_ADMIN_TOKEN_SECRET
+  process.env.WEB_ADMIN_TOKEN_SECRET = TOKEN_SECRET
+
+  try {
+    const { state, cloud } = createIndexCloudMock({
+      invites: [createPreviewInvite()]
+    })
+    const main = loadMerchantSelfServiceIndexWithCloudMock(cloud)
+
+    const result = await main({
+      action: 'previewMerchantSignupInvite',
+      code: 'ABCD2345'
+    })
+
+    assert.equal(result.success, true)
+    assert.equal(result.data.invite.code, 'ABCD2345')
+    assert.equal(result.data.invite.can_use, true)
+    assert.equal(state.invites.length, 1)
+    assert.equal(state.inviteUpdates, 0)
+    assert.equal(state.inviteRemoves, 0)
     assert.equal(state.merchantAdds, 0)
     assert.equal(state.staffAdds, 0)
   } finally {

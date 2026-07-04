@@ -2,7 +2,9 @@ const crypto = require('node:crypto')
 const { verifyWebAdminToken } = require('./web-admin-token-helper')
 
 const CREATE_SIGNUP_INVITE_ACTION = 'createMerchantSignupInvite'
+const PREVIEW_SIGNUP_INVITE_ACTION = 'previewMerchantSignupInvite'
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+const INVITE_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{8,12}$/
 const DAY_MS = 24 * 60 * 60 * 1000
 const DEFAULT_EXPIRES_DAYS = 7
 const MAX_EXPIRES_DAYS = 30
@@ -149,6 +151,24 @@ function formatInvite(invite = {}) {
   }
 }
 
+function formatInvitePreview(invite = {}) {
+  return {
+    code: invite.code || '',
+    invite_type: invite.invite_type || '',
+    status: invite.status || '',
+    can_use: true,
+    expires_at: invite.expires_at || null
+  }
+}
+
+function normalizeInviteCode(value) {
+  return normalizeText(value).toUpperCase()
+}
+
+function isValidInviteCode(code) {
+  return INVITE_CODE_PATTERN.test(code)
+}
+
 async function createUniqueInviteCode(deps) {
   for (let retry = 0; retry < MAX_CODE_RETRY; retry += 1) {
     const code = normalizeText(deps.createInviteCode()).toUpperCase()
@@ -214,6 +234,52 @@ async function handleCreateMerchantSignupInvite(deps, payload, adminResult) {
   }
 }
 
+async function handlePreviewMerchantSignupInvite(deps, payload) {
+  const code = normalizeInviteCode(payload.code)
+  if (!code || !isValidInviteCode(code)) {
+    return failure('INVALID_INVITE_CODE', '邀请码格式不正确')
+  }
+
+  try {
+    const invite = await deps.findInviteByCode(code)
+    if (!invite) {
+      return failure('INVITE_NOT_FOUND', '邀请码不存在')
+    }
+
+    if (invite.invite_type !== 'merchant_signup') {
+      return failure('INVITE_TYPE_MISMATCH', '该邀请码不能用于开店')
+    }
+
+    if (invite.status === 'used') {
+      return failure('INVITE_USED', '邀请码已使用')
+    }
+
+    if (invite.status === 'disabled') {
+      return failure('INVITE_DISABLED', '邀请码已禁用')
+    }
+
+    if (invite.status === 'expired') {
+      return failure('INVITE_EXPIRED', '邀请码已过期')
+    }
+
+    if (invite.status !== 'unused') {
+      return failure('INVITE_EXPIRED', '邀请码不可用')
+    }
+
+    const expiresAt = new Date(invite.expires_at)
+    if (!invite.expires_at || Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= deps.now().getTime()) {
+      return failure('INVITE_EXPIRED', '邀请码已过期')
+    }
+
+    return success('邀请码可用', {
+      invite: formatInvitePreview(invite)
+    })
+  } catch (error) {
+    deps.logger.error('merchantSelfService previewMerchantSignupInvite failed', error)
+    return failure('INTERNAL_ERROR', '预览开店邀请码失败，请稍后重试')
+  }
+}
+
 function createMerchantSelfServiceHandler(dependencies = {}) {
   const deps = buildDependencies(dependencies)
 
@@ -223,8 +289,12 @@ function createMerchantSelfServiceHandler(dependencies = {}) {
       const action = normalizeText(normalizedEvent.action)
       const payload = normalizePayload(normalizedEvent.payload || normalizedEvent.data || normalizedEvent)
 
-      if (action !== CREATE_SIGNUP_INVITE_ACTION) {
+      if (action !== CREATE_SIGNUP_INVITE_ACTION && action !== PREVIEW_SIGNUP_INVITE_ACTION) {
         return failure('INVALID_ACTION', '开店服务操作类型不合法')
+      }
+
+      if (action === PREVIEW_SIGNUP_INVITE_ACTION) {
+        return handlePreviewMerchantSignupInvite(deps, payload)
       }
 
       const adminResult = assertSuperAdmin(payload, deps)
