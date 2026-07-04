@@ -1,13 +1,36 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const Module = require('node:module')
 
 const { createGetPrepSummaryHandler } = require('./prep-summary-service')
+const {
+  createSignedToken
+} = require('../webAdminAuth/web-admin-auth-service')
+
+const FIXED_NOW = new Date('2026-06-24T10:30:00+08:00')
+const WEB_TOKEN_SECRET = 'prep-summary-test-secret'
+
+function createWebToken(options = {}) {
+  const now = options.now || FIXED_NOW
+  return createSignedToken({
+    role: options.role || 'super_admin',
+    issued_at: now,
+    expires_at: new Date(now.getTime() + (options.ttlMinutes || 60) * 60 * 1000),
+    now,
+    ttlMinutes: options.ttlMinutes || 60,
+    nonce: options.nonce || 'prep-summary-test-nonce',
+    secret: options.secret || WEB_TOKEN_SECRET
+  }).token
+}
 
 function makeDate(value) {
   return new Date(value)
 }
 
 function createDeps(overrides = {}) {
+  const calls = {
+    findOrdersByDateRange: []
+  }
   const state = {
     openid: overrides.openid === undefined ? 'staff_openid' : overrides.openid,
     now: overrides.now || makeDate('2026-06-24T10:30:00+08:00'),
@@ -25,8 +48,10 @@ function createDeps(overrides = {}) {
 
   return {
     state,
+    calls,
     deps: {
       getOpenid: () => state.openid,
+      getTokenSecret: () => WEB_TOKEN_SECRET,
       now: () => state.now,
       findMerchantStaff: async ({ merchant_id, openid }) => {
         return state.merchantStaff.find((staff) => {
@@ -34,6 +59,7 @@ function createDeps(overrides = {}) {
         }) || null
       },
       findOrdersByDateRange: async ({ merchant_id, start, end }) => {
+        calls.findOrdersByDateRange.push({ merchant_id, start, end })
         return state.orders.filter((order) => {
           const createdAt = new Date(order.created_at)
           return order.merchant_id === merchant_id && createdAt >= start && createdAt < end
@@ -151,6 +177,70 @@ async function runSummary(overrides = {}, event = { merchant_id: 'merchant_001' 
   const { deps } = createDeps(overrides)
   const handler = createGetPrepSummaryHandler(deps)
   return handler(event)
+}
+
+function loadIndexWithMockedCloud(openid = '') {
+  const indexPath = require.resolve('./index')
+  delete require.cache[indexPath]
+
+  const collectionData = {
+    merchant_staff: [
+      {
+        merchant_id: 'merchant_001',
+        openid: 'staff_openid',
+        status: 'active'
+      }
+    ],
+    orders: baseOrders(),
+    order_items: baseItems(),
+    dishes: baseDishes()
+  }
+  const chain = {
+    _collectionName: '',
+    where() {
+      return this
+    },
+    limit() {
+      return this
+    },
+    get: async function get() {
+      return {
+        data: collectionData[this._collectionName] || []
+      }
+    }
+  }
+  const dbMock = {
+    command: {
+      gte: () => ({ and: () => ({}) }),
+      lt: () => ({}),
+      in: (values) => values
+    },
+    collection: (collectionName) => ({
+      ...chain,
+      _collectionName: collectionName
+    })
+  }
+  const cloudMock = {
+    DYNAMIC_CURRENT_ENV: 'test-env',
+    init: () => {},
+    database: () => dbMock,
+    getWXContext: () => ({ OPENID: openid })
+  }
+
+  const originalLoad = Module._load
+  Module._load = function loadMockedModule(request, parent, isMain) {
+    if (request === 'wx-server-sdk') {
+      return cloudMock
+    }
+
+    return originalLoad.call(this, request, parent, isMain)
+  }
+
+  try {
+    return require('./index').main
+  } finally {
+    Module._load = originalLoad
+  }
 }
 
 test('returns FORBIDDEN when user is not active merchant staff', async () => {
@@ -314,4 +404,269 @@ test('copy text contains ingredient amount and source dish', async () => {
   assert.match(result.data.copy_text, /肥牛片 360g/)
   assert.match(result.data.copy_text, /招牌肥牛石锅拌饭 x3/)
   assert.match(result.data.copy_text, /米饭 4份/)
+})
+
+test('web valid admin token can read prep summary without openid', async () => {
+  const result = await runSummary({
+    openid: '',
+    orders: baseOrders(),
+    orderItems: baseItems(),
+    dishes: baseDishes()
+  }, {
+    action: 'getPrepSummary',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.data.order_count, 2)
+  assert.equal(result.data.ingredient_count, 5)
+})
+
+test('web empty token cannot read prep summary', async () => {
+  const result = await runSummary({ openid: '' }, {
+    action: 'getPrepSummary',
+    merchant_id: 'merchant_001',
+    admin_token: ''
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web tampered token cannot read prep summary', async () => {
+  const result = await runSummary({ openid: '' }, {
+    action: 'getPrepSummary',
+    merchant_id: 'merchant_001',
+    admin_token: `${createWebToken()}x`
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web expired token cannot read prep summary', async () => {
+  const result = await runSummary({ openid: '' }, {
+    action: 'getPrepSummary',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken({
+      now: new Date('2026-06-23T08:00:00.000Z'),
+      ttlMinutes: 30
+    })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'TOKEN_EXPIRED')
+})
+
+test('web non super admin token cannot read prep summary', async () => {
+  const result = await runSummary({ openid: '' }, {
+    action: 'getPrepSummary',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken({ role: 'staff' })
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'UNAUTHORIZED')
+})
+
+test('web http string body can read prep summary', async () => {
+  const result = await runSummary({
+    openid: '',
+    orders: baseOrders(),
+    orderItems: baseItems(),
+    dishes: baseDishes()
+  }, {
+    body: JSON.stringify({
+      action: 'getPrepSummary',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.order_count, 2)
+})
+
+test('web http object body can read prep summary', async () => {
+  const result = await runSummary({
+    openid: '',
+    orders: baseOrders(),
+    orderItems: baseItems(),
+    dishes: baseDishes()
+  }, {
+    body: {
+      action: 'getPrepSummary',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.order_count, 2)
+})
+
+test('web query string parameters can read prep summary', async () => {
+  const result = await runSummary({
+    openid: '',
+    orders: baseOrders(),
+    orderItems: baseItems(),
+    dishes: baseDishes()
+  }, {
+    queryStringParameters: {
+      action: 'getPrepSummary',
+      merchant_id: 'merchant_001',
+      admin_token: createWebToken()
+    }
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.order_count, 2)
+})
+
+test('web invalid json body does not crash', async () => {
+  const result = await runSummary({ openid: '' }, {
+    body: '{invalid json'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+})
+
+test('web missing merchant id is rejected', async () => {
+  const result = await runSummary({ openid: '' }, {
+    action: 'getPrepSummary',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_PARAMS')
+})
+
+test('date defaults to today when omitted', async () => {
+  const { deps, calls } = createDeps({
+    openid: '',
+    orders: baseOrders(),
+    orderItems: baseItems(),
+    dishes: baseDishes()
+  })
+  const handler = createGetPrepSummaryHandler(deps)
+
+  const result = await handler({
+    action: 'getPrepSummary',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.date, '2026-06-24')
+  assert.equal(calls.findOrdersByDateRange[0].start.getFullYear(), 2026)
+  assert.equal(calls.findOrdersByDateRange[0].start.getMonth(), 5)
+  assert.equal(calls.findOrdersByDateRange[0].start.getDate(), 24)
+})
+
+test('web date parameter selects requested day', async () => {
+  const { deps, calls } = createDeps({
+    openid: '',
+    orders: [
+      {
+        order_id: 'order_requested_day',
+        merchant_id: 'merchant_001',
+        status: 'pending',
+        created_at: makeDate('2026-06-23T09:00:00+08:00')
+      }
+    ],
+    orderItems: [
+      { order_id: 'order_requested_day', merchant_id: 'merchant_001', dish_id: 'dish_beef', dish_name: '招牌肥牛石锅拌饭', quantity: 1 }
+    ],
+    dishes: baseDishes()
+  })
+  const handler = createGetPrepSummaryHandler(deps)
+
+  const result = await handler({
+    action: 'getPrepSummary',
+    merchant_id: 'merchant_001',
+    date: '2026-06-23',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.date, '2026-06-23')
+  assert.equal(result.data.order_count, 1)
+  assert.equal(calls.findOrdersByDateRange[0].start.getDate(), 23)
+})
+
+test('web only returns current merchant prep data', async () => {
+  const result = await runSummary({
+    openid: '',
+    orders: [
+      ...baseOrders(),
+      {
+        order_id: 'order_other_merchant',
+        merchant_id: 'merchant_002',
+        status: 'pending',
+        created_at: makeDate('2026-06-24T09:00:00+08:00')
+      }
+    ],
+    orderItems: [
+      ...baseItems(),
+      { order_id: 'order_other_merchant', merchant_id: 'merchant_002', dish_id: 'dish_other', dish_name: '其它商户餐品', quantity: 5 }
+    ],
+    dishes: [
+      ...baseDishes(),
+      {
+        dish_id: 'dish_other',
+        merchant_id: 'merchant_002',
+        name: '其它商户餐品',
+        ingredients: [{ name: '不应出现', amount: 1, unit: '份', enabled: true }]
+      }
+    ]
+  }, {
+    action: 'getPrepSummary',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken()
+  })
+  const allItems = result.data.groups.flatMap((group) => group.items)
+
+  assert.equal(result.success, true)
+  assert.equal(allItems.find((item) => item.name === '不应出现'), undefined)
+})
+
+test('web empty prep data returns empty summary', async () => {
+  const result = await runSummary({
+    openid: '',
+    orders: [],
+    orderItems: [],
+    dishes: []
+  }, {
+    action: 'getPrepSummary',
+    merchant_id: 'merchant_001',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.order_count, 0)
+  assert.deepEqual(result.data.groups, [])
+})
+
+test('index entry accepts web getPrepSummary action', async () => {
+  const previousSecret = process.env.WEB_ADMIN_TOKEN_SECRET
+  process.env.WEB_ADMIN_TOKEN_SECRET = WEB_TOKEN_SECRET
+  const main = loadIndexWithMockedCloud('')
+
+  try {
+    const result = await main({
+      action: 'getPrepSummary',
+      merchant_id: 'merchant_001',
+      date: '2026-06-24',
+      admin_token: createWebToken({ now: new Date() })
+    })
+
+    assert.equal(result.success, true)
+    assert.equal(result.code, 'SUCCESS')
+    assert.equal(result.data.order_count, 2)
+  } finally {
+    process.env.WEB_ADMIN_TOKEN_SECRET = previousSecret
+  }
 })

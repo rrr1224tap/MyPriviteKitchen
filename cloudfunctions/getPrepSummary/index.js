@@ -75,6 +75,7 @@ exports.main = createGetPrepSummaryHandler({
     return wxContext.OPENID || ''
   },
   now: () => new Date(),
+  getTokenSecret: () => process.env.WEB_ADMIN_TOKEN_SECRET || '',
   findMerchantStaff,
   findOrdersByDateRange,
   findOrderItemsByOrderIds,

@@ -1,3 +1,6 @@
+const WEB_ALLOWED_ACTIONS = ['getPrepSummary']
+const { verifyWebAdminToken } = require('./web-admin-token-helper')
+
 function success(message, data) {
   return {
     success: true,
@@ -52,6 +55,32 @@ function getLocalDayRange(now) {
     0,
     0
   )
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
+
+  return {
+    start,
+    end
+  }
+}
+
+function getLocalDayRangeFromDateText(dateText) {
+  const text = normalizeText(dateText)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return null
+  }
+
+  const [year, month, day] = text.split('-').map((part) => Number(part))
+  const start = new Date(year, month - 1, day, 0, 0, 0, 0)
+  if (
+    Number.isNaN(start.getTime()) ||
+    start.getFullYear() !== year ||
+    start.getMonth() !== month - 1 ||
+    start.getDate() !== day
+  ) {
+    return null
+  }
+
   const end = new Date(start)
   end.setDate(end.getDate() + 1)
 
@@ -190,6 +219,83 @@ function buildCopyText(dateText, groups) {
   return lines.join('\n')
 }
 
+function parseJsonBody(body) {
+  if (!body) {
+    return {}
+  }
+
+  if (typeof body === 'object' && !Array.isArray(body)) {
+    return body
+  }
+
+  if (typeof body !== 'string') {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(body)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch (error) {
+    return {}
+  }
+}
+
+function normalizeEventPayload(event = {}) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) {
+    return {}
+  }
+
+  if (Object.prototype.hasOwnProperty.call(event, 'merchant_id') ||
+    Object.prototype.hasOwnProperty.call(event, 'admin_token')) {
+    return event
+  }
+
+  const bodyPayload = parseJsonBody(event.body)
+  if (Object.keys(bodyPayload).length > 0) {
+    return bodyPayload
+  }
+
+  const queryPayload = event.queryStringParameters
+  if (queryPayload && typeof queryPayload === 'object' && !Array.isArray(queryPayload)) {
+    return queryPayload
+  }
+
+  return {}
+}
+
+function isWebAdminRequest(event = {}) {
+  return Boolean(event && Object.prototype.hasOwnProperty.call(event, 'admin_token'))
+}
+
+function assertWebAdmin(event, action, dependencies) {
+  const verifyResult = verifyWebAdminToken(event.admin_token, {
+    secret: dependencies.getTokenSecret
+      ? dependencies.getTokenSecret()
+      : process.env.WEB_ADMIN_TOKEN_SECRET,
+    now: dependencies.now ? dependencies.now() : new Date()
+  })
+
+  if (!verifyResult.ok) {
+    return {
+      error: failure(
+        verifyResult.code,
+        verifyResult.code === 'TOKEN_EXPIRED' ? '登录状态已过期' : '登录状态无效或已过期'
+      )
+    }
+  }
+
+  if (action && !WEB_ALLOWED_ACTIONS.includes(action)) {
+    return {
+      error: failure('INVALID_PARAMS', '备料操作类型不合法')
+    }
+  }
+
+  return {
+    is_web_admin: true,
+    role: verifyResult.role
+  }
+}
+
 function buildPrepSummary({ orders, orderItems, dishes, merchantId, start, dateText }) {
   const activeOrders = asList(orders).filter((order) => isPrepOrder(order, merchantId, start, new Date(start.getTime() + 24 * 60 * 60 * 1000)))
   const activeOrderIds = new Set(activeOrders.map(getOrderId).filter(Boolean))
@@ -274,28 +380,43 @@ function buildPrepSummary({ orders, orderItems, dishes, merchantId, start, dateT
 function createGetPrepSummaryHandler(dependencies) {
   return async function getPrepSummary(event = {}) {
     try {
-      const openid = dependencies.getOpenid ? dependencies.getOpenid() : ''
+      const normalizedEvent = normalizeEventPayload(event)
+      const action = normalizeText(normalizedEvent.action)
+      const isWebAdmin = isWebAdminRequest(normalizedEvent)
+      let openid = ''
 
-      if (!openid) {
-        return failure('UNAUTHORIZED', '无法识别用户身份')
-      }
-
-      const merchantId = normalizeText(event.merchant_id)
+      const merchantId = normalizeText(normalizedEvent.merchant_id)
       if (!merchantId) {
         return failure('INVALID_PARAMS', '商家 ID 不能为空')
       }
 
-      const staff = await dependencies.findMerchantStaff({
-        merchant_id: merchantId,
-        openid
-      })
+      if (isWebAdmin) {
+        const webAdminResult = assertWebAdmin(normalizedEvent, action, dependencies)
+        if (webAdminResult.error) {
+          return webAdminResult.error
+        }
+      } else {
+        openid = dependencies.getOpenid ? dependencies.getOpenid() : ''
 
-      if (!isActiveMerchantStaff(staff, merchantId, openid)) {
-        return failure('FORBIDDEN', '没有查看今日备料的权限')
+        if (!openid) {
+          return failure('UNAUTHORIZED', '无法识别用户身份')
+        }
+      }
+
+      if (!isWebAdmin) {
+        const staff = await dependencies.findMerchantStaff({
+          merchant_id: merchantId,
+          openid
+        })
+
+        if (!isActiveMerchantStaff(staff, merchantId, openid)) {
+          return failure('FORBIDDEN', '没有查看今日备料的权限')
+        }
       }
 
       const now = dependencies.now ? dependencies.now() : new Date()
-      const { start, end } = getLocalDayRange(now)
+      const requestedRange = getLocalDayRangeFromDateText(normalizedEvent.date)
+      const { start, end } = requestedRange || getLocalDayRange(now)
       const dateText = formatDate(start)
       const orders = await dependencies.findOrdersByDateRange({
         merchant_id: merchantId,

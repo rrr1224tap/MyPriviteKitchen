@@ -622,6 +622,24 @@ button {
   background: rgba(255, 255, 255, 0.74);
 }
 
+.date-input {
+  height: 42px;
+  min-width: 150px;
+  padding: 0 14px;
+  border: 1px solid rgba(126, 90, 45, 0.12);
+  border-radius: 999px;
+  outline: 0;
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 12px 26px rgba(126, 90, 45, 0.08);
+  font-weight: 850;
+}
+
+.date-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .mock-table {
   overflow: auto;
   border: 1px solid rgba(126, 90, 45, 0.1);
@@ -851,6 +869,111 @@ button {
   overflow-wrap: anywhere;
   color: var(--color-muted);
   font-size: 13px;
+}
+
+.prep-group-list {
+  display: grid;
+  gap: 16px;
+}
+
+.prep-group {
+  display: grid;
+  gap: 12px;
+}
+
+.prep-group__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.prep-group__title strong {
+  color: var(--color-text);
+  font-size: 17px;
+  font-weight: 950;
+}
+
+.prep-group__title span {
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.prep-table {
+  overflow: auto;
+  border: 1px solid rgba(126, 90, 45, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.prep-table__row {
+  display: grid;
+  grid-template-columns:
+    minmax(150px, 0.9fr) minmax(90px, 0.45fr)
+    minmax(220px, 1.25fr) minmax(120px, 0.75fr);
+  gap: 14px;
+  align-items: center;
+  min-width: 720px;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(126, 90, 45, 0.09);
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.prep-table__head {
+  border-top: 0;
+  color: var(--color-muted);
+  background: rgba(255, 248, 238, 0.78);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.prep-table__row strong {
+  display: block;
+  color: var(--color-text);
+  font-weight: 950;
+}
+
+.prep-table__row small {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.prep-amount {
+  color: var(--color-brand);
+  font-size: 17px;
+  font-weight: 950;
+}
+
+.prep-summary-list {
+  display: grid;
+  gap: 12px;
+}
+
+.prep-summary-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(126, 90, 45, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 248, 238, 0.6);
+}
+
+.prep-summary-list strong {
+  color: var(--color-brand);
+  font-size: 24px;
+  font-weight: 950;
+}
+
+.prep-summary-list span {
+  color: var(--color-muted);
+  font-weight: 850;
+  text-align: right;
 }
 
 .dish-table__row--selected {
