@@ -1,6 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const Module = require('node:module')
+const crypto = require('node:crypto')
 
 const {
   createSignedToken
@@ -26,11 +27,16 @@ function createDeps(options = {}) {
     now: options.now || FIXED_NOW,
     tokenSecret: options.tokenSecret === undefined ? TOKEN_SECRET : options.tokenSecret,
     codeIndex: 0,
+    staffIndex: 1,
     codeSequence: options.codeSequence || ['ABCD2345', 'JKLM6789', 'PQRS2345', 'WXYZ6789', 'BCDF2345', 'GHJK6789'],
     invites: options.invites || [],
+    merchants: options.merchants || [],
+    staff: options.staff || [],
     inviteWrites: 0,
     merchantWrites: 0,
-    staffWrites: 0
+    staffWrites: 0,
+    merchantCompensations: 0,
+    staffCompensations: 0
   }
 
   return {
@@ -67,6 +73,68 @@ function createDeps(options = {}) {
         state.inviteWrites += 1
         throw new Error('SHOULD_NOT_REMOVE_INVITE')
       },
+      findMerchantBySlug: options.findMerchantBySlug || (async (merchantSlug) => {
+        return state.merchants.find((merchant) => merchant.merchant_slug === merchantSlug || merchant.merchant_id === merchantSlug) || null
+      }),
+      findStaffByLoginName: options.findStaffByLoginName || (async ({ merchant_id, login_name }) => {
+        return state.staff.find((staff) => {
+          return staff.merchant_id === merchant_id && staff.login_name === login_name
+        }) || null
+      }),
+      createMerchantForSignup: options.createMerchantForSignup
+        ? ((merchant) => options.createMerchantForSignup(merchant, state))
+        : (async (merchant) => {
+        state.merchantWrites += 1
+        const record = {
+          _id: `merchant_${merchant.merchant_id}`,
+          ...merchant
+        }
+        state.merchants.push(record)
+        return record
+      }),
+      createOwnerStaff: options.createOwnerStaff
+        ? ((staff) => options.createOwnerStaff(staff, state))
+        : (async (staff) => {
+        state.staffWrites += 1
+        const record = {
+          _id: staff.staff_id,
+          ...staff
+        }
+        state.staff.push(record)
+        return record
+      }),
+      markInviteUsed: options.markInviteUsed
+        ? ((params) => options.markInviteUsed(params, state))
+        : (async ({ code, updateData }) => {
+        state.inviteWrites += 1
+        const invite = state.invites.find((item) => item.code === code)
+        if (!invite || invite.status !== 'unused') {
+          return null
+        }
+        Object.assign(invite, updateData)
+        return invite
+      }),
+      disableMerchantForSignup: options.disableMerchantForSignup || (async (merchantId) => {
+        state.merchantCompensations += 1
+        const merchant = state.merchants.find((item) => item.merchant_id === merchantId)
+        if (merchant) {
+          merchant.status = 'disabled'
+          merchant.compensated = true
+        }
+      }),
+      disableStaffForSignup: options.disableStaffForSignup || (async (staffId) => {
+        state.staffCompensations += 1
+        const staff = state.staff.find((item) => item.staff_id === staffId || item._id === staffId)
+        if (staff) {
+          staff.status = 'disabled'
+          staff.account_status = 'disabled'
+          staff.compensated = true
+        }
+      }),
+      createStaffId: options.createStaffId || (() => `staff_${state.staffIndex++}`),
+      createPasswordSalt: options.createPasswordSalt || (() => 'fixed-test-password-salt'),
+      createNonce: options.createNonce || (() => 'fixed-merchant-admin-nonce'),
+      getMerchantTokenTtlMinutes: options.getMerchantTokenTtlMinutes || (() => 240),
       logger: {
         error: () => {}
       }
@@ -89,6 +157,32 @@ function assertResponseDoesNotLeak(result, blockedValues = []) {
   })
 }
 
+function decodeTokenPayload(token) {
+  const payloadSegment = token.split('.')[0]
+  const padded = payloadSegment.padEnd(payloadSegment.length + ((4 - (payloadSegment.length % 4)) % 4), '=')
+  return JSON.parse(Buffer.from(padded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'))
+}
+
+function base64urlEncode(value) {
+  return Buffer.from(value)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+}
+
+function assertTokenSignedWithSecret(token, secret) {
+  const [payloadSegment, signatureSegment] = token.split('.')
+  const expectedSignature = base64urlEncode(
+    crypto
+      .createHmac('sha256', secret)
+      .update(payloadSegment)
+      .digest()
+  )
+
+  assert.equal(signatureSegment, expectedSignature)
+}
+
 async function createInviteWithDeps(event = {}, options = {}) {
   const { state, deps } = createDeps(options)
   const { createMerchantSelfServiceHandler } = loadService()
@@ -101,6 +195,7 @@ async function createInviteWithDeps(event = {}, options = {}) {
 
   return {
     state,
+    deps,
     result
   }
 }
@@ -126,6 +221,38 @@ function createPreviewInvite(overrides = {}) {
     used_at: null,
     disabled_at: null,
     ...overrides
+  }
+}
+
+function createRedeemPayload(overrides = {}) {
+  return {
+    action: 'redeemMerchantSignupInvite',
+    code: 'ABCD2345',
+    merchant_name: 'Zhang San Private Kitchen',
+    short_name: 'Zhang San',
+    merchant_slug: 'zhangsan-kitchen',
+    login_name: 'owner',
+    password: 'password123',
+    ...overrides
+  }
+}
+
+async function redeemInviteWithDeps(event = {}, options = {}) {
+  const { state, deps } = createDeps({
+    invites: [createPreviewInvite({
+      used_by_openid: '',
+      used_by_account_id: ''
+    })],
+    ...options
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+  const result = await handler(createRedeemPayload(event))
+
+  return {
+    state,
+    deps,
+    result
   }
 }
 
@@ -290,12 +417,428 @@ test('unknown action fails with INVALID_ACTION', async () => {
   const handler = createMerchantSelfServiceHandler(deps)
 
   const result = await handler({
-    action: 'redeemMerchantSignupInvite',
+    action: 'merchantAdminLogin',
     admin_token: createWebToken()
   })
 
   assert.equal(result.success, false)
   assert.equal(result.code, 'INVALID_ACTION')
+})
+
+test('redeemMerchantSignupInvite succeeds and creates merchant owner invite used and merchant admin session', async () => {
+  const { state, result } = await redeemInviteWithDeps()
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.message, '开店成功')
+
+  assert.equal(state.merchants.length, 1)
+  assert.equal(state.merchants[0].merchant_id, 'zhangsan-kitchen')
+  assert.equal(state.merchants[0].merchant_slug, 'zhangsan-kitchen')
+  assert.equal(state.merchants[0].name, 'Zhang San Private Kitchen')
+  assert.equal(state.merchants[0].short_name, 'Zhang San')
+  assert.equal(state.merchants[0].status, 'active')
+  assert.equal(state.merchants[0].owner_openid, '')
+  assert.equal(state.merchants[0].owner_staff_id, 'staff_1')
+  assert.equal(state.merchants[0].created_from_invite_code, 'ABCD2345')
+  assert.equal(state.merchants[0].notice, '')
+  assert.equal(state.merchants[0].password, undefined)
+  assert.equal(state.merchants[0].created_at, FIXED_NOW)
+  assert.equal(state.merchants[0].updated_at, FIXED_NOW)
+
+  assert.equal(state.staff.length, 1)
+  assert.equal(state.staff[0].staff_id, 'staff_1')
+  assert.equal(state.staff[0].merchant_id, 'zhangsan-kitchen')
+  assert.equal(state.staff[0].openid, '')
+  assert.equal(state.staff[0].role, 'owner')
+  assert.equal(state.staff[0].status, 'active')
+  assert.equal(state.staff[0].nickname, 'Zhang San')
+  assert.equal(state.staff[0].login_name, 'owner')
+  assert.ok(state.staff[0].password_hash)
+  assert.ok(state.staff[0].password_salt)
+  assert.notEqual(state.staff[0].password_hash, 'password123')
+  assert.notEqual(state.staff[0].password_salt, 'password123')
+  assert.equal(state.staff[0].password, undefined)
+  assert.equal(state.staff[0].account_status, 'active')
+  assert.equal(state.staff[0].token_version, 1)
+  assert.equal(state.staff[0].last_login_at, FIXED_NOW)
+  assert.equal(state.staff[0].created_at, FIXED_NOW)
+  assert.equal(state.staff[0].updated_at, FIXED_NOW)
+
+  assert.equal(state.invites[0].status, 'used')
+  assert.equal(state.invites[0].used_merchant_id, 'zhangsan-kitchen')
+  assert.equal(state.invites[0].used_by_account_id, 'staff_1')
+  assert.equal(state.invites[0].used_by_openid, '')
+  assert.equal(state.invites[0].used_at, FIXED_NOW)
+  assert.equal(state.invites[0].updated_at, FIXED_NOW)
+
+  assert.deepEqual(result.data.merchant, {
+    merchant_id: 'zhangsan-kitchen',
+    merchant_slug: 'zhangsan-kitchen',
+    name: 'Zhang San Private Kitchen',
+    short_name: 'Zhang San',
+    status: 'active'
+  })
+  assert.equal(result.data.session.role, 'merchant_admin')
+  assert.equal(result.data.session.merchant_id, 'zhangsan-kitchen')
+  assert.ok(result.data.session.token)
+  assert.ok(result.data.session.expires_at)
+
+  const tokenPayload = decodeTokenPayload(result.data.session.token)
+  assert.equal(tokenPayload.role, 'merchant_admin')
+  assert.equal(tokenPayload.merchant_id, 'zhangsan-kitchen')
+  assert.equal(tokenPayload.staff_id, 'staff_1')
+  assert.equal(tokenPayload.account_id, 'staff_1')
+  assert.equal(tokenPayload.login_name, 'owner')
+  assert.equal(tokenPayload.token_version, 1)
+  assert.equal(tokenPayload.nonce, 'fixed-merchant-admin-nonce')
+  assertTokenSignedWithSecret(result.data.session.token, TOKEN_SECRET)
+})
+
+test('redeemMerchantSignupInvite normalizes merchant_slug and login_name', async () => {
+  const { state, result } = await redeemInviteWithDeps({
+    merchant_slug: '  ZhangSan-Kitchen  ',
+    login_name: ' OWNER '
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(state.merchants[0].merchant_id, 'zhangsan-kitchen')
+  assert.equal(state.merchants[0].merchant_slug, 'zhangsan-kitchen')
+  assert.equal(state.staff[0].login_name, 'owner')
+})
+
+test('redeemMerchantSignupInvite rejects missing or invalid invite code', async () => {
+  const cases = [
+    {
+      event: { code: '' },
+      code: 'INVALID_INVITE_CODE'
+    },
+    {
+      event: { code: 'BAD_CODE!' },
+      code: 'INVALID_INVITE_CODE'
+    },
+    {
+      event: { code: 'ZZZZ9999' },
+      options: { invites: [] },
+      code: 'INVITE_NOT_FOUND'
+    }
+  ]
+
+  for (const item of cases) {
+    const { state, result } = await redeemInviteWithDeps(item.event, item.options)
+    assert.equal(result.success, false)
+    assert.equal(result.code, item.code)
+    assert.equal(state.merchants.length, 0)
+    assert.equal(state.staff.length, 0)
+    assert.notEqual(state.invites[0] && state.invites[0].status, 'used')
+  }
+})
+
+test('redeemMerchantSignupInvite rejects invite that cannot be used for merchant signup', async () => {
+  const legacyInvite = createPreviewInvite()
+  delete legacyInvite.invite_type
+
+  const cases = [
+    {
+      invite: createPreviewInvite({ invite_type: 'staff_join', merchant_id: 'merchant_001' }),
+      code: 'INVITE_TYPE_MISMATCH'
+    },
+    {
+      invite: legacyInvite,
+      code: 'INVITE_TYPE_MISMATCH'
+    },
+    {
+      invite: createPreviewInvite({ status: 'used' }),
+      code: 'INVITE_USED'
+    },
+    {
+      invite: createPreviewInvite({ status: 'disabled' }),
+      code: 'INVITE_DISABLED'
+    },
+    {
+      invite: createPreviewInvite({ status: 'expired' }),
+      code: 'INVITE_EXPIRED'
+    },
+    {
+      invite: createPreviewInvite({ status: 'unused', expires_at: new Date(FIXED_NOW.getTime() - DAY_MS) }),
+      code: 'INVITE_EXPIRED'
+    }
+  ]
+
+  for (const item of cases) {
+    const originalStatus = item.invite.status
+    const { state, result } = await redeemInviteWithDeps({}, {
+      invites: [item.invite]
+    })
+    assert.equal(result.success, false)
+    assert.equal(result.code, item.code)
+    assert.equal(state.merchants.length, 0)
+    assert.equal(state.staff.length, 0)
+    assert.equal(state.invites[0].status, originalStatus)
+  }
+})
+
+test('redeemMerchantSignupInvite validates merchant and account fields', async () => {
+  const cases = [
+    {
+      event: { merchant_name: '' },
+      code: 'MERCHANT_NAME_REQUIRED'
+    },
+    {
+      event: { merchant_name: 'a'.repeat(41) },
+      code: 'MERCHANT_NAME_INVALID'
+    },
+    {
+      event: { short_name: '' },
+      code: 'SHORT_NAME_REQUIRED'
+    },
+    {
+      event: { short_name: 'a'.repeat(13) },
+      code: 'SHORT_NAME_INVALID'
+    },
+    {
+      event: { merchant_slug: '' },
+      code: 'MERCHANT_SLUG_REQUIRED'
+    },
+    {
+      event: { merchant_slug: 'bad_slug' },
+      code: 'MERCHANT_SLUG_INVALID'
+    },
+    {
+      event: { merchant_slug: '-bad' },
+      code: 'MERCHANT_SLUG_INVALID'
+    },
+    {
+      event: { merchant_slug: 'bad--slug' },
+      code: 'MERCHANT_SLUG_INVALID'
+    },
+    {
+      event: { login_name: '' },
+      code: 'LOGIN_NAME_REQUIRED'
+    },
+    {
+      event: { login_name: 'bad name' },
+      code: 'LOGIN_NAME_INVALID'
+    },
+    {
+      event: { password: '' },
+      code: 'PASSWORD_REQUIRED'
+    },
+    {
+      event: { password: '1234567' },
+      code: 'PASSWORD_TOO_SHORT'
+    }
+  ]
+
+  for (const item of cases) {
+    const { state, result } = await redeemInviteWithDeps(item.event)
+    assert.equal(result.success, false)
+    assert.equal(result.code, item.code)
+    assert.equal(state.merchants.length, 0)
+    assert.equal(state.staff.length, 0)
+    assert.equal(state.invites[0].status, 'unused')
+  }
+})
+
+test('redeemMerchantSignupInvite rejects duplicate merchant slug and duplicate owner login name', async () => {
+  const duplicateSlug = await redeemInviteWithDeps({}, {
+    merchants: [
+      {
+        merchant_id: 'zhangsan-kitchen',
+        merchant_slug: 'zhangsan-kitchen',
+        status: 'active'
+      }
+    ]
+  })
+  assert.equal(duplicateSlug.result.success, false)
+  assert.equal(duplicateSlug.result.code, 'MERCHANT_SLUG_EXISTS')
+  assert.equal(duplicateSlug.state.merchants.length, 1)
+  assert.equal(duplicateSlug.state.staff.length, 0)
+  assert.equal(duplicateSlug.state.invites[0].status, 'unused')
+
+  const duplicateLogin = await redeemInviteWithDeps({}, {
+    staff: [
+      {
+        merchant_id: 'zhangsan-kitchen',
+        login_name: 'owner',
+        status: 'active'
+      }
+    ]
+  })
+  assert.equal(duplicateLogin.result.success, false)
+  assert.equal(duplicateLogin.result.code, 'LOGIN_NAME_INVALID')
+  assert.equal(duplicateLogin.state.merchants.length, 0)
+  assert.equal(duplicateLogin.state.staff.length, 1)
+  assert.equal(duplicateLogin.state.invites[0].status, 'unused')
+})
+
+test('redeemMerchantSignupInvite response does not leak password secret or stack details', async () => {
+  const { state, result } = await redeemInviteWithDeps()
+
+  assert.equal(result.success, true)
+  assertResponseDoesNotLeak(result, [
+    'password123',
+    state.staff[0].password_hash,
+    state.staff[0].password_salt
+  ])
+
+  const internalError = await redeemInviteWithDeps({}, {
+    createMerchantForSignup: async () => {
+      const error = new Error(INTERNAL_STACK_MARKER)
+      error.stack = `Error: ${INTERNAL_STACK_MARKER}\n    at private-file.js:1:1`
+      throw error
+    }
+  })
+
+  assert.equal(internalError.result.success, false)
+  assert.equal(internalError.result.code, 'MERCHANT_CREATE_FAILED')
+  assertResponseDoesNotLeak(internalError.result, [INTERNAL_STACK_MARKER, 'password123'])
+})
+
+test('redeemMerchantSignupInvite failures do not create token or write data before validation passes', async () => {
+  const { state, result } = await redeemInviteWithDeps({
+    merchant_name: '',
+    password: 'password123'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.data, null)
+  assert.equal(state.merchants.length, 0)
+  assert.equal(state.staff.length, 0)
+  assert.equal(state.invites[0].status, 'unused')
+})
+
+test('redeemMerchantSignupInvite compensates active merchant when owner creation fails', async () => {
+  const { state, result } = await redeemInviteWithDeps({}, {
+    createOwnerStaff: async (staff, currentState) => {
+      void staff
+      currentState.staffWrites += 1
+      throw new Error('OWNER_CREATE_FAILED')
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'OWNER_CREATE_FAILED')
+  assert.equal(state.merchants.length, 1)
+  assert.equal(state.merchants[0].status, 'disabled')
+  assert.equal(state.merchantCompensations, 1)
+  assert.equal(state.staff.length, 0)
+  assert.equal(state.invites[0].status, 'unused')
+})
+
+test('redeemMerchantSignupInvite compensates merchant and owner when invite mark used fails', async () => {
+  const { state, result } = await redeemInviteWithDeps({}, {
+    markInviteUsed: async (params, currentState) => {
+      void params
+      currentState.inviteWrites += 1
+      throw new Error('INVITE_MARK_USED_FAILED')
+    }
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVITE_MARK_USED_FAILED')
+  assert.equal(state.merchants.length, 1)
+  assert.equal(state.merchants[0].status, 'disabled')
+  assert.equal(state.staff.length, 1)
+  assert.equal(state.staff[0].status, 'disabled')
+  assert.equal(state.staff[0].account_status, 'disabled')
+  assert.equal(state.merchantCompensations, 1)
+  assert.equal(state.staffCompensations, 1)
+  assert.equal(state.invites[0].status, 'unused')
+})
+
+test('redeemMerchantSignupInvite cannot redeem same invite or same slug twice', async () => {
+  const first = await redeemInviteWithDeps()
+  assert.equal(first.result.success, true)
+
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(first.deps)
+
+  const secondByInvite = await handler(createRedeemPayload({
+    merchant_slug: 'another-kitchen',
+    login_name: 'other-owner'
+  }))
+  assert.equal(secondByInvite.success, false)
+  assert.equal(secondByInvite.code, 'INVITE_USED')
+  assert.equal(first.state.merchants.length, 1)
+  assert.equal(first.state.staff.length, 1)
+
+  const secondInvite = createPreviewInvite({
+    _id: 'invite_preview_002',
+    code: 'JKLM6789'
+  })
+  first.state.invites.push(secondInvite)
+  const secondBySlug = await handler(createRedeemPayload({
+    code: 'JKLM6789'
+  }))
+  assert.equal(secondBySlug.success, false)
+  assert.equal(secondBySlug.code, 'MERCHANT_SLUG_EXISTS')
+  assert.equal(secondInvite.status, 'unused')
+  assert.equal(first.state.merchants.length, 1)
+  assert.equal(first.state.staff.length, 1)
+})
+
+test('redeemMerchantSignupInvite works with http body string', async () => {
+  const { state, deps } = createDeps({
+    invites: [createPreviewInvite()]
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+
+  const result = await handler({
+    body: JSON.stringify(createRedeemPayload({
+      merchant_slug: 'body-string-kitchen',
+      login_name: 'body-owner'
+    }))
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.merchant.merchant_id, 'body-string-kitchen')
+  assert.equal(state.merchants.length, 1)
+  assert.equal(state.staff.length, 1)
+  assert.equal(state.invites[0].status, 'used')
+})
+
+test('redeemMerchantSignupInvite works with http body object', async () => {
+  const { state, deps } = createDeps({
+    invites: [createPreviewInvite()]
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+
+  const result = await handler({
+    body: createRedeemPayload({
+      merchant_slug: 'body-object-kitchen',
+      login_name: 'body-object-owner'
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.merchant.merchant_id, 'body-object-kitchen')
+  assert.equal(state.merchants.length, 1)
+  assert.equal(state.staff.length, 1)
+  assert.equal(state.invites[0].status, 'used')
+})
+
+test('redeemMerchantSignupInvite works with queryStringParameters', async () => {
+  const { state, deps } = createDeps({
+    invites: [createPreviewInvite()]
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+
+  const result = await handler({
+    queryStringParameters: createRedeemPayload({
+      merchant_slug: 'query-kitchen',
+      login_name: 'query-owner'
+    })
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.merchant.merchant_id, 'query-kitchen')
+  assert.equal(state.merchants.length, 1)
+  assert.equal(state.staff.length, 1)
+  assert.equal(state.invites[0].status, 'used')
 })
 
 test('previewMerchantSignupInvite succeeds for available merchant signup invite', async () => {
@@ -754,10 +1297,14 @@ function matchesQuery(record, query = {}) {
 function createIndexCloudMock(options = {}) {
   const state = {
     invites: options.invites || [],
+    merchants: options.merchants || [],
+    staff: options.staff || [],
     inviteUpdates: 0,
     inviteRemoves: 0,
     merchantAdds: 0,
-    staffAdds: 0
+    merchantUpdates: 0,
+    staffAdds: 0,
+    staffUpdates: 0
   }
 
   function createQuery(collectionName, query = {}) {
@@ -769,9 +1316,42 @@ function createIndexCloudMock(options = {}) {
         return queryApi
       },
       async get() {
-        const source = collectionName === 'merchant_invites' ? state.invites : []
+        const sources = {
+          merchant_invites: state.invites,
+          merchants: state.merchants,
+          merchant_staff: state.staff
+        }
+        const source = sources[collectionName] || []
         return {
           data: source.filter((record) => matchesQuery(record, query))
+        }
+      },
+      async update({ data }) {
+        const sources = {
+          merchant_invites: state.invites,
+          merchants: state.merchants,
+          merchant_staff: state.staff
+        }
+        const source = sources[collectionName] || []
+        const matched = source.filter((record) => matchesQuery(record, query))
+        matched.forEach((record) => {
+          Object.assign(record, data)
+        })
+
+        if (collectionName === 'merchant_invites') {
+          state.inviteUpdates += matched.length
+        }
+        if (collectionName === 'merchants') {
+          state.merchantUpdates += matched.length
+        }
+        if (collectionName === 'merchant_staff') {
+          state.staffUpdates += matched.length
+        }
+
+        return {
+          stats: {
+            updated: matched.length
+          }
         }
       }
     }
@@ -800,10 +1380,28 @@ function createIndexCloudMock(options = {}) {
         async add({ data }) {
           if (collectionName === 'merchants') {
             state.merchantAdds += 1
+            const record = {
+              _id: `merchant_${data.merchant_id}`,
+              ...data
+            }
+            state.merchants.push(record)
+
+            return {
+              _id: record._id
+            }
           }
 
           if (collectionName === 'merchant_staff') {
             state.staffAdds += 1
+            const record = {
+              _id: data.staff_id,
+              ...data
+            }
+            state.staff.push(record)
+
+            return {
+              _id: record._id
+            }
           }
 
           if (collectionName !== 'merchant_invites') {
@@ -887,6 +1485,64 @@ test('index entry creates merchant signup invite through cloud database', async 
       delete process.env.WEB_ADMIN_TOKEN_SECRET
     } else {
       process.env.WEB_ADMIN_TOKEN_SECRET = originalSecret
+    }
+  }
+})
+
+test('index entry redeems merchant signup invite through cloud database', async () => {
+  const originalSecret = process.env.WEB_ADMIN_TOKEN_SECRET
+  const originalTtl = process.env.MERCHANT_ADMIN_TOKEN_TTL_MINUTES
+  process.env.WEB_ADMIN_TOKEN_SECRET = TOKEN_SECRET
+  process.env.MERCHANT_ADMIN_TOKEN_TTL_MINUTES = '240'
+
+  try {
+    const { state, cloud } = createIndexCloudMock({
+      invites: [
+        createPreviewInvite({
+          used_by_openid: '',
+          used_by_account_id: ''
+        })
+      ]
+    })
+    const main = loadMerchantSelfServiceIndexWithCloudMock(cloud)
+
+    const result = await main(createRedeemPayload({
+      merchant_slug: 'index-kitchen',
+      login_name: 'index-owner'
+    }))
+
+    assert.equal(result.success, true)
+    assert.equal(result.data.merchant.merchant_id, 'index-kitchen')
+    assert.equal(result.data.session.role, 'merchant_admin')
+    assert.equal(result.data.session.merchant_id, 'index-kitchen')
+    assert.ok(result.data.session.token)
+    assert.equal(state.merchants.length, 1)
+    assert.equal(state.merchants[0].merchant_id, 'index-kitchen')
+    assert.equal(state.merchants[0].status, 'active')
+    assert.equal(state.staff.length, 1)
+    assert.equal(state.staff[0].merchant_id, 'index-kitchen')
+    assert.equal(state.staff[0].role, 'owner')
+    assert.equal(state.staff[0].status, 'active')
+    assert.equal(state.staff[0].password, undefined)
+    assert.ok(state.staff[0].password_hash)
+    assert.ok(state.staff[0].password_salt)
+    assert.equal(state.invites[0].status, 'used')
+    assert.equal(state.invites[0].used_merchant_id, 'index-kitchen')
+    assert.equal(state.invites[0].used_by_openid, '')
+    assert.equal(state.inviteUpdates, 1)
+    assert.equal(state.merchantAdds, 1)
+    assert.equal(state.staffAdds, 1)
+  } finally {
+    if (originalSecret === undefined) {
+      delete process.env.WEB_ADMIN_TOKEN_SECRET
+    } else {
+      process.env.WEB_ADMIN_TOKEN_SECRET = originalSecret
+    }
+
+    if (originalTtl === undefined) {
+      delete process.env.MERCHANT_ADMIN_TOKEN_TTL_MINUTES
+    } else {
+      process.env.MERCHANT_ADMIN_TOKEN_TTL_MINUTES = originalTtl
     }
   }
 })
