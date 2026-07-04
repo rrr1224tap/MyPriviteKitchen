@@ -1,0 +1,9 @@
+{
+  "name": "merchantSelfService",
+  "version": "1.0.0",
+  "description": "Merchant self service onboarding for ordering mini program",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}
