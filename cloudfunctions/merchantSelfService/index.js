@@ -52,6 +52,17 @@ async function findStaffByLoginName({ merchant_id, login_name }) {
   return result.data && result.data.length ? result.data[0] : null
 }
 
+async function findStaffById(staffId) {
+  const result = await db.collection('merchant_staff')
+    .where({
+      staff_id: staffId
+    })
+    .limit(1)
+    .get()
+
+  return result.data && result.data.length ? result.data[0] : null
+}
+
 exports.main = createMerchantSelfServiceHandler({
   getTokenSecret: () => process.env.WEB_ADMIN_TOKEN_SECRET,
 
@@ -97,6 +108,22 @@ exports.main = createMerchantSelfServiceHandler({
       _id: result._id,
       ...staff
     }
+  },
+
+  updateStaffLoginAt: async ({ staff_id, updateData }) => {
+    const result = await db.collection('merchant_staff')
+      .where({
+        staff_id
+      })
+      .update({
+        data: updateData
+      })
+
+    if (!result.stats || result.stats.updated < 1) {
+      return null
+    }
+
+    return findStaffById(staff_id)
   },
 
   markInviteUsed: async ({ code, updateData }) => {

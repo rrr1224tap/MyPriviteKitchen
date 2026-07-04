@@ -35,6 +35,7 @@ function createDeps(options = {}) {
     inviteWrites: 0,
     merchantWrites: 0,
     staffWrites: 0,
+    staffLoginUpdates: 0,
     merchantCompensations: 0,
     staffCompensations: 0
   }
@@ -131,6 +132,17 @@ function createDeps(options = {}) {
           staff.compensated = true
         }
       }),
+      updateStaffLoginAt: options.updateStaffLoginAt
+        ? ((params) => options.updateStaffLoginAt(params, state))
+        : (async ({ staff_id, updateData }) => {
+        state.staffLoginUpdates += 1
+        const staff = state.staff.find((item) => item.staff_id === staff_id || item._id === staff_id)
+        if (!staff) {
+          return null
+        }
+        Object.assign(staff, updateData)
+        return staff
+      }),
       createStaffId: options.createStaffId || (() => `staff_${state.staffIndex++}`),
       createPasswordSalt: options.createPasswordSalt || (() => 'fixed-test-password-salt'),
       createNonce: options.createNonce || (() => 'fixed-merchant-admin-nonce'),
@@ -181,6 +193,10 @@ function assertTokenSignedWithSecret(token, secret) {
   )
 
   assert.equal(signatureSegment, expectedSignature)
+}
+
+function createPasswordHash(password, salt) {
+  return crypto.scryptSync(password, salt, 64).toString('hex')
 }
 
 async function createInviteWithDeps(event = {}, options = {}) {
@@ -234,6 +250,71 @@ function createRedeemPayload(overrides = {}) {
     login_name: 'owner',
     password: 'password123',
     ...overrides
+  }
+}
+
+function createLoginPayload(overrides = {}) {
+  return {
+    action: 'merchantAdminLogin',
+    merchant_slug: 'zhangsan-kitchen',
+    login_name: 'owner',
+    password: 'password123',
+    ...overrides
+  }
+}
+
+function createLoginMerchant(overrides = {}) {
+  return {
+    _id: 'merchant_zhangsan-kitchen',
+    merchant_id: 'zhangsan-kitchen',
+    merchant_slug: 'zhangsan-kitchen',
+    name: 'Zhang San Private Kitchen',
+    short_name: 'Zhang San',
+    status: 'active',
+    owner_staff_id: 'staff_owner_001',
+    created_at: new Date('2026-07-01T10:00:00.000Z'),
+    updated_at: new Date('2026-07-01T10:00:00.000Z'),
+    ...overrides
+  }
+}
+
+function createLoginStaff(overrides = {}) {
+  const passwordSalt = overrides.password_salt || 'login-test-password-salt'
+  return {
+    _id: 'staff_owner_001',
+    staff_id: 'staff_owner_001',
+    merchant_id: 'zhangsan-kitchen',
+    openid: '',
+    role: 'owner',
+    status: 'active',
+    nickname: 'Zhang San',
+    remark: 'owner account',
+    login_name: 'owner',
+    password_hash: createPasswordHash('password123', passwordSalt),
+    password_salt: passwordSalt,
+    account_status: 'active',
+    token_version: 3,
+    last_login_at: new Date('2026-07-01T10:00:00.000Z'),
+    created_at: new Date('2026-07-01T10:00:00.000Z'),
+    updated_at: new Date('2026-07-01T10:00:00.000Z'),
+    ...overrides
+  }
+}
+
+async function merchantAdminLoginWithDeps(event = {}, options = {}) {
+  const { state, deps } = createDeps({
+    merchants: [createLoginMerchant()],
+    staff: [createLoginStaff()],
+    ...options
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+  const result = await handler(createLoginPayload(event))
+
+  return {
+    state,
+    deps,
+    result
   }
 }
 
@@ -417,7 +498,7 @@ test('unknown action fails with INVALID_ACTION', async () => {
   const handler = createMerchantSelfServiceHandler(deps)
 
   const result = await handler({
-    action: 'merchantAdminLogin',
+    action: 'unknownMerchantSelfServiceAction',
     admin_token: createWebToken()
   })
 
@@ -839,6 +920,242 @@ test('redeemMerchantSignupInvite works with queryStringParameters', async () => 
   assert.equal(state.merchants.length, 1)
   assert.equal(state.staff.length, 1)
   assert.equal(state.invites[0].status, 'used')
+})
+
+test('merchantAdminLogin succeeds and returns safe merchant admin session', async () => {
+  const { state, result } = await merchantAdminLoginWithDeps()
+
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.message, '鐧诲綍鎴愬姛')
+  assert.deepEqual(result.data.merchant, {
+    merchant_id: 'zhangsan-kitchen',
+    merchant_slug: 'zhangsan-kitchen',
+    name: 'Zhang San Private Kitchen',
+    short_name: 'Zhang San',
+    status: 'active'
+  })
+  assert.equal(result.data.session.role, 'merchant_admin')
+  assert.equal(result.data.session.merchant_id, 'zhangsan-kitchen')
+  assert.ok(result.data.session.token)
+  assert.ok(result.data.session.expires_at)
+
+  const tokenPayload = decodeTokenPayload(result.data.session.token)
+  assert.equal(tokenPayload.role, 'merchant_admin')
+  assert.equal(tokenPayload.merchant_id, 'zhangsan-kitchen')
+  assert.equal(tokenPayload.staff_id, 'staff_owner_001')
+  assert.equal(tokenPayload.account_id, 'staff_owner_001')
+  assert.equal(tokenPayload.login_name, 'owner')
+  assert.equal(tokenPayload.token_version, 3)
+  assert.equal(tokenPayload.nonce, 'fixed-merchant-admin-nonce')
+  assertTokenSignedWithSecret(result.data.session.token, TOKEN_SECRET)
+
+  assert.equal(state.staff[0].last_login_at, FIXED_NOW)
+  assert.equal(state.staff[0].updated_at, FIXED_NOW)
+  assert.equal(state.staffLoginUpdates, 1)
+  assert.equal(state.merchantWrites, 0)
+  assert.equal(state.staffWrites, 0)
+  assert.equal(state.inviteWrites, 0)
+  assert.equal(state.merchants.length, 1)
+  assert.equal(state.staff.length, 1)
+  assert.equal(state.staff[0].password_hash, createPasswordHash('password123', 'login-test-password-salt'))
+  assert.equal(state.staff[0].password_salt, 'login-test-password-salt')
+
+  assertResponseDoesNotLeak(result, [
+    'password123',
+    state.staff[0].password_hash,
+    state.staff[0].password_salt
+  ])
+})
+
+test('merchantAdminLogin normalizes merchant_slug and login_name', async () => {
+  const { result } = await merchantAdminLoginWithDeps({
+    merchant_slug: '  ZhangSan-Kitchen  ',
+    login_name: ' OWNER '
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.session.merchant_id, 'zhangsan-kitchen')
+})
+
+test('merchantAdminLogin validates required fields', async () => {
+  const cases = [
+    {
+      event: { merchant_slug: '' },
+      code: 'MERCHANT_SLUG_REQUIRED'
+    },
+    {
+      event: { merchant_slug: 'bad_slug' },
+      code: 'MERCHANT_SLUG_INVALID'
+    },
+    {
+      event: { login_name: '' },
+      code: 'LOGIN_NAME_REQUIRED'
+    },
+    {
+      event: { login_name: 'bad name' },
+      code: 'LOGIN_NAME_INVALID'
+    },
+    {
+      event: { password: '' },
+      code: 'PASSWORD_REQUIRED'
+    }
+  ]
+
+  for (const item of cases) {
+    const { state, result } = await merchantAdminLoginWithDeps(item.event)
+    assert.equal(result.success, false)
+    assert.equal(result.code, item.code)
+    assert.equal(result.data, null)
+    assert.equal(state.staffLoginUpdates, 0)
+    assert.equal(state.merchantWrites, 0)
+    assert.equal(state.staffWrites, 0)
+    assert.equal(state.inviteWrites, 0)
+  }
+})
+
+test('merchantAdminLogin returns invalid login for missing merchant account or wrong password', async () => {
+  const cases = [
+    {
+      options: { merchants: [] }
+    },
+    {
+      options: { staff: [] }
+    },
+    {
+      event: { password: 'wrong-password' }
+    },
+    {
+      options: { staff: [createLoginStaff({ password_hash: '' })] }
+    },
+    {
+      options: { staff: [createLoginStaff({ password_salt: '' })] }
+    },
+    {
+      options: { staff: [createLoginStaff({ role: 'staff' })] }
+    }
+  ]
+
+  for (const item of cases) {
+    const { state, result } = await merchantAdminLoginWithDeps(item.event || {}, item.options || {})
+    assert.equal(result.success, false)
+    assert.equal(result.code, 'INVALID_LOGIN')
+    assert.equal(result.data, null)
+    assert.equal(state.staffLoginUpdates, 0)
+    assert.equal(state.inviteWrites, 0)
+    assert.equal(result.data && result.data.session, null)
+  }
+})
+
+test('merchantAdminLogin rejects disabled merchant staff or account', async () => {
+  const disabledMerchant = await merchantAdminLoginWithDeps({}, {
+    merchants: [createLoginMerchant({ status: 'disabled' })]
+  })
+  assert.equal(disabledMerchant.result.success, false)
+  assert.equal(disabledMerchant.result.code, 'MERCHANT_DISABLED')
+  assert.equal(disabledMerchant.state.staffLoginUpdates, 0)
+
+  const disabledStaff = await merchantAdminLoginWithDeps({}, {
+    staff: [createLoginStaff({ status: 'disabled' })]
+  })
+  assert.equal(disabledStaff.result.success, false)
+  assert.equal(disabledStaff.result.code, 'ACCOUNT_DISABLED')
+  assert.equal(disabledStaff.state.staffLoginUpdates, 0)
+
+  const disabledAccount = await merchantAdminLoginWithDeps({}, {
+    staff: [createLoginStaff({ account_status: 'disabled' })]
+  })
+  assert.equal(disabledAccount.result.success, false)
+  assert.equal(disabledAccount.result.code, 'ACCOUNT_DISABLED')
+  assert.equal(disabledAccount.state.staffLoginUpdates, 0)
+})
+
+test('merchantAdminLogin failure response does not leak sensitive data or stack details', async () => {
+  const broken = await merchantAdminLoginWithDeps({}, {
+    findMerchantBySlug: async () => {
+      const error = new Error(INTERNAL_STACK_MARKER)
+      error.stack = `Error: ${INTERNAL_STACK_MARKER}\n    at private-file.js:1:1`
+      throw error
+    }
+  })
+
+  assert.equal(broken.result.success, false)
+  assert.equal(broken.result.code, 'INTERNAL_ERROR')
+  assertResponseDoesNotLeak(broken.result, [INTERNAL_STACK_MARKER, 'password123'])
+
+  const invalid = await merchantAdminLoginWithDeps({ password: 'wrong-password' })
+  assertResponseDoesNotLeak(invalid.result, [
+    'password123',
+    invalid.state.staff[0].password_hash,
+    invalid.state.staff[0].password_salt
+  ])
+})
+
+test('merchantAdminLogin works with http body string', async () => {
+  const { state, deps } = createDeps({
+    merchants: [createLoginMerchant()],
+    staff: [createLoginStaff()]
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+
+  const result = await handler({
+    body: JSON.stringify(createLoginPayload())
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.session.role, 'merchant_admin')
+  assert.equal(state.staffLoginUpdates, 1)
+})
+
+test('merchantAdminLogin works with http body object', async () => {
+  const { state, deps } = createDeps({
+    merchants: [createLoginMerchant()],
+    staff: [createLoginStaff()]
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+
+  const result = await handler({
+    body: createLoginPayload()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.session.role, 'merchant_admin')
+  assert.equal(state.staffLoginUpdates, 1)
+})
+
+test('merchantAdminLogin works with queryStringParameters', async () => {
+  const { state, deps } = createDeps({
+    merchants: [createLoginMerchant()],
+    staff: [createLoginStaff()]
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+
+  const result = await handler({
+    queryStringParameters: createLoginPayload()
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.session.role, 'merchant_admin')
+  assert.equal(state.staffLoginUpdates, 1)
+})
+
+test('merchantAdminLogin invalid json body does not crash', async () => {
+  const { deps } = createDeps({
+    merchants: [createLoginMerchant()],
+    staff: [createLoginStaff()]
+  })
+  const { createMerchantSelfServiceHandler } = loadService()
+  const handler = createMerchantSelfServiceHandler(deps)
+
+  const result = await handler({
+    body: '{"action":'
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'INVALID_ACTION')
 })
 
 test('previewMerchantSignupInvite succeeds for available merchant signup invite', async () => {
@@ -1532,6 +1849,55 @@ test('index entry redeems merchant signup invite through cloud database', async 
     assert.equal(state.inviteUpdates, 1)
     assert.equal(state.merchantAdds, 1)
     assert.equal(state.staffAdds, 1)
+  } finally {
+    if (originalSecret === undefined) {
+      delete process.env.WEB_ADMIN_TOKEN_SECRET
+    } else {
+      process.env.WEB_ADMIN_TOKEN_SECRET = originalSecret
+    }
+
+    if (originalTtl === undefined) {
+      delete process.env.MERCHANT_ADMIN_TOKEN_TTL_MINUTES
+    } else {
+      process.env.MERCHANT_ADMIN_TOKEN_TTL_MINUTES = originalTtl
+    }
+  }
+})
+
+test('index entry logs merchant admin in through cloud database', async () => {
+  const originalSecret = process.env.WEB_ADMIN_TOKEN_SECRET
+  const originalTtl = process.env.MERCHANT_ADMIN_TOKEN_TTL_MINUTES
+  process.env.WEB_ADMIN_TOKEN_SECRET = TOKEN_SECRET
+  process.env.MERCHANT_ADMIN_TOKEN_TTL_MINUTES = '240'
+
+  try {
+    const { state, cloud } = createIndexCloudMock({
+      merchants: [createLoginMerchant({ merchant_id: 'index-kitchen', merchant_slug: 'index-kitchen' })],
+      staff: [createLoginStaff({
+        merchant_id: 'index-kitchen',
+        login_name: 'index-owner'
+      })]
+    })
+    const main = loadMerchantSelfServiceIndexWithCloudMock(cloud)
+
+    const result = await main(createLoginPayload({
+      merchant_slug: 'index-kitchen',
+      login_name: 'index-owner'
+    }))
+
+    assert.equal(result.success, true)
+    assert.equal(result.data.merchant.merchant_id, 'index-kitchen')
+    assert.equal(result.data.session.role, 'merchant_admin')
+    assert.equal(result.data.session.merchant_id, 'index-kitchen')
+    assert.ok(result.data.session.token)
+    assert.equal(state.merchants.length, 1)
+    assert.equal(state.staff.length, 1)
+    assert.equal(state.staff[0].last_login_at instanceof Date, true)
+    assert.equal(state.staff[0].updated_at instanceof Date, true)
+    assert.equal(state.staffUpdates, 1)
+    assert.equal(state.merchantAdds, 0)
+    assert.equal(state.staffAdds, 0)
+    assert.equal(state.inviteUpdates, 0)
   } finally {
     if (originalSecret === undefined) {
       delete process.env.WEB_ADMIN_TOKEN_SECRET

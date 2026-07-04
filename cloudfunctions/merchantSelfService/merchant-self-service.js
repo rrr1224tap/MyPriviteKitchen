@@ -4,6 +4,7 @@ const { verifyWebAdminToken } = require('./web-admin-token-helper')
 const CREATE_SIGNUP_INVITE_ACTION = 'createMerchantSignupInvite'
 const PREVIEW_SIGNUP_INVITE_ACTION = 'previewMerchantSignupInvite'
 const REDEEM_SIGNUP_INVITE_ACTION = 'redeemMerchantSignupInvite'
+const MERCHANT_ADMIN_LOGIN_ACTION = 'merchantAdminLogin'
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const INVITE_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{8,12}$/
 const MERCHANT_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/
@@ -124,6 +125,7 @@ function buildDependencies(dependencies = {}) {
     createMerchantForSignup: dependencies.createMerchantForSignup,
     createOwnerStaff: dependencies.createOwnerStaff,
     markInviteUsed: dependencies.markInviteUsed,
+    updateStaffLoginAt: dependencies.updateStaffLoginAt,
     disableMerchantForSignup: dependencies.disableMerchantForSignup,
     disableStaffForSignup: dependencies.disableStaffForSignup,
     createStaffId: dependencies.createStaffId || (() => `staff_${crypto.randomBytes(8).toString('hex')}`),
@@ -221,6 +223,21 @@ function isValidLoginName(value) {
 
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex')
+}
+
+function verifyPassword(password, storedHash, salt) {
+  if (!storedHash || !salt) {
+    return false
+  }
+
+  const passwordHash = hashPassword(password, salt)
+  const storedBuffer = Buffer.from(storedHash, 'hex')
+  const passwordBuffer = Buffer.from(passwordHash, 'hex')
+  if (storedBuffer.length !== passwordBuffer.length) {
+    return false
+  }
+
+  return crypto.timingSafeEqual(storedBuffer, passwordBuffer)
 }
 
 function createMerchantAdminToken(deps, payload) {
@@ -493,6 +510,47 @@ function validateRedeemPayload(payload) {
   }
 }
 
+function validateMerchantAdminLoginPayload(payload) {
+  const merchantSlug = normalizeMerchantSlug(payload.merchant_slug || payload.merchant_id)
+  if (!merchantSlug) {
+    return {
+      error: failure('MERCHANT_SLUG_REQUIRED', '商户标识不能为空')
+    }
+  }
+  if (!isValidMerchantSlug(merchantSlug)) {
+    return {
+      error: failure('MERCHANT_SLUG_INVALID', '商户标识格式不正确')
+    }
+  }
+
+  const loginName = normalizeLoginName(payload.login_name)
+  if (!loginName) {
+    return {
+      error: failure('LOGIN_NAME_REQUIRED', '登录名不能为空')
+    }
+  }
+  if (!isValidLoginName(loginName)) {
+    return {
+      error: failure('LOGIN_NAME_INVALID', '登录名格式不正确')
+    }
+  }
+
+  const password = typeof payload.password === 'string' ? payload.password : ''
+  if (!password) {
+    return {
+      error: failure('PASSWORD_REQUIRED', '密码不能为空')
+    }
+  }
+
+  return {
+    data: {
+      merchantSlug,
+      loginName,
+      password
+    }
+  }
+}
+
 function formatMerchantForResponse(merchant = {}) {
   return {
     merchant_id: merchant.merchant_id || '',
@@ -635,6 +693,77 @@ async function handleRedeemMerchantSignupInvite(deps, payload) {
   }
 }
 
+async function handleMerchantAdminLogin(deps, payload) {
+  const validation = validateMerchantAdminLoginPayload(payload)
+  if (validation.error) {
+    return validation.error
+  }
+
+  const data = validation.data
+
+  try {
+    const merchant = await deps.findMerchantBySlug(data.merchantSlug)
+    if (!merchant) {
+      return failure('INVALID_LOGIN', '登录信息不正确')
+    }
+
+    if (merchant.status !== 'active') {
+      return failure('MERCHANT_DISABLED', '商户已禁用')
+    }
+
+    const merchantId = merchant.merchant_id || merchant.merchant_slug || data.merchantSlug
+    const staff = await deps.findStaffByLoginName({
+      merchant_id: merchantId,
+      login_name: data.loginName
+    })
+
+    if (!staff || staff.role !== 'owner') {
+      return failure('INVALID_LOGIN', '登录信息不正确')
+    }
+
+    if (staff.status !== 'active' || staff.account_status !== 'active') {
+      return failure('ACCOUNT_DISABLED', '账号已禁用')
+    }
+
+    if (!verifyPassword(data.password, staff.password_hash, staff.password_salt)) {
+      return failure('INVALID_LOGIN', '登录信息不正确')
+    }
+
+    const now = deps.now()
+    const updatedStaff = await deps.updateStaffLoginAt({
+      staff_id: staff.staff_id || staff._id,
+      updateData: {
+        last_login_at: now,
+        updated_at: now
+      }
+    })
+
+    if (!updatedStaff) {
+      return failure('INTERNAL_ERROR', '登录失败，请稍后重试')
+    }
+
+    const tokenResult = createMerchantAdminToken(deps, {
+      merchant_id: merchantId,
+      staff_id: updatedStaff.staff_id || staff.staff_id || staff._id,
+      login_name: data.loginName,
+      token_version: updatedStaff.token_version || staff.token_version || 1
+    })
+
+    return success('鐧诲綍鎴愬姛', {
+      session: {
+        token: tokenResult.token,
+        role: MERCHANT_ADMIN_ROLE,
+        merchant_id: merchantId,
+        expires_at: tokenResult.expires_at
+      },
+      merchant: formatMerchantForResponse(merchant)
+    })
+  } catch (error) {
+    deps.logger.error('merchantSelfService merchantAdminLogin failed', error)
+    return failure('INTERNAL_ERROR', '登录失败，请稍后重试')
+  }
+}
+
 function createMerchantSelfServiceHandler(dependencies = {}) {
   const deps = buildDependencies(dependencies)
 
@@ -646,8 +775,13 @@ function createMerchantSelfServiceHandler(dependencies = {}) {
 
       if (action !== CREATE_SIGNUP_INVITE_ACTION &&
         action !== PREVIEW_SIGNUP_INVITE_ACTION &&
-        action !== REDEEM_SIGNUP_INVITE_ACTION) {
+        action !== REDEEM_SIGNUP_INVITE_ACTION &&
+        action !== MERCHANT_ADMIN_LOGIN_ACTION) {
         return failure('INVALID_ACTION', '开店服务操作类型不合法')
+      }
+
+      if (action === MERCHANT_ADMIN_LOGIN_ACTION) {
+        return handleMerchantAdminLogin(deps, payload)
       }
 
       if (action === PREVIEW_SIGNUP_INVITE_ACTION) {
