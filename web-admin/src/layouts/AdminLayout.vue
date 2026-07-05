@@ -53,7 +53,8 @@ const superAdminNavItems = computed(() => [
 ])
 
 const merchantAdminNavItems = [
-  { label: '商户首页', path: '/merchant', key: 'merchant-home', icon: '店' }
+  { label: '商户首页', path: '/merchant', key: 'merchant-home', icon: '店' },
+  { label: '分类管理', path: '/merchant/categories', key: 'merchant-categories', icon: '类' }
 ]
 
 const navItems = computed(() => {
@@ -65,6 +66,14 @@ const currentRoleText = computed(() => roleText(session.value?.role))
 const profileDesc = computed(() => {
   return isMerchantAdmin.value ? `商户：${currentMerchantId.value || '未识别'}` : '本地静态预览'
 })
+
+function isNavItemActive(path: string) {
+  if (path === '/merchant') {
+    return activePath.value === path
+  }
+
+  return activePath.value === path || activePath.value.startsWith(`${path}/`)
+}
 
 function handleNav(path: string) {
   router.push(path)
@@ -92,7 +101,7 @@ function logout() {
           v-for="item in navItems"
           :key="item.key"
           class="side-nav__item"
-          :class="{ 'is-active': activePath === item.path || (item.path !== '/' && activePath.startsWith(item.path)) }"
+          :class="{ 'is-active': isNavItemActive(item.path) }"
           type="button"
           @click="handleNav(item.path)"
         >

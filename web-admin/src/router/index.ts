@@ -116,6 +116,14 @@ const router = createRouter({
           meta: {
             roles: ['merchant_admin']
           }
+        },
+        {
+          path: 'merchant/categories',
+          name: 'merchant-categories',
+          component: CategoriesView,
+          meta: {
+            roles: ['merchant_admin']
+          }
         }
       ]
     }

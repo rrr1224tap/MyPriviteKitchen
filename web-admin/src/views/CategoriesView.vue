@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import ActionButton from '../components/ActionButton.vue'
 import EmptyState from '../components/EmptyState.vue'
 import GlassCard from '../components/GlassCard.vue'
@@ -14,6 +15,7 @@ import {
   type CategoryStatus,
   type EditableCategoryStatus
 } from '../services/categories'
+import { clearSession, getSession } from '../stores/session'
 import type { AdminApiError } from '../types/api'
 
 const MERCHANT_CONTEXT_KEY = 'xiaochu_current_merchant_id'
@@ -25,11 +27,14 @@ interface CategoryFormState {
   status: EditableCategoryStatus
 }
 
+const router = useRouter()
+const session = computed(() => getSession())
+const isMerchantAdmin = computed(() => session.value?.role === 'merchant_admin')
 const categories = ref<CategoryListItem[]>([])
 const isLoading = ref(false)
 const errorMessage = ref('')
 const errorCode = ref('')
-const merchantId = ref(getStoredMerchantId() || FALLBACK_MERCHANT_ID)
+const merchantId = ref(getInitialMerchantId())
 
 const isFormOpen = ref(false)
 const formMode = ref<'create' | 'edit'>('create')
@@ -49,6 +54,13 @@ const inactiveCount = computed(() =>
 )
 const isAuthError = computed(() => ['UNAUTHORIZED', 'TOKEN_EXPIRED', 'FORBIDDEN'].includes(errorCode.value))
 const formTitle = computed(() => formMode.value === 'create' ? '新增分类' : '编辑分类')
+const pageDescription = computed(() => {
+  if (isMerchantAdmin.value) {
+    return `当前商户：${merchantId.value || '未识别'}。分类列表、新增分类和编辑分类已绑定登录商户，不支持切换商户。`
+  }
+
+  return `当前商户：${merchantId.value}。分类列表、新增分类和编辑分类已接入真实云函数；删除和排序暂不执行真实写入。`
+})
 const submitLabel = computed(() => {
   if (isSubmitting.value) {
     return formMode.value === 'create' ? '正在新增...' : '正在更新...'
@@ -63,6 +75,14 @@ function getStoredMerchantId() {
   }
 
   return window.localStorage.getItem(MERCHANT_CONTEXT_KEY) || ''
+}
+
+function getInitialMerchantId() {
+  if (session.value?.role === 'merchant_admin') {
+    return session.value?.merchant_id || ''
+  }
+
+  return getStoredMerchantId() || FALLBACK_MERCHANT_ID
 }
 
 function showPendingTip() {
@@ -197,6 +217,17 @@ async function submitCategoryForm() {
 }
 
 async function loadCategories() {
+  if (!merchantId.value) {
+    categories.value = []
+    errorCode.value = 'TOKEN_INVALID'
+    errorMessage.value = '登录状态异常，请重新登录后再管理分类。'
+    if (isMerchantAdmin.value) {
+      clearSession()
+      router.push('/login')
+    }
+    return
+  }
+
   isLoading.value = true
   errorMessage.value = ''
   errorCode.value = ''
@@ -222,7 +253,7 @@ onMounted(loadCategories)
     <PageHeader
       eyebrow="Categories"
       title="分类管理"
-      :description="`当前商户：${merchantId}。分类列表、新增分类和编辑分类已接入真实云函数；删除和排序暂不执行真实写入。`"
+      :description="pageDescription"
     >
       <template #actions>
         <ActionButton variant="ghost" :disabled="isLoading" @click="loadCategories">刷新列表</ActionButton>
@@ -337,8 +368,8 @@ onMounted(loadCategories)
           <span>{{ formatDate(item.updated_at) }}</span>
           <div class="table-action-group">
             <button class="table-action-button" type="button" @click="openEditForm(item)">编辑</button>
-            <button class="table-action-button" type="button" @click="showPendingTip">排序</button>
-            <button class="table-action-button table-action-button--danger" type="button" @click="showPendingTip">删除</button>
+            <button v-if="!isMerchantAdmin" class="table-action-button" type="button" @click="showPendingTip">排序</button>
+            <button v-if="!isMerchantAdmin" class="table-action-button table-action-button--danger" type="button" @click="showPendingTip">删除</button>
           </div>
         </div>
       </div>
