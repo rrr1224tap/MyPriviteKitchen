@@ -72,6 +72,17 @@ export interface GetPrepSummaryParams {
   date?: string
 }
 
+function withMerchantId<T extends Record<string, unknown>>(merchantId: string | undefined, payload: T) {
+  if (!merchantId) {
+    return payload
+  }
+
+  return {
+    merchant_id: merchantId,
+    ...payload
+  }
+}
+
 function toText(value: unknown, fallback = '') {
   if (value === null || value === undefined) {
     return fallback
@@ -91,7 +102,7 @@ function normalizeSource(raw: RawPrepSummarySource): PrepSummarySource {
 
   return {
     dish_id: toText(raw.dish_id),
-    dish_name: toText(raw.dish_name, '餐品'),
+    dish_name: toText(raw.dish_name, '菜品'),
     quantity: toNumber(raw.quantity),
     amount,
     unit,
@@ -135,14 +146,13 @@ function normalizeGroup(raw: RawPrepSummaryGroup): PrepSummaryGroup {
 }
 
 export async function getPrepSummary(
-  merchantId: string,
+  merchantId: string | undefined,
   params: GetPrepSummaryParams = {}
 ): Promise<PrepSummary> {
-  const result = await callAdminFunction<RawPrepSummary>('getPrepSummary', {
+  const result = await callAdminFunction<RawPrepSummary>('getPrepSummary', withMerchantId(merchantId, {
     action: 'getPrepSummary',
-    merchant_id: merchantId,
     ...params
-  })
+  }))
 
   return {
     date: toText(result.date),

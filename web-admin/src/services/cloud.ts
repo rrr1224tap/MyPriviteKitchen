@@ -47,7 +47,7 @@ export async function callAdminFunction<T>(
 ): Promise<T> {
   const baseUrl = getAdminApiBaseUrl()
   if (!baseUrl) {
-    throw createError('ENDPOINT_NOT_CONFIGURED', '未配置 Web 后台接口，请检查 VITE_WEB_ADMIN_API_BASE_URL')
+    throw createError('ENDPOINT_NOT_CONFIGURED', '未配置 Web 工作台入口，请检查 VITE_WEB_ADMIN_API_BASE_URL')
   }
 
   if (!hasValidLocalSession()) {
@@ -72,7 +72,7 @@ export async function callAdminFunction<T>(
     })
 
     if (!response.ok) {
-      throw createError('NETWORK_ERROR', '后台服务暂时不可用，请稍后重试')
+      throw createError('NETWORK_ERROR', '工作台暂时不可用，请稍后重试')
     }
 
     const result = assertValidResponse<T>(await response.json())

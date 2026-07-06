@@ -14,7 +14,7 @@
 
   <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
     <view class="back-button" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
-    <view class="nav-title">点餐</view>
+    <view class="nav-title">今日菜单</view>
     <view class="nav-placeholder"></view>
   </view>
 
@@ -65,16 +65,16 @@
     <scroll-view class="dish-list" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
       <view class="dish-section-head">
         <view>
-          <view class="dish-section-title">本店推荐</view>
-          <view class="dish-section-subtitle">精心为你挑选</view>
+          <view class="dish-section-title">小厨推荐</view>
+          <view class="dish-section-subtitle">今天想给你吃这个</view>
         </view>
         <view class="dish-section-count">{{dishes.length}} 款 ›</view>
       </view>
 
       <view wx:if="{{pageStatus === 'loading'}}" class="empty-dishes">
         <view class="empty-emblem"><image class="empty-icon-image" src="/images/icons/icon-empty-dish.svg" mode="aspectFit"></image></view>
-        <view class="empty-title">菜单加载中</view>
-        <view class="empty-desc">正在读取门店餐品</view>
+        <view class="empty-title">今日菜单加载中</view>
+        <view class="empty-desc">正在看看小厨今天准备了什么</view>
       </view>
 
       <view wx:elif="{{pageStatus === 'error'}}" class="empty-dishes">
@@ -136,15 +136,15 @@
     </view>
     <view class="cart-summary">
       <view class="cart-price">{{cartAmountText}}</view>
-      <view class="cart-tip">已选 {{cartCount}} 件</view>
+      <view class="cart-tip">小篮子里 {{cartCount}} 份</view>
     </view>
     <view class="cart-saving">预计优惠 <text>¥6.00</text></view>
-    <view class="checkout-button">去结算</view>
+    <view class="checkout-button">去小篮子</view>
   </view>
 
   <view class="menu-tabbar dark-glass">
-    <view class="tab-item" bindtap="goHome"><view class="tab-icon"><image class="tab-icon-image" src="/images/ui-icons/tab-home.png" mode="aspectFit"></image></view><view>首页</view></view>
-    <view class="tab-item is-active"><view class="tab-icon"><image class="tab-icon-image" src="/images/ui-icons/tab-menu.png" mode="aspectFit"></image></view><view>点餐</view></view>
-    <view class="tab-item" bindtap="goToOrders"><view class="tab-icon"><image class="tab-icon-image" src="/images/ui-icons/tab-order.png" mode="aspectFit"></image></view><view>订单</view></view>
+    <view class="tab-item" bindtap="goHome"><view class="tab-icon"><image class="tab-icon-image" src="/images/ui-icons/tab-home.png" mode="aspectFit"></image></view><view>今天吃啥</view></view>
+    <view class="tab-item is-active"><view class="tab-icon"><image class="tab-icon-image" src="/images/ui-icons/tab-menu.png" mode="aspectFit"></image></view><view>今日菜单</view></view>
+    <view class="tab-item" bindtap="goToOrders"><view class="tab-icon"><image class="tab-icon-image" src="/images/ui-icons/tab-order.png" mode="aspectFit"></image></view><view>点菜单</view></view>
   </view>
 </view>

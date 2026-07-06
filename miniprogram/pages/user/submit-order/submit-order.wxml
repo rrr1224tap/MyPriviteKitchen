@@ -1,4 +1,4 @@
 <view class="page">
-  <view class="page-title">提交订单</view>
-  <view class="page-desc">基础页面已创建，后续任务将接入下单确认。</view>
+  <view class="page-title">跟小厨说一声</view>
+  <view class="page-desc">确认小篮子里的菜品后，小厨就开始准备。</view>
 </view>

@@ -1,5 +1,5 @@
-const VALID_ACTIONS = ['list', 'listCategories', 'create', 'createCategory', 'update', 'updateCategory', 'disable', 'sort']
-const WEB_ALLOWED_ACTIONS = ['listCategories', 'createCategory', 'updateCategory']
+const VALID_ACTIONS = ['list', 'listCategories', 'create', 'createCategory', 'update', 'updateCategory', 'deleteCategory', 'disable', 'sort']
+const WEB_ALLOWED_ACTIONS = ['listCategories', 'createCategory', 'updateCategory', 'deleteCategory']
 const VALID_CATEGORY_STATUSES = ['active', 'disabled', 'inactive', 'deleted']
 const {
   verifyWebAdminToken,
@@ -202,6 +202,12 @@ function assertWebAdmin(event, action, deps) {
     }
   }
 
+  if (action === 'deleteCategory' && verifyResult.role !== 'merchant_admin') {
+    return {
+      error: failure('FORBIDDEN', '只有当前小厨可以移除菜单分类')
+    }
+  }
+
   return {
     is_web_admin: true,
     role: verifyResult.role,
@@ -399,6 +405,46 @@ async function handleDisable(deps, merchantId, categoryId) {
   }
 }
 
+async function handleDelete(deps, merchantId, categoryId) {
+  if (!categoryId) {
+    return failure('INVALID_PARAMS', '分类 ID 不能为空')
+  }
+
+  let categoryResult
+  try {
+    categoryResult = await assertCategoryBelongsToMerchant(deps, categoryId, merchantId)
+  } catch (error) {
+    deps.logger.error('manageCategory delete query database error', error)
+    return failure('DATABASE_ERROR', '查询分类失败，请稍后重试')
+  }
+
+  if (categoryResult.error) {
+    return categoryResult.error
+  }
+
+  const updateData = {
+    status: 'deleted',
+    enabled: false,
+    updated_at: deps.now()
+  }
+
+  try {
+    const updatedCategory = await deps.updateCategory({
+      category_id: categoryId,
+      updateData
+    })
+    return success('菜单分类已移除', {
+      category: formatCategory({
+        ...categoryResult.category,
+        ...(updatedCategory || updateData)
+      })
+    })
+  } catch (error) {
+    deps.logger.error('manageCategory delete database error', error)
+    return failure('DATABASE_ERROR', '移除菜单分类失败，请稍后重试')
+  }
+}
+
 async function handleSort(deps, merchantId, data) {
   const sortItems = Array.isArray(data.categories)
     ? data.categories
@@ -523,6 +569,10 @@ function createManageCategoryHandler(dependencies) {
 
         if (action === 'updateCategory') {
           return handleUpdate(deps, merchantId, categoryId, categoryData)
+        }
+
+        if (action === 'deleteCategory') {
+          return handleDelete(deps, merchantId, categoryId)
         }
 
         return failure('FORBIDDEN', 'Web 后台当前仅开放分类列表读取和新增 / 编辑分类')

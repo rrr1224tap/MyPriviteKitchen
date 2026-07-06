@@ -37,7 +37,7 @@
         </view>
       </view>
       <button class="hero-button" bindtap="goToMenu">
-        <text>立即点餐</text>
+        <text>今天吃啥</text>
       </button>
     </view>
   </view>
@@ -153,8 +153,8 @@
         <image class="merchant-entry-icon-image" src="/images/icons/icon-merchant-orders.svg" mode="aspectFit"></image>
       </view>
       <view class="merchant-entry-copy">
-        <view class="merchant-entry-title">商家工作台</view>
-        <view class="merchant-entry-desc">管理订单与商品</view>
+        <view class="merchant-entry-title">小厨工作台</view>
+        <view class="merchant-entry-desc">照看点菜单与今日菜品</view>
       </view>
     </view>
   </view>
@@ -164,19 +164,19 @@
       <view class="tab-icon">
         <image class="tab-icon-image" src="/images/ui-icons/tab-home.png" mode="aspectFit"></image>
       </view>
-      <view>首页</view>
+      <view>今天吃啥</view>
     </view>
     <view class="tab-item" bindtap="goToMenu">
       <view class="tab-icon">
         <image class="tab-icon-image" src="/images/ui-icons/tab-menu.png" mode="aspectFit"></image>
       </view>
-      <view>点餐</view>
+      <view>今日菜单</view>
     </view>
     <view class="tab-item" bindtap="goToOrders">
       <view class="tab-icon">
         <image class="tab-icon-image" src="/images/ui-icons/tab-order.png" mode="aspectFit"></image>
       </view>
-      <view>订单</view>
+      <view>点菜单</view>
     </view>
   </view>
 </view>

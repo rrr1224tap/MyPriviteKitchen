@@ -10,7 +10,7 @@
 
   <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
     <view class="nav-back" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
-    <view class="nav-title">我的订单</view>
+    <view class="nav-title">我的点菜单</view>
   </view>
 
   <scroll-view class="order-scroll" scroll-y enhanced show-scrollbar="{{false}}">
@@ -18,38 +18,38 @@
       <view class="order-hero glass-panel">
         <view>
           <view class="hero-kicker">ORDER TRACK</view>
-          <view class="hero-title">订单记录</view>
+          <view class="hero-title">我的点菜单</view>
           <view class="hero-desc">
-            <block wx:if="{{orders.length}}">共 {{orders.length}} 笔订单，按下单时间展示</block>
-            <block wx:else>查看你的点餐进度和历史订单</block>
+            <block wx:if="{{orders.length}}">共 {{orders.length}} 份点菜单，按告诉小厨的时间展示</block>
+            <block wx:else>查看你的点餐进度和历史点菜单</block>
           </view>
           <view wx:if="{{isRefreshing || refreshMessage || lastUpdatedText}}" class="refresh-note {{refreshMessage ? 'is-error' : ''}}">
-            <block wx:if="{{isRefreshing}}">正在刷新订单状态...</block>
+            <block wx:if="{{isRefreshing}}">正在刷新点菜单状态...</block>
             <block wx:elif="{{refreshMessage}}">{{refreshMessage}}</block>
             <block wx:else>{{lastUpdatedText}}</block>
           </view>
         </view>
-        <button class="hero-action" bindtap="goToMenu">继续点餐</button>
+        <button class="hero-action" bindtap="goToMenu">继续点菜</button>
       </view>
 
       <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
         <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-clock.svg" mode="aspectFit"></image></view>
-        <view class="state-title">正在读取订单</view>
-        <view class="state-desc">正在同步你的最新订单记录</view>
+        <view class="state-title">正在读取点菜单</view>
+        <view class="state-desc">正在同步你的最新点菜单记录</view>
       </view>
 
       <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
         <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image></view>
-        <view class="state-title">订单加载失败</view>
+        <view class="state-title">点菜单加载失败</view>
         <view class="state-desc">{{errorMessage}}</view>
         <button class="state-button" bindtap="retryLoad">重新加载</button>
       </view>
 
       <view wx:elif="{{pageStatus === 'empty'}}" class="state-card glass-panel">
         <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-order.svg" mode="aspectFit"></image></view>
-        <view class="state-title">还没有订单</view>
-        <view class="state-desc">先去挑一份热乎的拌饭，提交后会显示在这里</view>
-        <button class="state-button" bindtap="goToMenu">去点餐</button>
+        <view class="state-title">还没有点菜单</view>
+        <view class="state-desc">先去挑一份热乎的拌饭，跟小厨说一声后会显示在这里</view>
+        <button class="state-button" bindtap="goToMenu">去今日菜单</button>
       </view>
 
       <view wx:else class="order-list">
@@ -62,7 +62,7 @@
         >
           <view class="order-card-head">
             <view class="order-card-main">
-              <view class="order-no">订单号 {{item.order_no}}</view>
+              <view class="order-no">点菜单号 {{item.order_no}}</view>
               <view class="order-time">{{item.created_time}}</view>
             </view>
             <view class="status-tag status-{{item.status_class}}">{{item.status_text}}</view>
@@ -82,7 +82,7 @@
               disabled="{{cancellingOrderId === item.order_id}}"
               catchtap="confirmCancelOrder"
             >
-              {{cancellingOrderId === item.order_id ? '取消中...' : '取消订单'}}
+              {{cancellingOrderId === item.order_id ? '取消中...' : '取消点菜单'}}
             </button>
           </view>
         </view>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import ActionButton from '../components/ActionButton.vue'
 import EmptyState from '../components/EmptyState.vue'
 import GlassCard from '../components/GlassCard.vue'
@@ -10,6 +10,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 import { fetchCategories, type CategoryListItem } from '../services/categories'
 import {
   createDish,
+  deleteDish,
   fetchDishes,
   updateDish,
   updateDishIngredients,
@@ -21,11 +22,13 @@ import {
   type DishTutorial,
   type DishTutorialPlatform
 } from '../services/dishes'
+import { clearSession, getSession } from '../stores/session'
 import type { AdminApiError } from '../types/api'
 
 const route = useRoute()
+const router = useRouter()
 const MERCHANT_CONTEXT_KEY = 'xiaochu_current_merchant_id'
-const FALLBACK_MERCHANT_ID = 'xiaochu'
+const SUPER_ADMIN_PREVIEW_MERCHANT_ID = 'xiaochu'
 const MAX_TUTORIAL_COUNT = 3
 const tutorialPlatformOptions: Array<{ value: DishTutorialPlatform; label: string }> = [
   { value: 'douyin', label: '抖音' },
@@ -67,6 +70,7 @@ const editForm = ref({
   image_url: ''
 })
 const statusActionDishId = ref('')
+const deleteActionDishId = ref('')
 const statusSuccessMessage = ref('')
 const statusErrorMessage = ref('')
 const isTutorialFormOpen = ref(false)
@@ -81,6 +85,8 @@ const ingredientErrorMessage = ref('')
 const ingredientSuccessMessage = ref('')
 const ingredientDish = ref<DishListItem | null>(null)
 const ingredientForm = ref<DishIngredient[]>([])
+const session = computed(() => getSession())
+const isMerchantAdmin = computed(() => session.value?.role === 'merchant_admin')
 
 function getRouteMerchantId() {
   const value = route.params.merchantId
@@ -101,7 +107,23 @@ function rememberMerchantId(value: string) {
   }
 }
 
-const merchantId = computed(() => getRouteMerchantId() || getStoredMerchantId() || FALLBACK_MERCHANT_ID)
+const merchantId = computed(() => getRouteMerchantId() || getStoredMerchantId() || SUPER_ADMIN_PREVIEW_MERCHANT_ID)
+const requestMerchantId = computed(() => (isMerchantAdmin.value ? undefined : merchantId.value))
+const currentMerchantId = computed(() => {
+  if (isMerchantAdmin.value) {
+    return session.value?.merchant_id || ''
+  }
+
+  return merchantId.value
+})
+const pageDescription = computed(() => {
+  if (isMerchantAdmin.value) {
+    return `当前小厨房：${currentMerchantId.value || '未识别'}。今日菜品、加一道菜、改一下、开始卖、先不卖了和移除都跟随登录身份。`
+  }
+
+  return `当前小厨：${currentMerchantId.value}。今日菜品、加一道菜、改一下、做法参考和食材配置已接入真实云函数；规格加料仍为后续接入。`
+})
+const pageTitle = computed(() => '今日菜品')
 
 const onSaleCount = computed(() => dishes.value.filter((item) => item.status === 'on_sale').length)
 const offSaleCount = computed(() => dishes.value.filter((item) => item.status === 'off_sale').length)
@@ -161,10 +183,6 @@ function getDishTone(status: DishStatus) {
   }
 
   return 'muted'
-}
-
-function showPendingTip() {
-  window.alert('删除和规格加料会在后续版本接入，本阶段不执行这些真实写入。')
 }
 
 function createEmptyIngredient(index: number): DishIngredient {
@@ -362,7 +380,7 @@ function validateCreateForm() {
   const name = createForm.value.name.trim()
   if (!name) {
     return {
-      error: '餐品名称不能为空'
+      error: '菜品名称不能为空'
     }
   }
 
@@ -400,7 +418,7 @@ function validateEditForm() {
   const name = editForm.value.name.trim()
   if (!name) {
     return {
-      error: '餐品名称不能为空'
+      error: '菜品名称不能为空'
     }
   }
 
@@ -519,20 +537,20 @@ async function submitCreateDish() {
   createSuccessMessage.value = ''
   const validation = validateCreateForm()
   if (validation.error || !validation.payload) {
-    createErrorMessage.value = validation.error || '请检查餐品表单'
+    createErrorMessage.value = validation.error || '请检查菜品表单'
     return
   }
 
   isCreating.value = true
   try {
-    await createDish(merchantId.value, validation.payload)
+    await createDish(requestMerchantId.value, validation.payload)
     await loadDishes()
-    createSuccessMessage.value = '餐品已新增，列表已刷新'
+    createSuccessMessage.value = '小厨记住啦，列表已刷新'
     isCreateFormOpen.value = false
     resetCreateForm()
   } catch (error) {
     const adminError = error as Partial<AdminApiError>
-    createErrorMessage.value = adminError.message || '餐品新增失败，请稍后重试'
+    createErrorMessage.value = adminError.message || '加菜失败，请稍后重试'
   } finally {
     isCreating.value = false
   }
@@ -545,20 +563,20 @@ async function submitUpdateDish() {
   editSuccessMessage.value = ''
   const validation = validateEditForm()
   if (validation.error || !validation.payload) {
-    editErrorMessage.value = validation.error || '请检查餐品表单'
+    editErrorMessage.value = validation.error || '请检查菜品表单'
     return
   }
 
   isUpdating.value = true
   try {
-    await updateDish(merchantId.value, editingDish.value.dish_id, validation.payload)
+    await updateDish(requestMerchantId.value, editingDish.value.dish_id, validation.payload)
     await loadDishes()
-    editSuccessMessage.value = '餐品已更新，列表已刷新'
+    editSuccessMessage.value = '已经帮你改好啦，列表已刷新'
     isEditFormOpen.value = false
     resetEditForm()
   } catch (error) {
     const adminError = error as Partial<AdminApiError>
-    editErrorMessage.value = adminError.message || '餐品编辑失败，请稍后重试'
+    editErrorMessage.value = adminError.message || '改菜失败，请稍后重试'
   } finally {
     isUpdating.value = false
   }
@@ -577,7 +595,7 @@ async function submitIngredients() {
 
   isSavingIngredients.value = true
   try {
-    await updateDishIngredients(merchantId.value, ingredientDish.value.dish_id, validation.payload)
+    await updateDishIngredients(requestMerchantId.value, ingredientDish.value.dish_id, validation.payload)
     await loadDishes()
     ingredientSuccessMessage.value = '食材配置已更新，列表已刷新'
     isIngredientFormOpen.value = false
@@ -603,7 +621,7 @@ async function submitTutorials() {
 
   isSavingTutorials.value = true
   try {
-    await updateDishTutorials(merchantId.value, tutorialDish.value.dish_id, validation.payload)
+    await updateDishTutorials(requestMerchantId.value, tutorialDish.value.dish_id, validation.payload)
     await loadDishes()
     tutorialSuccessMessage.value = '做法参考已更新，列表已刷新'
     isTutorialFormOpen.value = false
@@ -617,11 +635,11 @@ async function submitTutorials() {
 }
 
 function getStatusActionLabel(item: DishListItem) {
-  return item.status === 'on_sale' ? '下架' : '上架'
+  return item.status === 'on_sale' ? '先不卖了' : '开始卖'
 }
 
 function getStatusActionLoadingLabel(item: DishListItem) {
-  return item.status === 'on_sale' ? '下架中...' : '上架中...'
+  return item.status === 'on_sale' ? '正在收起...' : '正在开卖...'
 }
 
 async function toggleDishStatus(item: DishListItem) {
@@ -630,8 +648,8 @@ async function toggleDishStatus(item: DishListItem) {
   const isOnSale = item.status === 'on_sale'
   const nextStatus = isOnSale ? 'off_sale' : 'on_sale'
   const confirmMessage = isOnSale
-    ? '确认下架该餐品吗？下架后用户端将不再展示或不可点选，具体以小程序现有逻辑为准。'
-    : '确认上架该餐品吗？'
+    ? '确认这道菜先不卖了吗？点餐页将不再展示或不可点选，具体以小程序现有逻辑为准。'
+    : '确认这道菜开始卖吗？'
 
   if (!window.confirm(confirmMessage)) {
     return
@@ -641,27 +659,63 @@ async function toggleDishStatus(item: DishListItem) {
   statusSuccessMessage.value = ''
   statusErrorMessage.value = ''
   try {
-    await updateDishStatus(merchantId.value, item.dish_id, nextStatus)
+    await updateDishStatus(requestMerchantId.value, item.dish_id, nextStatus)
     await loadDishes()
     statusSuccessMessage.value = nextStatus === 'on_sale'
-      ? '餐品已上架，列表已刷新'
-      : '餐品已下架，列表已刷新'
+      ? '小厨记住啦，列表已刷新'
+      : '已经帮你改好啦，列表已刷新'
   } catch (error) {
     const adminError = error as Partial<AdminApiError>
-    statusErrorMessage.value = adminError.message || '餐品状态更新失败，请稍后重试'
+    statusErrorMessage.value = adminError.message || '菜品状态更新失败，请稍后重试'
   } finally {
     statusActionDishId.value = ''
   }
 }
 
+async function handleDeleteDish(item: DishListItem) {
+  if (!isMerchantAdmin.value || deleteActionDishId.value) return
+
+  const confirmed = window.confirm('确认删除这道菜？')
+  if (!confirmed) return
+
+  deleteActionDishId.value = item.dish_id
+  statusSuccessMessage.value = ''
+  statusErrorMessage.value = ''
+
+  try {
+    await deleteDish(requestMerchantId.value, item.dish_id)
+    statusSuccessMessage.value = '已经移走啦，列表已刷新'
+    window.alert('已经移走啦')
+    await loadDishes()
+  } catch (error) {
+    const adminError = error as Partial<AdminApiError>
+    statusErrorMessage.value = adminError.message || '移除失败，请稍后重试'
+    window.alert(statusErrorMessage.value)
+  } finally {
+    deleteActionDishId.value = ''
+  }
+}
+
 async function loadDishes() {
+  if (isMerchantAdmin.value && !currentMerchantId.value) {
+    dishes.value = []
+    selectedDishId.value = ''
+    errorCode.value = 'TOKEN_INVALID'
+    errorMessage.value = '登录状态异常，请重新登录后再整理今日菜品。'
+    clearSession()
+    router.push('/login')
+    return
+  }
+
   isLoading.value = true
   errorMessage.value = ''
   errorCode.value = ''
 
   try {
-    rememberMerchantId(merchantId.value)
-    const result = await fetchDishes(merchantId.value)
+    if (!isMerchantAdmin.value) {
+      rememberMerchantId(merchantId.value)
+    }
+    const result = await fetchDishes(requestMerchantId.value)
     dishes.value = result.list
     ensureSelectedDish(result.list)
   } catch (error) {
@@ -669,18 +723,26 @@ async function loadDishes() {
     selectedDishId.value = ''
     const adminError = error as Partial<AdminApiError>
     errorCode.value = adminError.code || 'UNKNOWN_ERROR'
-    errorMessage.value = adminError.message || '餐品列表读取失败，请稍后重试'
+    errorMessage.value = adminError.message || '菜品列表读取失败，请稍后重试'
   } finally {
     isLoading.value = false
   }
 }
 
 async function loadCategories() {
+  if (isMerchantAdmin.value && !currentMerchantId.value) {
+    categories.value = []
+    categoryErrorMessage.value = '登录状态异常，请重新登录后再选择分类。'
+    clearSession()
+    router.push('/login')
+    return
+  }
+
   isCategoryLoading.value = true
   categoryErrorMessage.value = ''
 
   try {
-    const result = await fetchCategories(merchantId.value)
+    const result = await fetchCategories(requestMerchantId.value)
     categories.value = result.list
     if (!createForm.value.category_id) {
       createForm.value.category_id = activeCategories.value[0]?.category_id || ''
@@ -707,26 +769,26 @@ watch(merchantId, loadPageData)
   <section class="page-stack">
     <PageHeader
       eyebrow="Dishes"
-      title="餐品管理"
-      :description="`当前商户：${merchantId}。餐品列表、新增、编辑、上下架、做法参考和食材配置已接入真实云函数；删除和规格加料仍为后续接入。`"
+      :title="pageTitle"
+      :description="pageDescription"
     >
       <template #actions>
         <ActionButton variant="ghost" :disabled="isLoading" @click="loadPageData">刷新</ActionButton>
-        <ActionButton variant="primary" @click="openCreateForm">新增餐品</ActionButton>
+        <ActionButton variant="primary" @click="openCreateForm">加一道菜</ActionButton>
       </template>
     </PageHeader>
 
     <section class="stat-grid">
-      <StatCard title="餐品总数" :value="dishes.length" caption="当前真实餐品数量" icon="餐" />
-      <StatCard title="上架餐品" :value="onSaleCount" caption="用户端可见" tone="green" icon="售" />
-      <StatCard title="已下架" :value="offSaleCount" caption="暂不对用户展示" tone="orange" icon="下" />
+      <StatCard title="菜品总数" :value="dishes.length" caption="当前真实菜品数量" icon="餐" />
+      <StatCard title="正在卖" :value="onSaleCount" caption="点餐页可见" tone="green" icon="售" />
+      <StatCard title="先不卖" :value="offSaleCount" caption="暂不对用户展示" tone="orange" icon="下" />
       <StatCard title="缺食材配置" :value="missingIngredientCount" caption="需要后续补齐" tone="muted" icon="材" />
     </section>
 
     <GlassCard v-if="createSuccessMessage">
       <div class="section-heading compact-section-heading">
         <div>
-          <h2>餐品已新增</h2>
+          <h2>小厨记住啦</h2>
           <p>{{ createSuccessMessage }}</p>
         </div>
       </div>
@@ -735,7 +797,7 @@ watch(merchantId, loadPageData)
     <GlassCard v-if="editSuccessMessage">
       <div class="section-heading compact-section-heading">
         <div>
-          <h2>餐品已更新</h2>
+          <h2>已经帮你改好啦</h2>
           <p>{{ editSuccessMessage }}</p>
         </div>
       </div>
@@ -744,7 +806,7 @@ watch(merchantId, loadPageData)
     <GlassCard v-if="statusSuccessMessage">
       <div class="section-heading compact-section-heading">
         <div>
-          <h2>餐品状态已更新</h2>
+          <h2>小厨记住啦</h2>
           <p>{{ statusSuccessMessage }}</p>
         </div>
       </div>
@@ -753,7 +815,7 @@ watch(merchantId, loadPageData)
     <GlassCard v-if="statusErrorMessage">
       <div class="inline-error">
         <div>
-          <strong>餐品状态更新失败</strong>
+          <strong>菜品状态更新失败</strong>
           <span>{{ statusErrorMessage }}</span>
         </div>
       </div>
@@ -780,15 +842,15 @@ watch(merchantId, loadPageData)
     <GlassCard v-if="isCreateFormOpen">
       <div class="section-heading">
         <div>
-          <h2>新增餐品基础信息</h2>
-          <p>本阶段只保存餐品名称、所属分类、价格、描述和图片地址。</p>
+          <h2>加一道菜</h2>
+          <p>本阶段只保存菜品名称、所属分类、价格、描述和图片地址。</p>
         </div>
         <ActionButton variant="ghost" :disabled="isCreating" @click="closeCreateForm">收起</ActionButton>
       </div>
 
       <form class="admin-form" @submit.prevent="submitCreateDish">
         <label class="form-field">
-          <span>餐品名称 <b>*</b></span>
+          <span>菜品名称 <b>*</b></span>
           <input
             v-model="createForm.name"
             autocomplete="off"
@@ -844,7 +906,7 @@ watch(merchantId, loadPageData)
         <div class="form-actions">
           <button class="ghost-button" type="button" :disabled="isCreating" @click="closeCreateForm">取消</button>
           <button class="primary-button" type="submit" :disabled="isCreating || isCategoryLoading">
-            {{ isCreating ? '正在新增...' : '新增餐品' }}
+            {{ isCreating ? '正在记...' : '加一道菜' }}
           </button>
         </div>
       </form>
@@ -853,15 +915,15 @@ watch(merchantId, loadPageData)
     <GlassCard v-if="isEditFormOpen">
       <div class="section-heading">
         <div>
-          <h2>编辑餐品基础信息</h2>
-          <p>只更新餐品名称、所属分类、价格、描述和图片地址。</p>
+          <h2>改一下菜品</h2>
+          <p>只更新菜品名称、所属分类、价格、描述和图片地址。</p>
         </div>
         <ActionButton variant="ghost" :disabled="isUpdating" @click="closeEditForm">收起</ActionButton>
       </div>
 
       <form class="admin-form" @submit.prevent="submitUpdateDish">
         <label class="form-field">
-          <span>餐品名称 <b>*</b></span>
+          <span>菜品名称 <b>*</b></span>
           <input
             v-model="editForm.name"
             autocomplete="off"
@@ -917,7 +979,7 @@ watch(merchantId, loadPageData)
         <div class="form-actions">
           <button class="ghost-button" type="button" :disabled="isUpdating" @click="closeEditForm">取消</button>
           <button class="primary-button" type="submit" :disabled="isUpdating || isCategoryLoading">
-            {{ isUpdating ? '正在保存...' : '保存修改' }}
+            {{ isUpdating ? '正在改...' : '改好了' }}
           </button>
         </div>
       </form>
@@ -926,8 +988,8 @@ watch(merchantId, loadPageData)
     <GlassCard v-if="isIngredientFormOpen">
       <div class="section-heading">
         <div>
-          <h2>编辑食材配置</h2>
-          <p>{{ ingredientDish?.name || '当前餐品' }}，用于今日备料汇总；保存空列表会清空现有食材配置。</p>
+          <h2>改一下食材配置</h2>
+          <p>{{ ingredientDish?.name || '当前菜品' }}，用于今日备菜汇总；保存空列表会清空现有食材配置。</p>
         </div>
         <ActionButton variant="ghost" :disabled="isSavingIngredients" @click="closeIngredientForm">收起</ActionButton>
       </div>
@@ -985,7 +1047,7 @@ watch(merchantId, loadPageData)
 
               <label class="ingredient-toggle form-field--wide">
                 <input v-model="item.enabled" type="checkbox" :disabled="isSavingIngredients" />
-                <span>启用此食材，参与今日备料汇总</span>
+                <span>启用此食材，参与今日备菜汇总</span>
               </label>
             </div>
           </div>
@@ -1005,8 +1067,8 @@ watch(merchantId, loadPageData)
     <GlassCard v-if="isTutorialFormOpen">
       <div class="section-heading">
         <div>
-          <h2>编辑做法参考</h2>
-          <p>{{ tutorialDish?.name || '当前餐品' }}，最多配置 {{ MAX_TUTORIAL_COUNT }} 条做法参考；保存空列表会清空现有做法参考。</p>
+          <h2>改一下做法参考</h2>
+          <p>{{ tutorialDish?.name || '当前菜品' }}，最多配置 {{ MAX_TUTORIAL_COUNT }} 条做法参考；保存空列表会清空现有做法参考。</p>
         </div>
         <ActionButton variant="ghost" :disabled="isSavingTutorials" @click="closeTutorialForm">收起</ActionButton>
       </div>
@@ -1085,30 +1147,30 @@ watch(merchantId, loadPageData)
       <GlassCard>
         <div class="section-heading">
           <div>
-            <h2>餐品列表</h2>
-            <p>数据来自 manageDish.listDishes，新增、编辑、上下架、做法参考和食材配置保存成功后会自动刷新。</p>
+          <h2>今日菜品</h2>
+          <p>内容来自 manageDish.listDishes，加一道菜、改一下、开始卖、先不卖了、做法参考和食材配置保存后会自动刷新。</p>
           </div>
-          <StatusBadge label="真实数据" tone="green" />
+          <StatusBadge label="真实内容" tone="green" />
         </div>
 
         <div v-if="errorMessage" class="inline-error">
           <div>
-            <strong>餐品列表读取失败</strong>
+            <strong>菜品列表读取失败</strong>
             <span>{{ errorMessage }}（{{ errorCode }}）</span>
           </div>
           <ActionButton variant="ghost" :disabled="isLoading" @click="loadDishes">重试</ActionButton>
         </div>
 
-        <EmptyState v-else-if="isLoading" title="正在读取餐品" description="请稍候，正在从云函数获取真实餐品列表。" />
+        <EmptyState v-else-if="isLoading" title="正在读取菜品" description="请稍候，正在从云函数获取真实菜品列表。" />
         <EmptyState
           v-else-if="dishes.length === 0"
-          title="暂无餐品"
-          description="当前商户还没有餐品。可以点击新增餐品创建第一条基础餐品。"
+          title="暂无菜品"
+          description="当前小厨房还没有菜品。可以点击加一道菜，先把第一道招牌菜记下来。"
         />
 
         <div v-else class="mock-table dish-table">
           <div class="mock-table__head mock-table__row dish-table__row">
-            <span>餐品信息</span>
+            <span>菜品信息</span>
             <span>分类</span>
             <span>价格</span>
             <span>状态</span>
@@ -1137,7 +1199,7 @@ watch(merchantId, loadPageData)
             <span>{{ item.tutorials.length }} 条</span>
             <span>{{ item.ingredients.length }} 项</span>
             <span class="table-action-group" @click.stop>
-              <ActionButton variant="ghost" @click="openEditForm(item)">编辑</ActionButton>
+              <ActionButton variant="ghost" @click="openEditForm(item)">改一下</ActionButton>
               <ActionButton variant="ghost" @click="openIngredientForm(item)">食材配置</ActionButton>
               <ActionButton variant="ghost" @click="openTutorialForm(item)">做法参考</ActionButton>
               <ActionButton
@@ -1147,7 +1209,14 @@ watch(merchantId, loadPageData)
               >
                 {{ statusActionDishId === item.dish_id ? getStatusActionLoadingLabel(item) : getStatusActionLabel(item) }}
               </ActionButton>
-              <ActionButton variant="danger" @click="showPendingTip">删除</ActionButton>
+              <ActionButton
+                v-if="isMerchantAdmin"
+                variant="danger"
+                :disabled="Boolean(deleteActionDishId)"
+                @click="handleDeleteDish(item)"
+              >
+                {{ deleteActionDishId === item.dish_id ? '移除中...' : '移除' }}
+              </ActionButton>
             </span>
           </div>
         </div>
@@ -1156,14 +1225,14 @@ watch(merchantId, loadPageData)
       <GlassCard>
         <div class="section-heading">
           <div>
-            <h2>选中餐品详情</h2>
-            <p>点击左侧餐品行查看基础信息、做法参考和食材配置摘要。</p>
+            <h2>选中菜品详情</h2>
+            <p>点击左侧菜品行查看基础信息、做法参考和食材配置摘要。</p>
           </div>
           <StatusBadge :label="selectedDish ? getDetailStatusText(selectedDish.status) : '未选择'" :tone="selectedDish ? getDishTone(selectedDish.status) : 'muted'" />
         </div>
 
         <div v-if="!selectedDish" class="dish-detail-empty">
-          请选择左侧餐品查看详情
+          请选择左侧菜品查看详情
         </div>
 
         <div v-else class="dish-detail-panel">
@@ -1187,7 +1256,7 @@ watch(merchantId, loadPageData)
           </div>
 
           <div class="dish-detail-section">
-            <strong>餐品描述</strong>
+            <strong>菜品描述</strong>
             <p class="dish-detail-text">{{ selectedDish.description || '暂无描述' }}</p>
           </div>
 

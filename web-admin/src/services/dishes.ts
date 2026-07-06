@@ -38,6 +38,7 @@ export interface DishListItem {
   sales_count: number
   tutorials: DishTutorial[]
   ingredients: DishIngredient[]
+  is_deleted: boolean
   created_at: string
   updated_at: string
 }
@@ -59,6 +60,7 @@ interface RawDishItem {
   sales_count?: unknown
   tutorials?: unknown
   ingredients?: unknown
+  is_deleted?: unknown
   created_at?: unknown
   updated_at?: unknown
 }
@@ -85,6 +87,17 @@ export interface UpdateDishPayload {
 }
 
 export type UpdateDishStatusValue = 'on_sale' | 'off_sale'
+
+function withMerchantId<T extends Record<string, unknown>>(merchantId: string | undefined, payload: T) {
+  if (!merchantId) {
+    return payload
+  }
+
+  return {
+    merchant_id: merchantId,
+    ...payload
+  }
+}
 
 function toText(value: unknown, fallback = '') {
   if (value === null || value === undefined) {
@@ -208,7 +221,7 @@ function normalizeDish(item: RawDishItem): DishListItem {
     dish_id: dishId,
     merchant_id: toText(item.merchant_id),
     category_id: toText(item.category_id),
-    name: toText(item.name, '未命名餐品'),
+    name: toText(item.name, '未命名菜品'),
     description: toText(item.description),
     image_url: toText(item.image_url ?? item.image),
     price_cent: priceCent,
@@ -219,16 +232,16 @@ function normalizeDish(item: RawDishItem): DishListItem {
     sales_count: toNumber(item.sales_count),
     tutorials: normalizeTutorials(item.tutorials),
     ingredients: normalizeIngredients(item.ingredients),
+    is_deleted: item.is_deleted === true,
     created_at: toText(item.created_at),
     updated_at: toText(item.updated_at)
   }
 }
 
-export async function fetchDishes(merchantId: string) {
-  const result = await callAdminFunction<DishListResponse>('manageDish', {
+export async function fetchDishes(merchantId?: string) {
+  const result = await callAdminFunction<DishListResponse>('manageDish', withMerchantId(merchantId, {
     action: 'listDishes',
-    merchant_id: merchantId
-  })
+  }))
 
   const list = Array.isArray(result?.list) ? result.list.map(normalizeDish) : []
 
@@ -238,68 +251,72 @@ export async function fetchDishes(merchantId: string) {
   }
 }
 
-export async function createDish(merchantId: string, payload: CreateDishPayload) {
-  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', {
+export async function createDish(merchantId: string | undefined, payload: CreateDishPayload) {
+  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', withMerchantId(merchantId, {
     action: 'createDish',
-    merchant_id: merchantId,
     ...payload
-  })
+  }))
 
   return result.dish ? normalizeDish(result.dish) : null
 }
 
-export async function updateDish(merchantId: string, dishId: string, payload: UpdateDishPayload) {
-  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', {
+export async function updateDish(merchantId: string | undefined, dishId: string, payload: UpdateDishPayload) {
+  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', withMerchantId(merchantId, {
     action: 'updateDish',
-    merchant_id: merchantId,
     dish_id: dishId,
     ...payload
-  })
+  }))
 
   return result.dish ? normalizeDish(result.dish) : null
 }
 
 export async function updateDishStatus(
-  merchantId: string,
+  merchantId: string | undefined,
   dishId: string,
   status: UpdateDishStatusValue
 ) {
-  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', {
+  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', withMerchantId(merchantId, {
     action: 'updateDishStatus',
-    merchant_id: merchantId,
     dish_id: dishId,
     status
-  })
+  }))
 
   return result.dish ? normalizeDish(result.dish) : null
 }
 
 export async function updateDishTutorials(
-  merchantId: string,
+  merchantId: string | undefined,
   dishId: string,
   tutorials: DishTutorial[]
 ) {
-  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', {
+  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', withMerchantId(merchantId, {
     action: 'updateDishTutorials',
-    merchant_id: merchantId,
     dish_id: dishId,
     tutorials
-  })
+  }))
 
   return result.dish ? normalizeDish(result.dish) : null
 }
 
 export async function updateDishIngredients(
-  merchantId: string,
+  merchantId: string | undefined,
   dishId: string,
   ingredients: DishIngredient[]
 ) {
-  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', {
+  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', withMerchantId(merchantId, {
     action: 'updateDishIngredients',
-    merchant_id: merchantId,
     dish_id: dishId,
     ingredients
-  })
+  }))
+
+  return result.dish ? normalizeDish(result.dish) : null
+}
+
+export async function deleteDish(merchantId: string | undefined, dishId: string) {
+  const result = await callAdminFunction<{ dish?: RawDishItem }>('manageDish', withMerchantId(merchantId, {
+    action: 'deleteDish',
+    dish_id: dishId
+  }))
 
   return result.dish ? normalizeDish(result.dish) : null
 }

@@ -598,6 +598,67 @@ test('web valid admin token can update category', async () => {
   assert.equal(state.writes, 1)
 })
 
+test('merchant_admin can soft delete own category without merchant_id', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    action: 'deleteCategory',
+    category_id: 'category_001',
+    admin_token: createMerchantAdminToken()
+  })
+
+  const deleted = state.categories.find((category) => category.category_id === 'category_001')
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.data.category.category_id, 'category_001')
+  assert.equal(result.data.category.status, 'deleted')
+  assert.equal(result.data.category.enabled, false)
+  assert.equal(deleted.status, 'deleted')
+  assert.equal(deleted.enabled, false)
+  assert.equal(deleted.updated_at, FIXED_NOW)
+  assert.equal(state.writes, 1)
+})
+
+test('merchant_admin cannot soft delete category from another merchant', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    action: 'deleteCategory',
+    category_id: 'category_other',
+    admin_token: createMerchantAdminToken()
+  })
+
+  const otherCategory = state.categories.find((category) => category.category_id === 'category_other')
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'FORBIDDEN')
+  assert.equal(otherCategory.status, 'active')
+  assert.equal(state.writes, 0)
+})
+
+test('super_admin web token cannot delete category', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageCategoryHandler(deps)
+
+  const result = await handler({
+    action: 'deleteCategory',
+    merchant_id: 'merchant_001',
+    category_id: 'category_001',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'FORBIDDEN')
+  assert.equal(state.writes, 0)
+})
+
 test('index entry accepts web createCategory action', async () => {
   const previousSecret = process.env.WEB_ADMIN_TOKEN_SECRET
   process.env.WEB_ADMIN_TOKEN_SECRET = 'manage-category-test-secret'

@@ -14,7 +14,7 @@
 
   <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
     <view class="back-button" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
-    <view class="nav-title">购物车</view>
+    <view class="nav-title">小篮子</view>
     <view wx:if="{{items.length}}" class="clear-button {{submitting ? 'is-disabled' : ''}}" bindtap="clearCart">清空</view>
     <view wx:else class="nav-placeholder"></view>
   </view>
@@ -23,8 +23,8 @@
     <view class="cart-overview glass-panel">
       <view>
         <view class="overview-kicker">YOUR ORDER</view>
-        <view class="overview-title">已选好味</view>
-        <view class="overview-desc">共 {{totalCount}} 份 · 下单后门店现做</view>
+        <view class="overview-title">小篮子里的好味</view>
+        <view class="overview-desc">共 {{totalCount}} 份 · 跟小厨说一声后现做</view>
       </view>
       <view class="overview-actions">
         <view class="overview-count">{{totalCount}}</view>
@@ -84,7 +84,7 @@
           <view class="pickup-icon"><image class="pickup-icon-image" src="/images/icons/icon-pickup.svg" mode="aspectFit"></image></view>
           <view>
             <view class="pickup-title">到店自提</view>
-            <view class="pickup-desc">提前下单，到店即取</view>
+            <view class="pickup-desc">提前说一声，到店即取</view>
           </view>
           <view class="option-mark"></view>
         </view>
@@ -108,7 +108,7 @@
         <view class="member-pill">饭友享价</view>
       </view>
       <view class="summary-row">
-        <text>商品小计</text>
+        <text>菜品小计</text>
         <text>{{subtotalAmountText}}</text>
       </view>
       <view class="summary-row is-discount">
@@ -130,9 +130,9 @@
 
   <view wx:else class="empty-state glass-panel">
     <view class="empty-emblem"><image class="empty-icon-image" src="/images/icons/icon-empty-dish.svg" mode="aspectFit"></image></view>
-    <view class="empty-title">购物车还是空的</view>
+    <view class="empty-title">小篮子还是空的</view>
     <view class="empty-desc">去挑几份热气腾腾的好味吧</view>
-    <button class="empty-button" bindtap="goToMenu">去点餐<text>→</text></button>
+    <button class="empty-button" bindtap="goToMenu">去今日菜单<text>→</text></button>
   </view>
 
   <view wx:if="{{items.length}}" class="submit-bar glass-panel">
@@ -147,7 +147,7 @@
       loading="{{submitting}}"
       disabled="{{submitting}}"
     >
-      {{submitting ? '提交中...' : '去提交订单'}}<text>→</text>
+      {{submitting ? '正在告诉小厨...' : '跟小厨说一声'}}<text>→</text>
     </button>
   </view>
 </view>

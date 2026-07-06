@@ -326,8 +326,8 @@ function buildMenuState(menuData) {
     activeCategory,
     dishes: categoryDishesMap[activeCategory] || [],
     pageStatus: categories.length && allDishes.length ? 'success' : 'empty',
-    emptyTitle: categories.length ? '当前暂无可点餐品' : '菜单还没有准备好',
-    emptyDesc: categories.length ? '请稍后再来看看' : '请先在数据库中添加分类和餐品'
+    emptyTitle: categories.length ? '今天暂时没有可点的菜' : '今日菜单还没有准备好',
+    emptyDesc: categories.length ? '晚点再来看看小厨上新了没' : '小厨还在准备菜单'
   }
 }
 
@@ -345,8 +345,8 @@ Page({
     activeCategory: '',
     dishes: [],
     allDishes: [],
-    emptyTitle: '菜单加载中',
-    emptyDesc: '正在读取门店餐品',
+    emptyTitle: '今日菜单加载中',
+    emptyDesc: '正在看看小厨今天准备了什么',
     fallbackNoticeTitle: '',
     fallbackNoticeDesc: '',
     cartCount: 0,
@@ -384,8 +384,8 @@ Page({
       usingFallback: false,
       fallbackNoticeTitle: '',
       fallbackNoticeDesc: '',
-      emptyTitle: '菜单加载中',
-      emptyDesc: '正在读取门店餐品'
+      emptyTitle: '今日菜单加载中',
+      emptyDesc: '正在看看小厨今天准备了什么'
     })
 
     try {
@@ -416,7 +416,7 @@ Page({
           usingFallback: false,
           fallbackNoticeTitle: '',
           fallbackNoticeDesc: '',
-          emptyTitle: '菜单加载失败',
+          emptyTitle: '今日菜单加载失败',
           emptyDesc: '服务暂时不可用，请稍后重试'
         })
         return
@@ -427,7 +427,7 @@ Page({
         pageStatus: 'success',
         usingFallback: true,
         fallbackNoticeTitle: '当前为示例菜单',
-        fallbackNoticeDesc: '实际菜单加载失败，可点击重试'
+        fallbackNoticeDesc: '今日菜单暂时没取到，可点击重试'
       })
     }
   },
@@ -541,7 +541,7 @@ Page({
     this.refreshCartSummary()
 
     wx.showToast({
-      title: '已加入购物车',
+        title: '已放进小篮子',
       icon: 'none'
     })
   },

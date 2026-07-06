@@ -1561,6 +1561,105 @@ test('web valid admin token can on sale dish status', async () => {
   assert.equal(state.writes, 1)
 })
 
+test('merchant_admin can soft delete own dish without merchant_id', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'deleteDish',
+    dish_id: 'dish_001',
+    admin_token: createMerchantAdminToken()
+  })
+
+  const deletedDish = state.dishes.find((dish) => dish.dish_id === 'dish_001')
+  assert.equal(result.success, true)
+  assert.equal(result.code, 'SUCCESS')
+  assert.equal(result.data.dish.dish_id, 'dish_001')
+  assert.equal(result.data.dish.is_deleted, true)
+  assert.equal(deletedDish.is_deleted, true)
+  assert.equal(deletedDish.updated_at, FIXED_NOW)
+  assert.equal(state.writes, 1)
+  assert.deepEqual(Object.keys(state.updateCalls[0].updateData).sort(), [
+    'is_deleted',
+    'updated_at'
+  ])
+})
+
+test('merchant_admin cannot soft delete dish from another merchant', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'deleteDish',
+    dish_id: 'dish_other',
+    admin_token: createMerchantAdminToken()
+  })
+
+  const otherDish = state.dishes.find((dish) => dish.dish_id === 'dish_other')
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'FORBIDDEN')
+  assert.equal(otherDish.is_deleted, undefined)
+  assert.equal(state.writes, 0)
+})
+
+test('super_admin web token cannot delete dish', async () => {
+  const { state, deps } = createDependencies({
+    openid: ''
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    action: 'deleteDish',
+    merchant_id: 'merchant_001',
+    dish_id: 'dish_001',
+    admin_token: createWebToken()
+  })
+
+  assert.equal(result.success, false)
+  assert.equal(result.code, 'FORBIDDEN')
+  assert.equal(state.writes, 0)
+})
+
+test('list dishes filters soft deleted dishes', async () => {
+  const { deps } = createDependencies({
+    dishes: [
+      {
+        dish_id: 'dish_visible',
+        merchant_id: 'merchant_001',
+        category_id: 'category_001',
+        name: 'Visible Dish',
+        price_cent: 1800,
+        status: 'on_sale',
+        sort_order: 1
+      },
+      {
+        dish_id: 'dish_deleted',
+        merchant_id: 'merchant_001',
+        category_id: 'category_001',
+        name: 'Deleted Dish',
+        price_cent: 1800,
+        status: 'off_sale',
+        sort_order: 2,
+        is_deleted: true
+      }
+    ]
+  })
+  const handler = createManageDishHandler(deps)
+
+  const result = await handler({
+    merchant_id: 'merchant_001',
+    action: 'list'
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.total, 1)
+  assert.equal(result.data.list[0].dish_id, 'dish_visible')
+})
+
 test('index entry accepts web updateDishStatus action', async () => {
   const previousSecret = process.env.WEB_ADMIN_TOKEN_SECRET
   process.env.WEB_ADMIN_TOKEN_SECRET = 'manage-dish-test-secret'

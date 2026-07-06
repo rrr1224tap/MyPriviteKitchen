@@ -5,28 +5,28 @@ const BACKGROUND_IMAGE = '/images/mock/home-glass-display.jpg'
 
 const ORDER_STATUS_META = {
   pending: {
-    text: '待商家接单',
-    desc: '等待商家接单',
+    text: '待小厨接单',
+    desc: '等待小厨接单',
     className: 'pending'
   },
   accepted: {
-    text: '商家已接单',
-    desc: '商家已接单，等待制作',
+    text: '小厨已接单',
+    desc: '小厨已接单，等待制作',
     className: 'accepted'
   },
   cooking: {
     text: '制作中',
-    desc: '商家正在制作，请稍候',
+    desc: '小厨正在制作，请稍候',
     className: 'cooking'
   },
   finished: {
     text: '已完成',
-    desc: '订单已完成，感谢惠顾',
+    desc: '点菜单已完成，感谢惠顾',
     className: 'finished'
   },
   cancelled: {
     text: '已取消',
-    desc: '订单已取消',
+    desc: '点菜单已取消',
     className: 'cancelled'
   }
 }
@@ -65,17 +65,17 @@ function getOrderPageErrorMessage(error = {}) {
     return '网络不太稳定，请稍后重试'
   }
 
-  return '订单信息暂时不可用，请稍后重试'
+  return '点菜单信息暂时不可用，请稍后重试'
 }
 
 function getCancelOrderErrorMessage(error = {}) {
   const code = error.code || (error.result && error.result.code) || ''
   const messageMap = {
     UNAUTHORIZED: '登录状态异常，请重新进入小程序',
-    INVALID_PARAMS: '订单信息不完整，请刷新后重试',
-    NOT_FOUND: '订单不存在或已被删除',
-    FORBIDDEN: '当前账号无法操作该订单',
-    STATUS_CONFLICT: '订单状态已变化，当前不可取消，请刷新状态',
+    INVALID_PARAMS: '点菜单信息不完整，请刷新后重试',
+    NOT_FOUND: '点菜单不存在或已被删除',
+    FORBIDDEN: '当前账号无法操作这份点菜单',
+    STATUS_CONFLICT: '点菜单状态已变化，当前不可取消，请刷新状态',
     DATABASE_ERROR: '服务暂时不可用，请稍后重试'
   }
 
@@ -176,14 +176,14 @@ function buildProgress(order) {
     return [
       {
         key: 'pending',
-        title: '订单已提交',
+        title: '小厨已收到',
         time: order.created_time,
         done: true,
         active: false
       },
       {
         key: 'cancelled',
-        title: '订单已取消',
+        title: '点菜单已取消',
         time: order.cancelled_time || '等待更新',
         done: true,
         active: true
@@ -215,14 +215,14 @@ function buildProgress(order) {
   return [
     {
       key: 'pending',
-      title: '订单已提交',
+      title: '小厨已收到',
       time: order.created_time,
       done: activeIndex >= 0,
       active: activeIndex === 0
     },
     {
       key: 'accepted',
-      title: '商家已接单',
+      title: '小厨已接单',
       time: order.accepted_time || '等待更新',
       done: activeIndex >= 1,
       active: activeIndex === 1
@@ -236,7 +236,7 @@ function buildProgress(order) {
     },
     {
       key: 'finished',
-      title: '订单已完成',
+      title: '点菜单已完成',
       time: order.finished_time || '等待更新',
       done: activeIndex >= 3,
       active: activeIndex === 3
@@ -274,7 +274,7 @@ function normalizeOrderDetail(data = {}) {
     cancelled_time: cancelledTime,
     pickup_type_text: PICKUP_TYPE_TEXT[order.pickup_type] || '到店自提',
     remark_text: order.remark || '无备注',
-    item_count_text: `${Number(order.item_count) || items.reduce((sum, item) => sum + item.quantity, 0)}件商品`,
+    item_count_text: `${Number(order.item_count) || items.reduce((sum, item) => sum + item.quantity, 0)}份菜品`,
     total_amount_text: formatMoney(order.total_amount_cent)
   }
 
@@ -325,7 +325,7 @@ Page({
     if (!orderId) {
       this.setData({
         pageStatus: 'error',
-        errorMessage: '订单信息暂时不可用，请从订单列表重新进入'
+        errorMessage: '点菜单信息暂时不可用，请从我的点菜单重新进入'
       })
       return
     }
@@ -437,7 +437,7 @@ Page({
     if (!this.data.orderId) {
       this.setData({
         pageStatus: 'error',
-        errorMessage: '订单信息暂时不可用，请从订单列表重新进入'
+        errorMessage: '点菜单信息暂时不可用，请从我的点菜单重新进入'
       })
       return
     }
@@ -481,8 +481,8 @@ Page({
     }
 
     wx.showModal({
-      title: '确认取消订单？',
-      content: '订单取消后不可恢复，请确认是否取消。',
+      title: '确认取消这份点菜单？',
+      content: '取消后不可恢复，请确认是否取消。',
       cancelText: '再想想',
       confirmText: '确认取消',
       confirmColor: '#e63b4a',
@@ -508,7 +508,7 @@ Page({
     try {
       await callCancelUserOrder(orderId)
       wx.showToast({
-        title: '订单已取消',
+        title: '点菜单已取消',
         icon: 'success'
       })
       await this.loadOrderDetail(orderId, {

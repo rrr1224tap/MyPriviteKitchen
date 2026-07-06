@@ -7,11 +7,11 @@ const FALLBACK_IMAGE_STYLE = 'width: 100%; height: 100%; left: 0; top: 0;'
 const FALLBACK_INGREDIENTS = ['肥牛', '米饭', '时令蔬菜', '拌饭酱', '鸡蛋']
 const CART_STORAGE_KEY = STORAGE_KEYS.CART_ITEMS || 'cart_items'
 const DETAIL_ERROR_TEXT = {
-  title: '餐品信息加载失败',
-  missingId: '缺少餐品信息，请返回菜单重新选择',
+  title: '小厨推荐加载失败',
+  missingId: '缺少菜品信息，请返回今日菜单重新选择',
   loadFailed: '服务暂时不可用，请稍后重试',
-  notFound: '没有找到餐品信息，请返回菜单重新选择',
-  notReady: '餐品信息未加载成功，请返回菜单重新选择'
+  notFound: '没有找到这道菜，请返回今日菜单重新选择',
+  notReady: '菜品信息还没加载好，请返回今日菜单重新选择'
 }
 
 const FALLBACK_DISH = {
@@ -388,7 +388,7 @@ function decorateDish(rawDish, detailData = {}) {
     image_mode: hasRealImage ? 'aspectFill' : 'aspectFit',
     is_placeholder_image: !hasRealImage,
     tags,
-    description: dish.detail_description || dish.description || '暂无餐品介绍',
+    description: dish.detail_description || dish.description || '暂无菜品介绍',
     ingredients: normalizeIngredients(detailData.ingredients, tags),
     status: dish.status || 'on_sale',
     category: detailData.category || null,
@@ -436,7 +436,7 @@ Page({
     pageStatus: 'loading',
     usingFallback: false,
     dishId: '',
-    statusNotice: '正在读取餐品详情',
+    statusNotice: '正在读取小厨推荐',
     errorTitle: '',
     errorMessage: '',
     canRetry: false,
@@ -490,7 +490,7 @@ Page({
     this.setData({
       pageStatus: 'loading',
       usingFallback: false,
-      statusNotice: '正在读取餐品详情',
+      statusNotice: '正在读取小厨推荐',
       errorTitle: '',
       errorMessage: '',
       canRetry: false,
@@ -530,7 +530,7 @@ Page({
         errorTitle: '',
         errorMessage: '',
         canRetry: false,
-        statusNotice: '下单后现做，高峰期请耐心等待',
+        statusNotice: '跟小厨说一声后现做，高峰期请耐心等待',
         dish,
         quantity: 1,
         totalPriceText: selectionState.unitPriceText,
@@ -824,7 +824,7 @@ Page({
     addCartItemByKey(this.buildCartItem(), this.data.quantity)
 
     wx.showToast({
-      title: '已加入购物车',
+      title: '已放进小篮子',
       icon: 'none'
     })
   }

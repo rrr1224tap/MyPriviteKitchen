@@ -7,7 +7,7 @@ import { getSession } from '../stores/session'
 const route = useRoute()
 const router = useRouter()
 const MERCHANT_CONTEXT_KEY = 'xiaochu_current_merchant_id'
-const FALLBACK_MERCHANT_ID = 'xiaochu'
+const SUPER_ADMIN_PREVIEW_MERCHANT_ID = 'xiaochu'
 
 const session = computed(() => getSession())
 const isMerchantAdmin = computed(() => session.value?.role === 'merchant_admin')
@@ -30,7 +30,7 @@ const currentMerchantId = computed(() => {
     return session.value?.merchant_id || ''
   }
 
-  return getRouteMerchantId() || getStoredMerchantId() || FALLBACK_MERCHANT_ID
+  return getRouteMerchantId() || getStoredMerchantId() || SUPER_ADMIN_PREVIEW_MERCHANT_ID
 })
 
 watchEffect(() => {
@@ -42,19 +42,21 @@ watchEffect(() => {
 
 const superAdminNavItems = computed(() => [
   { label: '概览', path: '/', key: 'dashboard', icon: '总' },
-  { label: '商户管理', path: '/merchants', key: 'merchants', icon: '商' },
+  { label: '小厨档案', path: '/merchants', key: 'merchants', icon: '商' },
   { label: '成员邀请', path: `/merchants/${currentMerchantId.value}/staff`, key: 'staff', icon: '员' },
-  { label: '餐品管理', path: `/merchants/${currentMerchantId.value}/dishes`, key: 'dishes', icon: '餐' },
-  { label: '分类管理', path: '/categories', key: 'categories', icon: '类' },
-  { label: '订单管理', path: '/orders', key: 'orders', icon: '单' },
-  { label: '今日备料', path: '/prep-summary', key: 'prep-summary', icon: '备' },
-  { label: '数据检查', path: '/data-health', key: 'data-health', icon: '检' },
-  { label: '系统设置', path: '/settings', key: 'settings', icon: '设' }
+  { label: '今日菜品', path: `/merchants/${currentMerchantId.value}/dishes`, key: 'dishes', icon: '餐' },
+  { label: '菜单分类', path: '/categories', key: 'categories', icon: '类' },
+  { label: '今天的点菜单', path: '/orders', key: 'orders', icon: '单' },
+  { label: '今日备菜', path: '/prep-summary', key: 'prep-summary', icon: '备' },
+  { label: '健康检查', path: '/data-health', key: 'data-health', icon: '检' },
+  { label: '偏好设置', path: '/settings', key: 'settings', icon: '设' }
 ])
 
 const merchantAdminNavItems = [
-  { label: '商户首页', path: '/merchant', key: 'merchant-home', icon: '店' },
-  { label: '分类管理', path: '/merchant/categories', key: 'merchant-categories', icon: '类' }
+  { label: '菜单分类', path: '/merchant/categories', key: 'merchant-categories', icon: '类' },
+  { label: '今日菜品', path: '/merchant/dishes', key: 'merchant-dishes', icon: '餐' },
+  { label: '今天谁来吃饭', path: '/merchant/orders', key: 'merchant-orders', icon: '单' },
+  { label: '备菜清单', path: '/merchant/prep-summary', key: 'merchant-prep-summary', icon: '备' }
 ]
 
 const navItems = computed(() => {
@@ -64,7 +66,7 @@ const navItems = computed(() => {
 const activePath = computed(() => route.path)
 const currentRoleText = computed(() => roleText(session.value?.role))
 const profileDesc = computed(() => {
-  return isMerchantAdmin.value ? `商户：${currentMerchantId.value || '未识别'}` : '本地静态预览'
+  return isMerchantAdmin.value ? `小厨房：${currentMerchantId.value || '未识别'}` : '本地预览'
 })
 
 function isNavItemActive(path: string) {
@@ -92,11 +94,11 @@ function logout() {
         <div class="brand-mark">厨</div>
         <div>
           <div class="brand-name">小厨食堂</div>
-          <div class="brand-subtitle">Private Kitchen Admin</div>
+          <div class="brand-subtitle">Private Kitchen Workbench</div>
         </div>
       </div>
 
-      <nav class="side-nav" aria-label="后台导航">
+      <nav class="side-nav" aria-label="工作台导航">
         <button
           v-for="item in navItems"
           :key="item.key"

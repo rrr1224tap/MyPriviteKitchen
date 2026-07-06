@@ -10,13 +10,13 @@ const merchantId = computed(() => session.value?.merchant_id || '未识别')
   <section class="page-stack">
     <div class="page-header glass-card">
       <div>
-        <div class="page-header__eyebrow">Merchant Admin</div>
-        <h1>商户后台</h1>
+        <div class="page-header__eyebrow">Kitchen Workbench</div>
+        <h1>小厨工作台</h1>
         <p>
-          商户菜单、订单和备料管理正在接入中，请先完成前置权限隔离。
+          菜单分类、今日菜品、今天的点菜单和备菜清单已经按当前小厨房隔离。
         </p>
       </div>
-      <span class="status-badge tone-green">最小占位页</span>
+      <span class="status-badge tone-green">已按小厨房隔离</span>
     </div>
 
     <div class="merchant-home-grid">
@@ -24,7 +24,7 @@ const merchantId = computed(() => session.value?.merchant_id || '未识别')
         <div class="section-heading compact-section-heading">
           <div>
             <h2>当前身份</h2>
-            <p>这里仅展示当前商户管理员 session 的基础信息。</p>
+            <p>这里仅展示当前小厨登录身份的基础信息。</p>
           </div>
         </div>
         <div class="detail-list">
@@ -33,7 +33,7 @@ const merchantId = computed(() => session.value?.merchant_id || '未识别')
             <span>merchant_admin</span>
           </div>
           <div>
-            <strong>当前商户</strong>
+            <strong>当前小厨房</strong>
             <span>{{ merchantId }}</span>
           </div>
         </div>
@@ -42,15 +42,15 @@ const merchantId = computed(() => session.value?.merchant_id || '未识别')
       <section class="panel glass-card">
         <div class="section-heading compact-section-heading">
           <div>
-            <h2>接入状态</h2>
-            <p>本阶段只开放登录与占位入口。</p>
+            <h2>工作台入口</h2>
+            <p>从左侧进入对应小厨房的日常操作。</p>
           </div>
         </div>
         <div class="checklist-grid merchant-home-checklist">
-          <span>分类管理：待权限隔离</span>
-          <span>餐品管理：待权限隔离</span>
-          <span>订单管理：待权限隔离</span>
-          <span>今日备料：待权限隔离</span>
+          <span>菜单分类：已可使用</span>
+          <span>今日菜品：已可使用</span>
+          <span>今天谁来吃饭：已可使用</span>
+          <span>备菜清单：已可使用</span>
         </div>
       </section>
     </div>

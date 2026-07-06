@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import ActionButton from '../components/ActionButton.vue'
 import EmptyState from '../components/EmptyState.vue'
 import GlassCard from '../components/GlassCard.vue'
@@ -7,18 +8,40 @@ import PageHeader from '../components/PageHeader.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { getPrepSummary, type PrepSummary, type PrepSummaryItem } from '../services/prepSummary'
+import { clearSession, getSession } from '../stores/session'
 import type { AdminApiError } from '../types/api'
 
 const MERCHANT_CONTEXT_KEY = 'xiaochu_current_merchant_id'
-const FALLBACK_MERCHANT_ID = 'xiaochu'
+const SUPER_ADMIN_PREVIEW_MERCHANT_ID = 'xiaochu'
 
-const merchantId = ref(getStoredMerchantId() || FALLBACK_MERCHANT_ID)
+const router = useRouter()
+const session = computed(() => getSession())
+const isMerchantAdmin = computed(() => session.value?.role === 'merchant_admin')
+const merchantId = ref(getStoredMerchantId() || SUPER_ADMIN_PREVIEW_MERCHANT_ID)
 const selectedDate = ref(getTodayText())
 const summary = ref<PrepSummary | null>(null)
 const isLoading = ref(false)
 const errorMessage = ref('')
 const errorCode = ref('')
+const copySuccessMessage = ref('')
+const copyErrorMessage = ref('')
 
+const requestMerchantId = computed(() => (isMerchantAdmin.value ? undefined : merchantId.value))
+const currentMerchantId = computed(() => {
+  if (isMerchantAdmin.value) {
+    return session.value?.merchant_id || ''
+  }
+
+  return merchantId.value
+})
+const pageDescription = computed(() => {
+  if (isMerchantAdmin.value) {
+    return `当前小厨房：${currentMerchantId.value || '未识别'}。按日期汇总未取消的点菜单，生成今天要准备的食材清单。`
+  }
+
+  return `当前小厨：${currentMerchantId.value}。内容来自 getPrepSummary，仅做真实读取，不执行采购、库存或打印写入。`
+})
+const pageTitle = computed(() => '今日备菜清单')
 const allItems = computed(() => summary.value?.groups.flatMap((group) => group.items) || [])
 const missingConfigCount = computed(() =>
   allItems.value.filter((item) => !item.unit || !Number.isFinite(item.amount) || item.amount <= 0).length
@@ -26,17 +49,17 @@ const missingConfigCount = computed(() =>
 const hasSummaryData = computed(() => Boolean(summary.value && summary.value.ingredient_count > 0))
 const emptyTitle = computed(() => {
   if (!summary.value || summary.value.order_count <= 0) {
-    return '今日暂无需要备料的订单'
+    return '今天暂时还没有需要备菜的点菜单'
   }
 
-  return '当前餐品未配置食材'
+  return '当前菜品未配置食材'
 })
 const emptyDescription = computed(() => {
   if (!summary.value || summary.value.order_count <= 0) {
-    return '有新的非取消订单后，这里会自动汇总对应餐品的食材。'
+    return '有新的未取消点菜单后，这里会自动汇总对应菜品的食材。'
   }
 
-  return '请确认今日订单中的餐品是否已经在餐品管理中配置 ingredients。'
+  return '请确认今日点菜单里的菜品是否已经配置食材。'
 })
 const isAuthError = computed(() => ['UNAUTHORIZED', 'TOKEN_EXPIRED', 'FORBIDDEN'].includes(errorCode.value))
 
@@ -46,6 +69,19 @@ function getStoredMerchantId() {
   }
 
   return window.localStorage.getItem(MERCHANT_CONTEXT_KEY) || ''
+}
+
+function ensureMerchantContext() {
+  if (isMerchantAdmin.value && !currentMerchantId.value) {
+    errorCode.value = 'SESSION_INVALID'
+    errorMessage.value = '小厨登录状态异常，请重新登录'
+    summary.value = null
+    clearSession()
+    router.push('/login')
+    return false
+  }
+
+  return true
 }
 
 function getTodayText() {
@@ -58,7 +94,7 @@ function getTodayText() {
 
 function getSourceText(item: PrepSummaryItem) {
   if (!item.sources.length) {
-    return '暂无来源餐品'
+    return '暂无来源菜品'
   }
 
   return item.sources
@@ -67,18 +103,24 @@ function getSourceText(item: PrepSummaryItem) {
 }
 
 async function loadPrepSummary() {
+  if (!ensureMerchantContext()) {
+    return
+  }
+
   isLoading.value = true
   errorMessage.value = ''
   errorCode.value = ''
+  copySuccessMessage.value = ''
+  copyErrorMessage.value = ''
 
   try {
-    summary.value = await getPrepSummary(merchantId.value, {
+    summary.value = await getPrepSummary(requestMerchantId.value, {
       date: selectedDate.value || undefined
     })
   } catch (error) {
     const apiError = error as AdminApiError
     errorCode.value = apiError.code || 'UNKNOWN'
-    errorMessage.value = apiError.message || '今日备料读取失败，请稍后重试'
+    errorMessage.value = apiError.message || '今日备菜读取失败，请稍后重试'
     summary.value = null
   } finally {
     isLoading.value = false
@@ -91,6 +133,30 @@ function handleDateChange(event: Event) {
   loadPrepSummary()
 }
 
+async function copyPrepSummary() {
+  const text = summary.value?.copy_text || ''
+  copySuccessMessage.value = ''
+  copyErrorMessage.value = ''
+
+  if (!text) {
+    copyErrorMessage.value = '暂无可复制的备菜清单'
+    return
+  }
+
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      copySuccessMessage.value = '今日备菜清单已复制'
+      window.alert('今日备菜清单已复制')
+      return
+    }
+
+    window.prompt('请手动复制今日备菜清单', text)
+  } catch (error) {
+    window.prompt('请手动复制今日备菜清单', text)
+  }
+}
+
 onMounted(() => {
   loadPrepSummary()
 })
@@ -100,8 +166,8 @@ onMounted(() => {
   <section class="page-stack">
     <PageHeader
       eyebrow="Prep Summary"
-      title="今日备料"
-      :description="`当前商户：${merchantId}。数据来自 getPrepSummary，仅做真实读取，不执行采购、库存或打印写入。`"
+      :title="pageTitle"
+      :description="pageDescription"
     >
       <template #actions>
         <input
@@ -114,28 +180,31 @@ onMounted(() => {
         <ActionButton variant="ghost" :disabled="isLoading" @click="loadPrepSummary">
           {{ isLoading ? '刷新中...' : '刷新' }}
         </ActionButton>
+        <ActionButton variant="primary" :disabled="isLoading || !summary?.copy_text" @click="copyPrepSummary">
+          复制今日备菜清单
+        </ActionButton>
       </template>
     </PageHeader>
 
     <section class="stat-grid">
-      <StatCard title="有效订单" :value="summary?.order_count || 0" caption="排除已取消订单" icon="单" />
-      <StatCard title="餐品份数" :value="summary?.item_count || 0" caption="订单商品数量汇总" tone="orange" icon="份" />
-      <StatCard title="来源餐品" :value="summary?.dish_count || 0" caption="涉及已配置餐品" tone="green" icon="餐" />
-      <StatCard title="备料食材" :value="summary?.ingredient_count || 0" caption="按名称和单位合并" tone="brand" icon="材" />
+      <StatCard title="有效点菜单" :value="summary?.order_count || 0" caption="排除已取消点菜单" icon="单" />
+      <StatCard title="菜品份数" :value="summary?.item_count || 0" caption="点菜单菜品数量汇总" tone="orange" icon="份" />
+      <StatCard title="来源菜品" :value="summary?.dish_count || 0" caption="涉及已配置菜品" tone="green" icon="餐" />
+      <StatCard title="备菜食材" :value="summary?.ingredient_count || 0" caption="按名称和单位合并" tone="brand" icon="材" />
     </section>
 
     <GlassCard>
       <div class="section-heading">
         <div>
-          <h2>备料清单</h2>
-          <p>按食材分类汇总用量，来源餐品只读展示。</p>
+          <h2>备菜清单</h2>
+          <p>按食材分类汇总用量，来源菜品只读展示。</p>
         </div>
         <StatusBadge :label="summary?.date || selectedDate || '今日'" tone="green" />
       </div>
 
       <div v-if="errorMessage" class="inline-error">
         <div>
-          <strong>今日备料读取失败</strong>
+          <strong>今日备菜读取失败</strong>
           <span>{{ errorMessage }}（{{ errorCode }}）</span>
         </div>
         <ActionButton variant="ghost" :disabled="isLoading" @click="loadPrepSummary">
@@ -145,8 +214,8 @@ onMounted(() => {
 
       <EmptyState
         v-else-if="isLoading"
-        title="正在生成今日备料"
-        description="正在读取今日订单和餐品食材配置，请稍候。"
+        title="正在生成今日备菜"
+        description="正在读取今天的点菜单和菜品食材配置，请稍候。"
       />
 
       <EmptyState
@@ -165,7 +234,7 @@ onMounted(() => {
             <div class="prep-table__head prep-table__row">
               <span>食材</span>
               <span>用量</span>
-              <span>来源餐品</span>
+              <span>来源菜品</span>
               <span>备注</span>
             </div>
             <div v-for="item in group.items" :key="`${item.name}-${item.unit}`" class="prep-table__row">
@@ -186,7 +255,7 @@ onMounted(() => {
       <GlassCard>
         <div class="section-heading">
           <div>
-            <h2>采购清单摘要</h2>
+            <h2>备菜清单摘要</h2>
             <p>只读展示当前汇总结果，不创建采购单。</p>
           </div>
         </div>
@@ -201,7 +270,7 @@ onMounted(() => {
           </div>
           <div>
             <strong>{{ allItems.length }}</strong>
-            <span>当前展示备料行</span>
+            <span>当前展示备菜行</span>
           </div>
         </div>
       </GlassCard>
@@ -209,11 +278,13 @@ onMounted(() => {
       <GlassCard>
         <div class="section-heading">
           <div>
-            <h2>采购清单文本</h2>
-            <p>由 getPrepSummary 返回，只读展示，复制体验后续再优化。</p>
+            <h2>备菜清单文本</h2>
+            <p>由 getPrepSummary 返回，只读展示，可复制到微信或备忘录使用。</p>
           </div>
         </div>
-        <pre class="copy-box">{{ summary?.copy_text || '暂无可展示的采购清单文本' }}</pre>
+        <p v-if="copySuccessMessage" class="form-success">{{ copySuccessMessage }}</p>
+        <p v-if="copyErrorMessage" class="form-error">{{ copyErrorMessage }}</p>
+        <pre class="copy-box">{{ summary?.copy_text || '暂无可展示的备菜清单文本' }}</pre>
       </GlassCard>
     </section>
   </section>

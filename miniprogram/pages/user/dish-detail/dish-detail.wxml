@@ -18,7 +18,7 @@
 
     <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
       <view class="back-button" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
-      <view class="nav-title">餐品详情</view>
+      <view class="nav-title">小厨推荐</view>
       <view class="nav-placeholder"></view>
     </view>
 
@@ -33,15 +33,15 @@
       <view class="error-title">{{errorTitle}}</view>
       <view class="error-desc">{{errorMessage}}</view>
       <view class="error-actions">
-        <button wx:if="{{canRetry}}" class="error-button secondary" bindtap="retryLoad">重新加载</button>
-        <button class="error-button primary" bindtap="goToMenu">返回菜单</button>
+        <button wx:if="{{canRetry}}" class="error-button secondary" bindtap="retryLoad">再试一次</button>
+        <button class="error-button primary" bindtap="goToMenu">返回今日菜单</button>
       </view>
     </view>
 
     <view wx:if="{{pageStatus !== 'error'}}" class="dish-panel glass-panel">
       <view class="dish-head">
         <view class="dish-title-wrap">
-          <view class="dish-name">{{pageStatus === 'loading' ? '餐品加载中' : dish.name}}</view>
+          <view class="dish-name">{{pageStatus === 'loading' ? '小厨推荐加载中' : dish.name}}</view>
           <view class="dish-subtitle">SAN YE SIGNATURE</view>
         </view>
         <view class="dish-price">{{pageStatus === 'loading' ? '¥--' : unitPriceText}}</view>
@@ -52,7 +52,7 @@
         <view wx:for="{{dish.tags}}" wx:key="*this" class="dish-tag">{{item}}</view>
       </view>
 
-      <view class="dish-description">{{pageStatus === 'loading' ? '正在读取餐品详情，请稍等。' : dish.description}}</view>
+      <view class="dish-description">{{pageStatus === 'loading' ? '正在看看这道菜的细节，请稍等。' : dish.description}}</view>
       <view class="fresh-note"><text></text>{{statusNotice}}</view>
     </view>
 
@@ -122,7 +122,7 @@
           <view class="section-kicker">INGREDIENTS</view>
           <view class="section-title">主要食材</view>
         </view>
-        <view class="section-note">每日新鲜备料</view>
+        <view class="section-note">每日新鲜备菜</view>
       </view>
       <view class="ingredient-list">
         <view wx:for="{{dish.ingredients}}" wx:key="*this" class="ingredient-item">
@@ -154,6 +154,6 @@
       <view class="purchase-price">{{pageStatus === 'loading' ? '¥--' : totalPriceText}}</view>
     </view>
     <view class="purchase-count">{{quantity}} 份</view>
-    <button class="add-cart-button {{pageStatus !== 'success' || dish.is_sold_out ? 'is-disabled' : ''}}" bindtap="addToCart" disabled="{{pageStatus !== 'success'}}">{{dish.is_sold_out ? '已售罄' : '加入购物车'}}<text wx:if="{{!dish.is_sold_out}}">›</text></button>
+    <button class="add-cart-button {{pageStatus !== 'success' || dish.is_sold_out ? 'is-disabled' : ''}}" bindtap="addToCart" disabled="{{pageStatus !== 'success'}}">{{dish.is_sold_out ? '已售罄' : '放进小篮子'}}<text wx:if="{{!dish.is_sold_out}}">›</text></button>
   </view>
 </view>

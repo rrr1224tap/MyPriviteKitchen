@@ -31,7 +31,7 @@ export interface MerchantAdminLoginData {
 }
 
 const ENDPOINT_NOT_CONFIGURED_MESSAGE = '未配置 Web 登录接口，请检查 VITE_WEB_ADMIN_AUTH_ENDPOINT'
-const API_BASE_NOT_CONFIGURED_MESSAGE = '未配置 Web 后台接口，请检查 VITE_WEB_ADMIN_API_BASE_URL'
+const API_BASE_NOT_CONFIGURED_MESSAGE = '未配置 Web 工作台入口，请检查 VITE_WEB_ADMIN_API_BASE_URL'
 
 function getAuthEndpoint() {
   return String(import.meta.env.VITE_WEB_ADMIN_AUTH_ENDPOINT || '').trim()
@@ -133,7 +133,7 @@ async function postAdminApi<T>(functionName: string, payload: Record<string, str
         success: false,
         error: {
           code: 'NETWORK_ERROR',
-          message: '后台服务暂时不可用，请稍后重试'
+          message: '工作台暂时不可用，请稍后重试'
         }
       }
     }
@@ -171,7 +171,7 @@ export function loginMerchantAdmin(params: {
 }
 
 export function roleText(role?: AdminRole) {
-  return role === 'merchant_admin' ? '商户管理员' : '超级管理员'
+  return role === 'merchant_admin' ? '小厨' : '总控小厨'
 }
 
 export function verifyWebAdminToken(token: string) {

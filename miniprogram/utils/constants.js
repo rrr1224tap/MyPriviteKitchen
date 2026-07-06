@@ -1,6 +1,6 @@
 const DEFAULT_MERCHANT_ID = 'merchant_001'
 
-// TODO: 请替换为微信开发者工具“云开发”控制台中的真实环境 ID。
+// 云开发环境 ID，由微信开发者工具“云开发”控制台提供。
 const CLOUD_ENV_ID = 'cloud1-d1gg2kdq762389ea4'
 
 const STORAGE_KEYS = {
@@ -38,8 +38,8 @@ const PAYMENT_METHOD = {
 }
 
 const ORDER_STATUS_TEXT = {
-  [ORDER_STATUS.PENDING]: '待商家接单',
-  [ORDER_STATUS.ACCEPTED]: '商家已接单',
+  [ORDER_STATUS.PENDING]: '待小厨接单',
+  [ORDER_STATUS.ACCEPTED]: '小厨已接单',
   [ORDER_STATUS.COOKING]: '制作中',
   [ORDER_STATUS.FINISHED]: '已完成',
   [ORDER_STATUS.CANCELLED]: '已取消'

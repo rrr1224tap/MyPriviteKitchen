@@ -2,7 +2,7 @@ Component({
   properties: {
     title: {
       type: String,
-      value: '暂无数据'
+      value: '暂时还没有内容'
     },
     desc: {
       type: String,

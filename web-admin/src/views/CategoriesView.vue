@@ -9,6 +9,7 @@ import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import {
   createCategory,
+  deleteCategory,
   fetchCategories,
   updateCategory,
   type CategoryListItem,
@@ -19,7 +20,7 @@ import { clearSession, getSession } from '../stores/session'
 import type { AdminApiError } from '../types/api'
 
 const MERCHANT_CONTEXT_KEY = 'xiaochu_current_merchant_id'
-const FALLBACK_MERCHANT_ID = 'xiaochu'
+const SUPER_ADMIN_PREVIEW_MERCHANT_ID = 'xiaochu'
 
 interface CategoryFormState {
   name: string
@@ -47,26 +48,29 @@ const form = ref<CategoryFormState>({
 const isSubmitting = ref(false)
 const formErrorMessage = ref('')
 const formSuccessMessage = ref('')
+const deletingCategoryId = ref('')
 
 const activeCount = computed(() => categories.value.filter((item) => item.status === 'active').length)
 const inactiveCount = computed(() =>
   categories.value.filter((item) => item.status === 'inactive' || item.status === 'disabled').length
 )
 const isAuthError = computed(() => ['UNAUTHORIZED', 'TOKEN_EXPIRED', 'FORBIDDEN'].includes(errorCode.value))
-const formTitle = computed(() => formMode.value === 'create' ? '新增分类' : '编辑分类')
+const pageTitle = computed(() => '整理菜单')
+const formTitle = computed(() => formMode.value === 'create' ? '添个菜单分类' : '改一下菜单分类')
+const requestMerchantId = computed(() => (isMerchantAdmin.value ? undefined : merchantId.value))
 const pageDescription = computed(() => {
   if (isMerchantAdmin.value) {
-    return `当前商户：${merchantId.value || '未识别'}。分类列表、新增分类和编辑分类已绑定登录商户，不支持切换商户。`
+    return `当前小厨房：${merchantId.value || '未识别'}。菜单分类、添个分类、改一下和移除都跟随登录身份。`
   }
 
-  return `当前商户：${merchantId.value}。分类列表、新增分类和编辑分类已接入真实云函数；删除和排序暂不执行真实写入。`
+  return `当前小厨：${merchantId.value}。菜单分类、添个分类和改一下已接入真实云函数；排序暂不执行真实写入。`
 })
 const submitLabel = computed(() => {
   if (isSubmitting.value) {
-    return formMode.value === 'create' ? '正在新增...' : '正在更新...'
+    return formMode.value === 'create' ? '正在记...' : '正在改...'
   }
 
-  return formMode.value === 'create' ? '新增分类' : '保存修改'
+  return formMode.value === 'create' ? '小厨记一下' : '改好了'
 })
 
 function getStoredMerchantId() {
@@ -82,11 +86,11 @@ function getInitialMerchantId() {
     return session.value?.merchant_id || ''
   }
 
-  return getStoredMerchantId() || FALLBACK_MERCHANT_ID
+  return getStoredMerchantId() || SUPER_ADMIN_PREVIEW_MERCHANT_ID
 }
 
 function showPendingTip() {
-  window.alert('删除分类和分类排序会在后续版本接入，本阶段只开放新增和编辑分类。')
+  window.alert('排序会在后续版本接入，当前先支持添个分类、改一下和移除菜单分类。')
 }
 
 function categoryTone(status: CategoryStatus) {
@@ -198,21 +202,49 @@ async function submitCategoryForm() {
   isSubmitting.value = true
   try {
     if (formMode.value === 'create') {
-      await createCategory(merchantId.value, validation.payload)
-      formSuccessMessage.value = '分类已新增，列表已刷新'
+      await createCategory(requestMerchantId.value, validation.payload)
+      formSuccessMessage.value = '小厨记住啦，列表已刷新'
       resetForm()
     } else {
-      await updateCategory(merchantId.value, editingCategoryId.value, validation.payload)
-      formSuccessMessage.value = '分类已更新，列表已刷新'
+      await updateCategory(requestMerchantId.value, editingCategoryId.value, validation.payload)
+      formSuccessMessage.value = '已经帮你改好啦，列表已刷新'
     }
     await loadCategories()
   } catch (error) {
     const apiError = error as Partial<AdminApiError>
     formErrorMessage.value = formMode.value === 'create'
-      ? apiError.message || '分类新增失败，请稍后重试'
-      : apiError.message || '分类更新失败，请稍后重试'
+      ? apiError.message || '菜单分类添加失败，请稍后重试'
+      : apiError.message || '菜单分类修改失败，请稍后重试'
   } finally {
     isSubmitting.value = false
+  }
+}
+
+async function handleDeleteCategory(item: CategoryListItem) {
+  if (!isMerchantAdmin.value || deletingCategoryId.value) {
+    return
+  }
+
+  const confirmed = window.confirm('确认删除这个分类？')
+  if (!confirmed) {
+    return
+  }
+
+  deletingCategoryId.value = item.category_id
+  formErrorMessage.value = ''
+  formSuccessMessage.value = ''
+
+  try {
+    await deleteCategory(requestMerchantId.value, item.category_id)
+    formSuccessMessage.value = '已经移走啦，列表已刷新'
+    window.alert('已经移走啦')
+    await loadCategories()
+  } catch (error) {
+    const apiError = error as Partial<AdminApiError>
+    formErrorMessage.value = apiError.message || '移除失败，请稍后重试'
+    window.alert(formErrorMessage.value)
+  } finally {
+    deletingCategoryId.value = ''
   }
 }
 
@@ -220,7 +252,7 @@ async function loadCategories() {
   if (!merchantId.value) {
     categories.value = []
     errorCode.value = 'TOKEN_INVALID'
-    errorMessage.value = '登录状态异常，请重新登录后再管理分类。'
+    errorMessage.value = '登录状态异常，请重新登录后再整理菜单。'
     if (isMerchantAdmin.value) {
       clearSession()
       router.push('/login')
@@ -233,7 +265,7 @@ async function loadCategories() {
   errorCode.value = ''
 
   try {
-    const result = await fetchCategories(merchantId.value)
+    const result = await fetchCategories(requestMerchantId.value)
     categories.value = result.list
   } catch (error) {
     categories.value = []
@@ -252,27 +284,27 @@ onMounted(loadCategories)
   <section class="page-stack">
     <PageHeader
       eyebrow="Categories"
-      title="分类管理"
+      :title="pageTitle"
       :description="pageDescription"
     >
       <template #actions>
         <ActionButton variant="ghost" :disabled="isLoading" @click="loadCategories">刷新列表</ActionButton>
-        <ActionButton variant="primary" @click="openCreateForm">新增分类</ActionButton>
+        <ActionButton variant="primary" @click="openCreateForm">添个分类</ActionButton>
       </template>
     </PageHeader>
 
     <section class="stat-grid">
-      <StatCard title="分类总数" :value="isLoading ? '...' : categories.length" caption="来自 manageCategory.listCategories" icon="类" />
-      <StatCard title="启用分类" :value="isLoading ? '...' : activeCount" caption="点餐页可展示" tone="green" icon="启" />
-      <StatCard title="停用分类" :value="isLoading ? '...' : inactiveCount" caption="暂不展示" tone="muted" icon="停" />
-      <StatCard title="真实写入" value="2 项" caption="仅新增和编辑分类" tone="orange" icon="写" />
+      <StatCard title="分类总数" :value="isLoading ? '...' : categories.length" caption="菜单里的分类数量" icon="类" />
+      <StatCard title="正在使用" :value="isLoading ? '...' : activeCount" caption="点餐页可展示" tone="green" icon="启" />
+      <StatCard title="暂时收起" :value="isLoading ? '...' : inactiveCount" caption="暂不展示" tone="muted" icon="停" />
+      <StatCard title="可调整项" value="2 项" caption="名称和展示状态" tone="orange" icon="写" />
     </section>
 
     <GlassCard v-if="isFormOpen">
       <div class="section-heading">
         <div>
           <h2>{{ formTitle }}</h2>
-          <p>只会写入分类名称、排序值和状态。商户 ID、分类 ID 和时间字段由后端控制。</p>
+          <p>只会调整分类名称、排序值和状态。小厨房身份、分类 ID 和时间字段由后端控制。</p>
         </div>
         <ActionButton variant="ghost" :disabled="isSubmitting" @click="closeForm">收起</ActionButton>
       </div>
@@ -320,10 +352,10 @@ onMounted(loadCategories)
     <GlassCard>
       <div class="section-heading">
         <div>
-          <h2>分类列表</h2>
-          <p>按分类排序值升序展示真实数据；已删除分类由云函数过滤，不在列表中展示。</p>
+          <h2>菜单分类</h2>
+          <p>按排序值展示当前菜单分类；已移除分类由云函数过滤，不在列表中展示。</p>
         </div>
-        <StatusBadge label="真实数据" tone="green" />
+        <StatusBadge label="真实内容" tone="green" />
       </div>
 
       <div v-if="errorMessage" class="inline-error">
@@ -339,15 +371,15 @@ onMounted(loadCategories)
       <EmptyState
         v-else-if="isLoading"
         title="正在加载分类"
-        description="正在从云函数读取当前商户的真实分类列表。"
+        description="正在读取当前小厨房的菜单分类。"
       />
 
       <EmptyState
         v-else-if="!categories.length"
         title="暂无分类"
-        description="当前商户还没有可展示分类。可以点击新增分类创建第一条分类。"
+        description="当前小厨房还没有可展示分类。可以点击添个分类，先把菜单分组搭起来。"
       >
-        <ActionButton v-if="!isAuthError" variant="ghost" @click="openCreateForm">新增分类</ActionButton>
+        <ActionButton v-if="!isAuthError" variant="ghost" @click="openCreateForm">添个分类</ActionButton>
       </EmptyState>
 
       <div v-else class="mock-table category-table">
@@ -367,9 +399,17 @@ onMounted(loadCategories)
           <span>{{ item.category_id }}</span>
           <span>{{ formatDate(item.updated_at) }}</span>
           <div class="table-action-group">
-            <button class="table-action-button" type="button" @click="openEditForm(item)">编辑</button>
+            <button class="table-action-button" type="button" @click="openEditForm(item)">改一下</button>
             <button v-if="!isMerchantAdmin" class="table-action-button" type="button" @click="showPendingTip">排序</button>
-            <button v-if="!isMerchantAdmin" class="table-action-button table-action-button--danger" type="button" @click="showPendingTip">删除</button>
+            <button
+              v-if="isMerchantAdmin"
+              class="table-action-button table-action-button--danger"
+              type="button"
+              :disabled="deletingCategoryId === item.category_id"
+              @click="handleDeleteCategory(item)"
+            >
+              {{ deletingCategoryId === item.category_id ? '移除中...' : '移除' }}
+            </button>
           </div>
         </div>
       </div>

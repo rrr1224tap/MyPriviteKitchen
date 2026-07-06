@@ -66,6 +66,17 @@ function toNumber(value: unknown) {
   return Number.isFinite(numberValue) && numberValue >= 0 ? numberValue : 0
 }
 
+function withMerchantId<T extends Record<string, unknown>>(merchantId: string | undefined, payload: T) {
+  if (!merchantId) {
+    return payload
+  }
+
+  return {
+    merchant_id: merchantId,
+    ...payload
+  }
+}
+
 function toStatus(value: unknown, enabled: unknown): CategoryStatus {
   if (value === 'disabled' || value === 'inactive' || value === 'deleted') {
     return value
@@ -104,11 +115,10 @@ function normalizeCategory(raw: RawCategoryItem): CategoryListItem {
   }
 }
 
-export async function fetchCategories(merchantId: string) {
-  const data = await callAdminFunction<CategoryListResponse>('manageCategory', {
+export async function fetchCategories(merchantId?: string) {
+  const data = await callAdminFunction<CategoryListResponse>('manageCategory', withMerchantId(merchantId, {
     action: 'listCategories',
-    merchant_id: merchantId
-  })
+  }))
 
   const list = Array.isArray(data.list) ? data.list.map(normalizeCategory) : []
 
@@ -124,23 +134,30 @@ export interface CategoryMutationPayload {
   status?: EditableCategoryStatus
 }
 
-export async function createCategory(merchantId: string, payload: CategoryMutationPayload) {
-  const data = await callAdminFunction<{ category?: RawCategoryItem }>('manageCategory', {
+export async function createCategory(merchantId: string | undefined, payload: CategoryMutationPayload) {
+  const data = await callAdminFunction<{ category?: RawCategoryItem }>('manageCategory', withMerchantId(merchantId, {
     action: 'createCategory',
-    merchant_id: merchantId,
     ...payload
-  })
+  }))
 
   return data.category ? normalizeCategory(data.category) : null
 }
 
-export async function updateCategory(merchantId: string, categoryId: string, payload: CategoryMutationPayload) {
-  const data = await callAdminFunction<{ category?: RawCategoryItem }>('manageCategory', {
+export async function updateCategory(merchantId: string | undefined, categoryId: string, payload: CategoryMutationPayload) {
+  const data = await callAdminFunction<{ category?: RawCategoryItem }>('manageCategory', withMerchantId(merchantId, {
     action: 'updateCategory',
-    merchant_id: merchantId,
     category_id: categoryId,
     ...payload
-  })
+  }))
+
+  return data.category ? normalizeCategory(data.category) : null
+}
+
+export async function deleteCategory(merchantId: string | undefined, categoryId: string) {
+  const data = await callAdminFunction<{ category?: RawCategoryItem }>('manageCategory', withMerchantId(merchantId, {
+    action: 'deleteCategory',
+    category_id: categoryId
+  }))
 
   return data.category ? normalizeCategory(data.category) : null
 }

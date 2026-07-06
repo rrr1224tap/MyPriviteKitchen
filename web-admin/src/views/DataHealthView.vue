@@ -35,7 +35,7 @@ function confirmFix() {
     </PageHeader>
 
     <section class="stat-grid">
-      <StatCard title="问题总数" :value="4" caption="静态 mock 问题" tone="orange" icon="检" />
+      <StatCard title="问题总数" :value="4" caption="上线前核对项" tone="orange" icon="检" />
       <StatCard title="error" :value="0" caption="暂无严重问题" tone="green" icon="安" />
       <StatCard title="warning" :value="3" caption="建议上线前处理" tone="brand" icon="醒" />
       <StatCard title="可修复项" :value="2" caption="仅限 merchant_id 补齐" tone="muted" icon="修" />

@@ -35,7 +35,7 @@ const functions = [
           <div><strong>Web Admin 版本</strong><span>v0.5-A2</span></div>
           <div><strong>小程序稳定 tag</strong><span>private-kitchen-v0.4</span></div>
           <div><strong>SUPER_ADMIN_OPENIDS</strong><span>仅在云函数环境变量配置，不在前端显示真实值</span></div>
-          <div><strong>DEFAULT_MERCHANT_ID</strong><span>建议按实际默认商户配置</span></div>
+          <div><strong>小厨房来源</strong><span>小厨登录后使用登录身份里的小厨房信息</span></div>
         </div>
       </GlassCard>
 
@@ -54,7 +54,7 @@ const functions = [
       <div class="section-heading">
         <div>
           <h2>上线前检查清单</h2>
-          <p>当前为 mock 清单，后续可接入真实检查结果。</p>
+          <p>当前为上线前核对清单，后续可接入自动检查结果。</p>
         </div>
       </div>
       <div class="checklist-grid">

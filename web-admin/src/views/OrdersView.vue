@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import ActionButton from '../components/ActionButton.vue'
 import EmptyState from '../components/EmptyState.vue'
 import GlassCard from '../components/GlassCard.vue'
@@ -17,10 +18,11 @@ import {
   type OrderPagination,
   type OrderStatus
 } from '../services/orders'
+import { clearSession, getSession } from '../stores/session'
 import type { AdminApiError } from '../types/api'
 
 const MERCHANT_CONTEXT_KEY = 'xiaochu_current_merchant_id'
-const FALLBACK_MERCHANT_ID = 'xiaochu'
+const SUPER_ADMIN_PREVIEW_MERCHANT_ID = 'xiaochu'
 const PAGE_SIZE = 20
 
 interface OrderStatusAction {
@@ -44,22 +46,25 @@ const statusActions: Record<string, OrderStatusAction> = {
     from: 'pending',
     to: 'accepted',
     label: '确认接单',
-    confirmText: '确认接单这个订单吗？确认后订单将进入已接单状态。'
+    confirmText: '确认接下这份点菜单吗？确认后会进入已接单状态。'
   },
   accepted: {
     from: 'accepted',
     to: 'cooking',
     label: '开始备餐',
-    confirmText: '确认开始备餐吗？确认后订单将进入制作中状态。'
+    confirmText: '确认开始备餐吗？确认后点菜单会进入制作中状态。'
   },
   cooking: {
     from: 'cooking',
     to: 'finished',
     label: '标记完成',
-    confirmText: '确认将这个订单标记为已完成吗？确认后订单将进入已完成状态。'
+    confirmText: '确认将这份点菜单标记为已完成吗？确认后会进入已完成状态。'
   }
 }
 
+const router = useRouter()
+const session = computed(() => getSession())
+const isMerchantAdmin = computed(() => session.value?.role === 'merchant_admin')
 const orders = ref<OrderListItem[]>([])
 const pagination = ref<OrderPagination>({
   page: 1,
@@ -71,7 +76,7 @@ const selectedStatus = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
 const errorCode = ref('')
-const merchantId = ref(getStoredMerchantId() || FALLBACK_MERCHANT_ID)
+const merchantId = ref(getStoredMerchantId() || SUPER_ADMIN_PREVIEW_MERCHANT_ID)
 const selectedOrderId = ref('')
 const orderDetail = ref<OrderDetail | null>(null)
 const isDetailLoading = ref(false)
@@ -80,6 +85,22 @@ const detailErrorCode = ref('')
 const isStatusUpdating = ref(false)
 const statusActionError = ref('')
 
+const requestMerchantId = computed(() => (isMerchantAdmin.value ? undefined : merchantId.value))
+const currentMerchantId = computed(() => {
+  if (isMerchantAdmin.value) {
+    return session.value?.merchant_id || ''
+  }
+
+  return merchantId.value
+})
+const pageDescription = computed(() => {
+  if (isMerchantAdmin.value) {
+    return `当前小厨房：${currentMerchantId.value || '未识别'}。点菜单列表、详情和出餐进度都跟随登录身份。`
+  }
+
+  return `当前小厨：${currentMerchantId.value}。点菜单列表、详情和出餐进度已接入真实云函数。`
+})
+const pageTitle = computed(() => '今天的点菜单')
 const pendingCount = computed(() => orders.value.filter((item) => item.status === 'pending').length)
 const processingCount = computed(() =>
   orders.value.filter((item) => item.status === 'accepted' || item.status === 'cooking').length
@@ -104,6 +125,19 @@ function getStoredMerchantId() {
   }
 
   return window.localStorage.getItem(MERCHANT_CONTEXT_KEY) || ''
+}
+
+function ensureMerchantContext() {
+  if (isMerchantAdmin.value && !currentMerchantId.value) {
+    errorCode.value = 'SESSION_INVALID'
+    errorMessage.value = '小厨登录状态异常，请重新登录'
+    clearDetail()
+    clearSession()
+    router.push('/login')
+    return false
+  }
+
+  return true
 }
 
 function getOrderKey(item: OrderListItem) {
@@ -174,17 +208,21 @@ async function loadOrderDetail(orderId = selectedOrderId.value) {
     return
   }
 
+  if (!ensureMerchantContext()) {
+    return
+  }
+
   isDetailLoading.value = true
   detailErrorMessage.value = ''
   detailErrorCode.value = ''
 
   try {
-    const result = await getOrderDetail(merchantId.value, orderId)
+    const result = await getOrderDetail(requestMerchantId.value, orderId)
     orderDetail.value = result
   } catch (error) {
     const apiError = error as AdminApiError
     detailErrorCode.value = apiError.code || 'UNKNOWN'
-    detailErrorMessage.value = apiError.message || '订单详情读取失败，请稍后重试'
+    detailErrorMessage.value = apiError.message || '点菜单详情读取失败，请稍后重试'
     orderDetail.value = null
   } finally {
     isDetailLoading.value = false
@@ -228,12 +266,16 @@ function getItemOptionsText(item: OrderDetailItem) {
 }
 
 async function loadOrders(page = 1) {
+  if (!ensureMerchantContext()) {
+    return
+  }
+
   isLoading.value = true
   errorMessage.value = ''
   errorCode.value = ''
 
   try {
-    const result = await listOrders(merchantId.value, {
+    const result = await listOrders(requestMerchantId.value, {
       page,
       page_size: PAGE_SIZE,
       status: selectedStatus.value || undefined
@@ -247,7 +289,7 @@ async function loadOrders(page = 1) {
   } catch (error) {
     const apiError = error as AdminApiError
     errorCode.value = apiError.code || 'UNKNOWN'
-    errorMessage.value = apiError.message || '订单列表读取失败，请稍后重试'
+    errorMessage.value = apiError.message || '点菜单列表读取失败，请稍后重试'
     orders.value = []
     clearDetail()
     pagination.value = {
@@ -262,6 +304,10 @@ async function loadOrders(page = 1) {
 }
 
 async function handleStatusUpdate() {
+  if (!ensureMerchantContext()) {
+    return
+  }
+
   const action = currentStatusAction.value
   const order = detailOrder.value
   const orderId = order ? getOrderKey(order) : ''
@@ -279,18 +325,18 @@ async function handleStatusUpdate() {
   statusActionError.value = ''
 
   try {
-    await updateOrderStatus(merchantId.value, orderId, action.to)
+    await updateOrderStatus(requestMerchantId.value, orderId, action.to)
     const detailOrderId = selectedOrderId.value
     await loadOrders(pagination.value.page)
     if (detailOrderId) {
       selectedOrderId.value = detailOrderId
       await loadOrderDetail(detailOrderId)
     }
-    window.alert('订单状态已更新，列表已刷新')
+    window.alert('点菜单状态已更新，列表已刷新')
   } catch (error) {
     const apiError = error as AdminApiError
-    statusActionError.value = apiError.message || '订单状态更新失败，请稍后重试'
-    window.alert('订单状态更新失败，请稍后重试')
+    statusActionError.value = apiError.message || '点菜单状态更新失败，请稍后重试'
+    window.alert('点菜单状态更新失败，请稍后重试')
   } finally {
     isStatusUpdating.value = false
   }
@@ -314,8 +360,8 @@ onMounted(() => {
   <section class="page-stack">
     <PageHeader
       eyebrow="Orders"
-      title="订单管理"
-      :description="`当前商户：${merchantId}。订单列表和详情已接入真实数据，状态流转通过 updateOrderStatus 写入。`"
+      :title="pageTitle"
+      :description="pageDescription"
     >
       <template #actions>
         <ActionButton variant="ghost" :disabled="isLoading" @click="loadOrders(pagination.page)">
@@ -325,7 +371,7 @@ onMounted(() => {
     </PageHeader>
 
     <section class="stat-grid">
-      <StatCard title="当前列表" :value="pagination.total" caption="真实订单数量" icon="单" />
+      <StatCard title="当前列表" :value="pagination.total" caption="真实点菜单数量" icon="单" />
       <StatCard title="待接单" :value="pendingCount" caption="当前页待处理" tone="orange" icon="接" />
       <StatCard title="处理中" :value="processingCount" caption="已接单 / 制作中" tone="brand" icon="制" />
       <StatCard title="当前页金额" :value="totalAmountText" caption="按当前页汇总" tone="green" icon="¥" />
@@ -334,10 +380,10 @@ onMounted(() => {
     <GlassCard>
       <div class="section-heading">
         <div>
-          <h2>订单列表</h2>
-          <p>数据来自 getMerchantOrders.listOrders，支持分页、筛选、刷新和查看详情。</p>
+          <h2>点菜单列表</h2>
+          <p>内容来自 getMerchantOrders.listOrders，支持分页、筛选、刷新和查看详情。</p>
         </div>
-        <StatusBadge label="真实数据" tone="green" />
+        <StatusBadge label="真实内容" tone="green" />
       </div>
 
       <div class="toolbar">
@@ -358,7 +404,7 @@ onMounted(() => {
 
       <div v-if="errorMessage" class="inline-error">
         <div>
-          <strong>订单列表读取失败</strong>
+          <strong>点菜单列表读取失败</strong>
           <span>{{ errorMessage }}（{{ errorCode }}）</span>
         </div>
         <ActionButton variant="ghost" :disabled="isLoading" @click="loadOrders(1)">
@@ -366,20 +412,20 @@ onMounted(() => {
         </ActionButton>
       </div>
 
-      <EmptyState v-else-if="isLoading" title="正在读取订单" description="请稍候，正在从云函数获取当前商户订单列表。" />
+      <EmptyState v-else-if="isLoading" title="正在读取点菜单" description="请稍候，正在从云函数获取当前小厨房的点菜单。" />
       <EmptyState
         v-else-if="orders.length === 0"
-        title="暂无订单"
-        description="当前商户在该筛选条件下还没有订单。"
+        title="暂无点菜单"
+        description="当前小厨房在该筛选条件下还没有点菜单。"
       />
 
       <div v-else class="mock-table orders-table">
         <div class="mock-table__head mock-table__row orders-table__row">
-          <span>订单号</span>
+          <span>点菜单号</span>
           <span>下单时间</span>
           <span>联系人</span>
           <span>金额</span>
-          <span>商品数</span>
+          <span>菜品数</span>
           <span>状态</span>
           <span>备注</span>
           <span>操作</span>
@@ -431,8 +477,8 @@ onMounted(() => {
     <GlassCard>
       <div class="section-heading">
         <div>
-          <h2>订单详情</h2>
-          <p>查看选中订单的基础信息、联系信息、商品明细和备注。</p>
+          <h2>点菜单详情</h2>
+          <p>查看选中点菜单的基础信息、联系信息、菜品明细和备注。</p>
         </div>
         <StatusBadge
           :label="detailOrder ? getOrderStatusText(detailOrder.status) : '未选择'"
@@ -442,19 +488,19 @@ onMounted(() => {
 
       <EmptyState
         v-if="!selectedOrderId"
-        title="请选择订单"
-        description="点击左侧订单列表中的查看详情，读取真实订单详情。"
+        title="请选择点菜单"
+        description="点击左侧点菜单列表中的查看详情，读取真实点菜单详情。"
       />
 
       <EmptyState
         v-else-if="isDetailLoading"
         title="正在读取详情"
-        description="请稍候，正在从云函数获取真实订单详情。"
+        description="请稍候，正在从云函数获取真实点菜单详情。"
       />
 
       <div v-else-if="detailErrorMessage" class="inline-error">
         <div>
-          <strong>订单详情读取失败</strong>
+          <strong>点菜单详情读取失败</strong>
           <span>{{ detailErrorMessage }}（{{ detailErrorCode }}）</span>
         </div>
         <ActionButton variant="ghost" :disabled="isDetailLoading" @click="loadOrderDetail()">
@@ -465,7 +511,7 @@ onMounted(() => {
       <EmptyState
         v-else-if="!orderDetail"
         title="暂无详情"
-        description="当前订单详情为空，请刷新后重试。"
+        description="当前点菜单详情为空，请刷新后重试。"
       />
 
       <div v-else class="order-detail-panel">
@@ -478,7 +524,7 @@ onMounted(() => {
             <span>下单：{{ formatDateTime(orderDetail.order.created_at) }}</span>
             <span>更新：{{ formatDateTime(orderDetail.order.updated_at) }}</span>
             <span>金额：{{ orderDetail.order.total_amount_text }}</span>
-            <span>商品数：{{ orderDetail.order.item_count }}</span>
+            <span>菜品数：{{ orderDetail.order.item_count }}</span>
           </div>
         </div>
 
@@ -495,7 +541,7 @@ onMounted(() => {
 
         <div class="order-detail-section">
           <div class="order-detail-title compact">
-            <strong>商品明细</strong>
+            <strong>菜品明细</strong>
             <span>{{ orderDetail.items.length }} 项</span>
           </div>
           <div v-if="orderDetail.items.length" class="order-items-list">
@@ -512,7 +558,7 @@ onMounted(() => {
               </div>
             </div>
           </div>
-          <p v-else class="dish-detail-muted">暂无商品明细</p>
+          <p v-else class="dish-detail-muted">暂无菜品明细</p>
         </div>
 
         <div class="order-detail-section">

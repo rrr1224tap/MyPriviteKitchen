@@ -10,32 +10,32 @@
 
   <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
     <view class="nav-back" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
-    <view class="nav-title">订单详情</view>
+    <view class="nav-title">点菜单详情</view>
   </view>
 
   <scroll-view class="detail-scroll" scroll-y enhanced show-scrollbar="{{false}}">
     <view class="detail-content" style="padding-top: {{statusBarHeight + navigationHeight + 16}}px;">
       <view wx:if="{{pageStatus === 'loading'}}" class="state-card glass-panel">
         <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-clock.svg" mode="aspectFit"></image></view>
-        <view class="state-title">正在读取订单</view>
-        <view class="state-desc">正在同步订单详情和商品明细</view>
+        <view class="state-title">正在读取点菜单</view>
+        <view class="state-desc">正在同步点菜单详情和菜品明细</view>
       </view>
 
       <view wx:elif="{{pageStatus === 'error'}}" class="state-card glass-panel">
         <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-warning.svg" mode="aspectFit"></image></view>
-        <view class="state-title">订单详情加载失败</view>
+        <view class="state-title">点菜单详情加载失败</view>
         <view class="state-desc">{{errorMessage}}</view>
         <view class="state-actions">
-          <button class="state-button is-secondary" bindtap="goBack">返回订单列表</button>
+          <button class="state-button is-secondary" bindtap="goBack">返回我的点菜单</button>
           <button class="state-button" bindtap="retryLoad">重新加载</button>
         </view>
       </view>
 
       <view wx:elif="{{pageStatus === 'empty'}}" class="state-card glass-panel">
         <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-order.svg" mode="aspectFit"></image></view>
-        <view class="state-title">没有找到订单</view>
-        <view class="state-desc">请返回订单列表，选择有效订单查看</view>
-        <button class="state-button" bindtap="goBack">返回订单列表</button>
+        <view class="state-title">没有找到点菜单</view>
+        <view class="state-desc">请返回我的点菜单，选择有效记录查看</view>
+        <button class="state-button" bindtap="goBack">返回我的点菜单</button>
       </view>
 
       <block wx:else>
@@ -44,7 +44,7 @@
             <view class="hero-kicker">ORDER DETAIL</view>
             <view class="hero-title">{{order.status_text}}</view>
             <view class="hero-status-desc">{{order.status_desc}}</view>
-            <view class="hero-desc">订单号 {{order.order_no}}</view>
+            <view class="hero-desc">点菜单号 {{order.order_no}}</view>
             <view class="hero-time">{{order.created_time}}</view>
           </view>
           <view class="status-tag status-{{order.status_class}}">{{order.status_text}}</view>
@@ -74,7 +74,7 @@
               disabled="{{cancelling || isRefreshing}}"
               bindtap="confirmCancelOrder"
             >
-              {{cancelling ? '取消中...' : '取消订单'}}
+              {{cancelling ? '取消中...' : '取消点菜单'}}
             </button>
           </view>
         </view>
@@ -83,7 +83,7 @@
           <view class="section-head">
             <view>
               <view class="section-kicker">PROGRESS</view>
-              <view class="section-title">订单进度</view>
+              <view class="section-title">点菜单进度</view>
             </view>
           </view>
           <view class="timeline">
@@ -105,7 +105,7 @@
           <view class="section-head">
             <view>
               <view class="section-kicker is-dark">ITEMS</view>
-              <view class="section-title is-dark">商品明细</view>
+              <view class="section-title is-dark">菜品明细</view>
             </view>
             <view class="item-count">{{order.item_count_text}}</view>
           </view>
@@ -127,7 +127,7 @@
               </view>
             </view>
           </block>
-          <view wx:else class="items-empty">商品信息暂不可用</view>
+          <view wx:else class="items-empty">菜品信息暂不可用</view>
         </view>
 
         <view class="info-panel glass-panel">
@@ -145,13 +145,13 @@
 
         <view class="total-panel glass-panel">
           <view>
-            <view class="total-label">订单总金额</view>
-            <view class="total-note">金额由云函数按下单时价格计算</view>
+            <view class="total-label">点菜单合计</view>
+            <view class="total-note">金额由小厨按下单时价格计算</view>
           </view>
           <view class="total-price">{{order.total_amount_text}}</view>
         </view>
 
-        <button class="continue-button" bindtap="goToMenu">继续点餐</button>
+        <button class="continue-button" bindtap="goToMenu">继续点菜</button>
       </block>
     </view>
   </scroll-view>

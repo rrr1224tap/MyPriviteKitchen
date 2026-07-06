@@ -124,6 +124,30 @@ const router = createRouter({
           meta: {
             roles: ['merchant_admin']
           }
+        },
+        {
+          path: 'merchant/dishes',
+          name: 'merchant-admin-dishes',
+          component: DishesView,
+          meta: {
+            roles: ['merchant_admin']
+          }
+        },
+        {
+          path: 'merchant/orders',
+          name: 'merchant-admin-orders',
+          component: OrdersView,
+          meta: {
+            roles: ['merchant_admin']
+          }
+        },
+        {
+          path: 'merchant/prep-summary',
+          name: 'merchant-admin-prep-summary',
+          component: PrepSummaryView,
+          meta: {
+            roles: ['merchant_admin']
+          }
         }
       ]
     }

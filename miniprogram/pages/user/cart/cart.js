@@ -13,8 +13,8 @@ const CREATE_ORDER_ERROR_TEXT = {
   STOCK_NOT_ENOUGH: '库存不足，请调整数量后重试',
   DISH_OFF_SALE: '有餐品已下架，请重新选择',
   VALIDATION_ERROR: '规格或加料选择已变化，请重新选择',
-  INVALID_PARAMS: '订单信息不完整，请重新选择',
-  AMOUNT_ERROR: '订单金额校验失败，请重新选择',
+  INVALID_PARAMS: '点菜单信息不完整，请重新选择',
+  AMOUNT_ERROR: '点菜单金额校验失败，请重新选择',
   NOT_FOUND: '有餐品信息不存在，请重新选择',
   DATABASE_ERROR: '服务暂时不可用，请稍后重试'
 }
@@ -25,9 +25,9 @@ const ORDER_RESELECT_CODES = [
   'VALIDATION_ERROR',
   'NOT_FOUND'
 ]
-const ORDER_RESELECT_MESSAGE = '餐品状态或规格已变化，请返回菜单重新选择。'
+const ORDER_RESELECT_MESSAGE = '菜品状态或规格已变化，请返回今日菜单重新选择。'
 const ORDER_NETWORK_ERROR_TEXT = '网络不太稳定，请稍后重试'
-const ORDER_UNKNOWN_ERROR_TEXT = '下单失败，请稍后重试'
+const ORDER_UNKNOWN_ERROR_TEXT = '没能告诉小厨，请稍后重试'
 
 function getFallbackImageStyle(index) {
   return FALLBACK_IMAGE_STYLE
@@ -389,7 +389,7 @@ Page({
     }
 
     wx.showModal({
-      title: '清空购物车',
+      title: '清空小篮子',
       content: '确认移除当前已选餐品吗？',
       confirmColor: '#E63B4A',
       success: (result) => {
@@ -499,10 +499,10 @@ Page({
 
     if (shouldGuideToMenu(code)) {
       wx.showModal({
-        title: '下单失败',
+        title: '没能告诉小厨',
         content: ORDER_RESELECT_MESSAGE,
         cancelText: '我知道了',
-        confirmText: '去菜单',
+        confirmText: '去今日菜单',
         confirmColor: '#E63B4A',
         success: (result) => {
           if (result.confirm) {
@@ -528,7 +528,7 @@ Page({
 
     if (!payload.items.length) {
       wx.showToast({
-        title: '购物车还是空的，先去点餐吧',
+        title: '小篮子还是空的，先去今日菜单吧',
         icon: 'none'
       })
       return
@@ -545,10 +545,10 @@ Page({
       this.refreshCart()
 
       wx.showModal({
-        title: '下单成功',
-        content: `订单号：${order.order_no || order.order_id || ''}`,
-        cancelText: '继续点餐',
-        confirmText: '查看订单',
+        title: '小厨收到啦',
+        content: `点菜单号：${order.order_no || order.order_id || ''}`,
+        cancelText: '继续点菜',
+        confirmText: '看点菜单',
         confirmColor: '#E63B4A',
         success: (result) => {
           if (result.confirm) {

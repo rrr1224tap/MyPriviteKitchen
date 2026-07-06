@@ -1,5 +1,5 @@
-const VALID_ACTIONS = ['list', 'listDishes', 'create', 'createDish', 'update', 'updateDish', 'updateDishStatus', 'updateDishTutorials', 'updateDishIngredients', 'onSale', 'offSale', 'sort']
-const WEB_ALLOWED_ACTIONS = ['listDishes', 'createDish', 'updateDish', 'updateDishStatus', 'updateDishTutorials', 'updateDishIngredients']
+const VALID_ACTIONS = ['list', 'listDishes', 'create', 'createDish', 'update', 'updateDish', 'updateDishStatus', 'updateDishTutorials', 'updateDishIngredients', 'deleteDish', 'onSale', 'offSale', 'sort']
+const WEB_ALLOWED_ACTIONS = ['listDishes', 'createDish', 'updateDish', 'updateDishStatus', 'updateDishTutorials', 'updateDishIngredients', 'deleteDish']
 const VALID_DISH_STATUSES = ['on_sale', 'off_sale']
 const VALID_TUTORIAL_PLATFORMS = ['douyin', 'xiaohongshu', 'bilibili', 'other']
 const MAX_TUTORIAL_COUNT = 3
@@ -619,6 +619,7 @@ function formatDish(dish = {}) {
     addon_groups: normalizeOptionGroupList(dish.addon_groups),
     tutorials: normalizeTutorialList(dish.tutorials),
     ingredients: normalizeIngredientList(dish.ingredients),
+    is_deleted: dish.is_deleted === true,
     has_options: hasOptions(dish),
     sort_order: Number(dish.sort_order) || 0,
     created_at: dish.created_at || null,
@@ -669,6 +670,12 @@ function assertWebAdmin(event, action, deps) {
   if (!WEB_ALLOWED_ACTIONS.includes(action)) {
     return {
       error: failure('FORBIDDEN', 'Web 后台当前仅开放餐品列表读取')
+    }
+  }
+
+  if (action === 'deleteDish' && verifyResult.role !== 'merchant_admin') {
+    return {
+      error: failure('FORBIDDEN', '只有当前小厨可以移除菜品')
     }
   }
 
@@ -963,6 +970,7 @@ async function handleList(deps, merchantId, data) {
 
   const list = (dishes || [])
     .filter((dish) => dish.merchant_id === merchantId)
+    .filter((dish) => dish.is_deleted !== true)
     .filter((dish) => !categoryId || dish.category_id === categoryId)
     .filter((dish) => !status || dish.status === status)
     .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0))
@@ -1167,6 +1175,45 @@ async function handleWebStatusUpdate(deps, merchantId, dishId, data) {
   }
 
   return handleStatusUpdate(deps, merchantId, dishId, status)
+}
+
+async function handleWebDelete(deps, merchantId, dishId) {
+  if (!dishId) {
+    return failure('INVALID_PARAMS', '菜品 ID 不能为空')
+  }
+
+  let dishResult
+  try {
+    dishResult = await assertDishBelongsToMerchant(deps, dishId, merchantId)
+  } catch (error) {
+    deps.logger.error('manageDish web delete query database error', error)
+    return failure('DATABASE_ERROR', '查询菜品失败，请稍后重试')
+  }
+
+  if (dishResult.error) {
+    return dishResult.error
+  }
+
+  const updateData = {
+    is_deleted: true,
+    updated_at: deps.now()
+  }
+
+  try {
+    const updatedDish = await deps.updateDish({
+      dish_id: dishResult.dish.dish_id || dishId,
+      updateData
+    })
+    return success('菜品已移除', {
+      dish: formatDish({
+        ...dishResult.dish,
+        ...(updatedDish || updateData)
+      })
+    })
+  } catch (error) {
+    deps.logger.error('manageDish web delete database error', error)
+    return failure('DATABASE_ERROR', '移除菜品失败，请稍后重试')
+  }
 }
 
 async function handleWebTutorialsUpdate(deps, merchantId, dishId, data) {
@@ -1512,6 +1559,10 @@ function createManageDishHandler(dependencies) {
             dishId,
             normalizeWebDishStatusData(normalizedEvent)
           )
+        }
+
+        if (action === 'deleteDish') {
+          return handleWebDelete(deps, merchantId, dishId)
         }
 
         if (action === 'updateDishTutorials') {

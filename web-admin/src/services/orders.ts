@@ -126,6 +126,17 @@ interface UpdateOrderStatusResponse {
   updated_at?: unknown
 }
 
+function withMerchantId<T extends Record<string, unknown>>(merchantId: string | undefined, payload: T) {
+  if (!merchantId) {
+    return payload
+  }
+
+  return {
+    merchant_id: merchantId,
+    ...payload
+  }
+}
+
 function toText(value: unknown, fallback = '') {
   if (value === null || value === undefined) {
     return fallback
@@ -231,7 +242,7 @@ function normalizeOrderDetailItem(raw: RawOrderDetailItem): OrderDetailItem {
     order_item_id: orderItemId,
     order_id: toText(raw.order_id),
     dish_id: toText(raw.dish_id),
-    dish_name: toText(raw.dish_name ?? raw.name, '未命名餐品'),
+    dish_name: toText(raw.dish_name ?? raw.name, '未命名菜品'),
     dish_image_url: toText(raw.dish_image_url ?? raw.dish_image),
     unit_price_cent: unitPriceCent,
     unit_price_text: toMoneyText(unitPriceCent),
@@ -252,12 +263,11 @@ function normalizePagination(value: Partial<OrderPagination> | undefined, fallba
   }
 }
 
-export async function listOrders(merchantId: string, params: ListOrdersParams = {}) {
-  const result = await callAdminFunction<OrderListResponse>('getMerchantOrders', {
+export async function listOrders(merchantId: string | undefined, params: ListOrdersParams = {}) {
+  const result = await callAdminFunction<OrderListResponse>('getMerchantOrders', withMerchantId(merchantId, {
     action: 'listOrders',
-    merchant_id: merchantId,
     ...params
-  })
+  }))
 
   const list = Array.isArray(result.list) ? result.list.map(normalizeOrder) : []
 
@@ -267,12 +277,11 @@ export async function listOrders(merchantId: string, params: ListOrdersParams = 
   }
 }
 
-export async function getOrderDetail(merchantId: string, orderId: string): Promise<OrderDetail | null> {
-  const result = await callAdminFunction<OrderDetailResponse>('getMerchantOrderDetail', {
+export async function getOrderDetail(merchantId: string | undefined, orderId: string): Promise<OrderDetail | null> {
+  const result = await callAdminFunction<OrderDetailResponse>('getMerchantOrderDetail', withMerchantId(merchantId, {
     action: 'getOrderDetail',
-    merchant_id: merchantId,
     order_id: orderId
-  })
+  }))
 
   if (!result.order) {
     return null
@@ -284,13 +293,12 @@ export async function getOrderDetail(merchantId: string, orderId: string): Promi
   }
 }
 
-export async function updateOrderStatus(merchantId: string, orderId: string, status: string) {
-  const result = await callAdminFunction<UpdateOrderStatusResponse>('updateOrderStatus', {
+export async function updateOrderStatus(merchantId: string | undefined, orderId: string, status: string) {
+  const result = await callAdminFunction<UpdateOrderStatusResponse>('updateOrderStatus', withMerchantId(merchantId, {
     action: 'updateOrderStatus',
-    merchant_id: merchantId,
     order_id: orderId,
     status
-  })
+  }))
 
   return {
     order_id: toText(result.order_id ?? orderId),

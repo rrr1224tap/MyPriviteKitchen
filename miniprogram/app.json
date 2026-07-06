@@ -20,7 +20,7 @@
     "pages/merchant/dishes/dishes"
   ],
   "window": {
-    "navigationBarTitleText": "点餐小程序",
+    "navigationBarTitleText": "小厨食堂",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f7f7f7"

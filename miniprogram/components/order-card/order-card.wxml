@@ -1,10 +1,10 @@
 <view class="order-card" bindtap="onTap">
   <view class="order-header">
-    <view class="order-no">#{{order.order_no || '订单编号'}}</view>
+    <view class="order-no">#{{order.order_no || '点菜单编号'}}</view>
     <status-tag status="{{order.status}}" text="{{order.status_text || statusText}}"></status-tag>
   </view>
   <view class="order-info">
-    <view class="order-summary">{{order.summary || '订单内容待展示'}}</view>
+    <view class="order-summary">{{order.summary || '点菜单内容待展示'}}</view>
     <view wx:if="{{order.remark}}" class="order-remark">备注：{{order.remark}}</view>
     <view class="order-time">{{order.created_at_text || createdAtText}}</view>
   </view>
