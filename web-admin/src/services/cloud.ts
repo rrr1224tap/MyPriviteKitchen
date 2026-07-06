@@ -2,9 +2,12 @@ import { clearSession, getSession, hasValidLocalSession } from '../stores/sessio
 import { AdminApiError, type ApiResponse } from '../types/api'
 
 const TOKEN_ERROR_CODES = new Set(['UNAUTHORIZED', 'TOKEN_EXPIRED'])
+const DEFAULT_ADMIN_API_BASE_URL = '/api'
 
 function getAdminApiBaseUrl() {
-  return String(import.meta.env.VITE_WEB_ADMIN_API_BASE_URL || '').trim().replace(/\/+$/, '')
+  return String(import.meta.env.VITE_WEB_ADMIN_API_BASE_URL || DEFAULT_ADMIN_API_BASE_URL)
+    .trim()
+    .replace(/\/+$/, '')
 }
 
 function createError(code: string, message: string): AdminApiError {
