@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://cloud1-d1gg2kq762389ea4-1443234267.ap-shanghai.app.tcloudbase.com/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
