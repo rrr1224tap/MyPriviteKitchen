@@ -30,8 +30,7 @@ export interface MerchantAdminLoginData {
   }
 }
 
-const WEB_ADMIN_AUTH_ENDPOINT =
-  'https://cloud1-d1gg2kq762389ea4-1443234267.ap-shanghai.app.tcloudbase.com/webAdminAuth'
+const WEB_ADMIN_AUTH_ENDPOINT = '/api/webAdminAuth'
 const API_BASE_NOT_CONFIGURED_MESSAGE = '未配置 Web 工作台入口，请检查 VITE_WEB_ADMIN_API_BASE_URL'
 
 function getAdminApiBaseUrl() {
