@@ -1,5 +1,5 @@
 const UPSTREAM =
-  'https://cloud1-d1gg2kq762389ea4-1443234267.ap-shanghai.app.cloudbase.com/webAdminAuth'
+  'https://cloud1-d1gg2kdq762389ea4-1443234267.ap-shanghai.app.tcloudbase.com/webAdminAuth'
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
