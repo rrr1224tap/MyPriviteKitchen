@@ -30,18 +30,15 @@ export interface MerchantAdminLoginData {
   }
 }
 
-const ENDPOINT_NOT_CONFIGURED_MESSAGE = '未配置 Web 登录接口，请检查 VITE_WEB_ADMIN_AUTH_ENDPOINT'
+const WEB_ADMIN_AUTH_ENDPOINT =
+  'https://cloud1-d1gg2kq762389ea4-1443234267.ap-shanghai.app.tcloudbase.com/webAdminAuth'
 const API_BASE_NOT_CONFIGURED_MESSAGE = '未配置 Web 工作台入口，请检查 VITE_WEB_ADMIN_API_BASE_URL'
-
-function getAuthEndpoint() {
-  return String(import.meta.env.VITE_WEB_ADMIN_AUTH_ENDPOINT || '').trim()
-}
 
 function getAdminApiBaseUrl() {
   return String(import.meta.env.VITE_WEB_ADMIN_API_BASE_URL || '').trim().replace(/\/+$/, '')
 }
 
-function endpointNotConfigured<T>(message = ENDPOINT_NOT_CONFIGURED_MESSAGE): ApiResponse<T> {
+function endpointNotConfigured<T>(message: string): ApiResponse<T> {
   return {
     success: false,
     error: {
@@ -77,13 +74,8 @@ function normalizeApiResponse<T>(value: unknown): ApiResponse<T> {
 }
 
 async function postAuth<T>(payload: Record<string, string>): Promise<ApiResponse<T>> {
-  const endpoint = getAuthEndpoint()
-  if (!endpoint) {
-    return endpointNotConfigured<T>()
-  }
-
   try {
-    const response = await fetch(endpoint, {
+    const response = await fetch(WEB_ADMIN_AUTH_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
