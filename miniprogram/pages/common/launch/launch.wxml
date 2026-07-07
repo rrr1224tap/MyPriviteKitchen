@@ -25,7 +25,10 @@
 
     <view class="hero-copy">
       <view class="brand-sign">
-        <view class="brand-cn">朋友们的食堂</view>
+        <view class="brand-cn">
+          <text>朋友们的</text>
+          <text>食堂</text>
+        </view>
         <view class="brand-en">FRIENDS' CANTEEN</view>
       </view>
       <view class="hero-desc">现炒现做 · <text>锅气十足</text> · 每一碗都很用心</view>

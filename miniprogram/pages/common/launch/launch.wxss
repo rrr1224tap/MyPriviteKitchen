@@ -56,8 +56,8 @@
 .hero-food-image {
   position: absolute;
   top: 100rpx;
-  right: -118rpx;
-  width: 720rpx;
+  right: -146rpx;
+  width: 700rpx;
   max-width: none;
   filter: brightness(1.03) saturate(1.04);
 }
@@ -103,7 +103,7 @@
 .hero-copy {
   position: relative;
   z-index: 5;
-  width: 438rpx;
+  width: 452rpx;
   padding: 74rpx 0 0 42rpx;
   color: #251a14;
 }
@@ -114,11 +114,15 @@
 }
 
 .brand-cn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   font-family: "PingFang SC", "Microsoft YaHei", serif;
-  font-size: 72rpx;
+  font-size: 68rpx;
   font-weight: 900;
-  line-height: 1.02;
-  letter-spacing: 6rpx;
+  line-height: 0.98;
+  letter-spacing: 1rpx;
+  white-space: nowrap;
 }
 
 .brand-en {
