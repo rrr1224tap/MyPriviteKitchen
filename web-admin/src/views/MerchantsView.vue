@@ -398,7 +398,7 @@ onMounted(() => {
     <section v-if="isCreateFormOpen" class="panel glass-card merchant-create-panel">
       <div class="section-heading">
         <div>
-          <h2>新增私厨商户</h2>
+          <h2>新增食堂档案</h2>
           <p>创建后会立即刷新真实商户列表。当前已开放新增、编辑和启停。</p>
         </div>
         <button class="ghost-button" type="button" :disabled="isCreating" @click="closeCreateForm">收起</button>
@@ -420,7 +420,7 @@ onMounted(() => {
           <input
             v-model="createForm.name"
             autocomplete="off"
-            placeholder="例如 小厨食堂私厨店"
+            placeholder="例如 朋友们的食堂朋友店"
             :disabled="isCreating"
           />
         </label>
@@ -430,7 +430,7 @@ onMounted(() => {
           <input
             v-model="createForm.short_name"
             autocomplete="off"
-            placeholder="例如 小厨私厨"
+            placeholder="例如 朋友食堂"
             :disabled="isCreating"
           />
         </label>
@@ -487,7 +487,7 @@ onMounted(() => {
           <input
             v-model="editForm.name"
             autocomplete="off"
-            placeholder="例如 小厨食堂私厨店"
+            placeholder="例如 朋友们的食堂朋友店"
             :disabled="isUpdating"
           />
         </label>
@@ -497,7 +497,7 @@ onMounted(() => {
           <input
             v-model="editForm.short_name"
             autocomplete="off"
-            placeholder="例如 小厨私厨"
+            placeholder="例如 朋友食堂"
             :disabled="isUpdating"
           />
         </label>

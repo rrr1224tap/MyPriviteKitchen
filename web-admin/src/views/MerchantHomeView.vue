@@ -10,13 +10,13 @@ const merchantId = computed(() => session.value?.merchant_id || '未识别')
   <section class="page-stack">
     <div class="page-header glass-card">
       <div>
-        <div class="page-header__eyebrow">Kitchen Workbench</div>
-        <h1>小厨工作台</h1>
+        <div class="page-header__eyebrow">FRIENDS' CANTEEN</div>
+        <h1>朋友们的食堂工作台</h1>
         <p>
-          菜单分类、今日菜品、今天的点菜单和备菜清单已经按当前小厨房隔离。
+          菜单分类、今日菜品、今天的点菜单和备菜清单已经按当前食堂房隔离。
         </p>
       </div>
-      <span class="status-badge tone-green">已按小厨房隔离</span>
+      <span class="status-badge tone-green">已按厨房隔离</span>
     </div>
 
     <div class="merchant-home-grid">
@@ -24,7 +24,7 @@ const merchantId = computed(() => session.value?.merchant_id || '未识别')
         <div class="section-heading compact-section-heading">
           <div>
             <h2>当前身份</h2>
-            <p>这里仅展示当前小厨登录身份的基础信息。</p>
+            <p>这里仅展示当前食堂登录身份的基础信息。</p>
           </div>
         </div>
         <div class="detail-list">
@@ -33,7 +33,7 @@ const merchantId = computed(() => session.value?.merchant_id || '未识别')
             <span>merchant_admin</span>
           </div>
           <div>
-            <strong>当前小厨房</strong>
+            <strong>当前食堂房</strong>
             <span>{{ merchantId }}</span>
           </div>
         </div>
@@ -43,7 +43,7 @@ const merchantId = computed(() => session.value?.merchant_id || '未识别')
         <div class="section-heading compact-section-heading">
           <div>
             <h2>工作台入口</h2>
-            <p>从左侧进入对应小厨房的日常操作。</p>
+            <p>从左侧进入对应厨房的日常操作。</p>
           </div>
         </div>
         <div class="checklist-grid merchant-home-checklist">

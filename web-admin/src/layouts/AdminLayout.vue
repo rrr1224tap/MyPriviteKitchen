@@ -42,7 +42,7 @@ watchEffect(() => {
 
 const superAdminNavItems = computed(() => [
   { label: '概览', path: '/', key: 'dashboard', icon: '总' },
-  { label: '小厨档案', path: '/merchants', key: 'merchants', icon: '商' },
+  { label: '食堂档案', path: '/merchants', key: 'merchants', icon: '商' },
   { label: '成员邀请', path: `/merchants/${currentMerchantId.value}/staff`, key: 'staff', icon: '员' },
   { label: '今日菜品', path: `/merchants/${currentMerchantId.value}/dishes`, key: 'dishes', icon: '餐' },
   { label: '菜单分类', path: '/categories', key: 'categories', icon: '类' },
@@ -66,7 +66,7 @@ const navItems = computed(() => {
 const activePath = computed(() => route.path)
 const currentRoleText = computed(() => roleText(session.value?.role))
 const profileDesc = computed(() => {
-  return isMerchantAdmin.value ? `小厨房：${currentMerchantId.value || '未识别'}` : '本地预览'
+  return isMerchantAdmin.value ? `厨房：${currentMerchantId.value || '未识别'}` : '本地预览'
 })
 
 function isNavItemActive(path: string) {
@@ -93,8 +93,8 @@ function logout() {
       <div class="brand-lockup">
         <div class="brand-mark">厨</div>
         <div>
-          <div class="brand-name">小厨食堂</div>
-          <div class="brand-subtitle">Private Kitchen Workbench</div>
+          <div class="brand-name">朋友们的食堂</div>
+          <div class="brand-subtitle">FRIENDS' CANTEEN</div>
         </div>
       </div>
 

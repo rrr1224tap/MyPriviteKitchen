@@ -20,13 +20,13 @@
     <view class="hero-vignette"></view>
 
     <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
-      <view class="nav-wordmark">小厨食堂</view>
+      <view class="nav-wordmark">朋友们的食堂</view>
     </view>
 
     <view class="hero-copy">
       <view class="brand-sign">
-        <view class="brand-cn">小厨食堂</view>
-        <view class="brand-en">XIAO CHU · KITCHEN</view>
+        <view class="brand-cn">朋友们的食堂</view>
+        <view class="brand-en">FRIENDS' CANTEEN</view>
       </view>
       <view class="hero-desc">现炒现做 · <text>锅气十足</text> · 每一碗都很用心</view>
       <view class="hero-status-row">
@@ -72,7 +72,7 @@
         <view>
           <view class="recommend-title">
             <image class="recommend-title-icon" src="/images/ui-icons/wok-cook.png" mode="aspectFit"></image>
-            <text>小厨推荐</text>
+            <text>今日推荐</text>
           </view>
           <view class="recommend-subtitle">厨师今天想吃</view>
         </view>
@@ -153,7 +153,7 @@
         <image class="merchant-entry-icon-image" src="/images/icons/icon-merchant-orders.svg" mode="aspectFit"></image>
       </view>
       <view class="merchant-entry-copy">
-        <view class="merchant-entry-title">小厨工作台</view>
+        <view class="merchant-entry-title">朋友们的食堂工作台</view>
         <view class="merchant-entry-desc">照看点菜单与今日菜品</view>
       </view>
     </view>

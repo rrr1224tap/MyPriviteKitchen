@@ -54,8 +54,8 @@ const STATUS_CONFLICT_CODES = [
   'STATUS_CONFLICT'
 ]
 const REFRESH_FAILED_MESSAGE = '操作成功，但刷新失败，请手动刷新'
-const MERCHANT_PERMISSION_TITLE = '需要注册小厨身份'
-const MERCHANT_PERMISSION_MESSAGE = '当前账号暂未开通小厨商家身份，请联系管理员注册 / 开通后再进入商家工作台。'
+const MERCHANT_PERMISSION_TITLE = '需要注册食堂身份'
+const MERCHANT_PERMISSION_MESSAGE = '当前账号暂未开通食堂身份，请联系管理员注册 / 开通后再进入商家工作台。'
 
 const MERCHANT_ORDER_ERROR_TEXT = {
   FORBIDDEN: MERCHANT_PERMISSION_MESSAGE,

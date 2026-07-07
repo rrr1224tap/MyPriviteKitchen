@@ -162,7 +162,7 @@ export function loginMerchantAdmin(params: {
 }
 
 export function roleText(role?: AdminRole) {
-  return role === 'merchant_admin' ? '小厨' : '总控小厨'
+  return role === 'merchant_admin' ? '食堂' : '总控台'
 }
 
 export function verifyWebAdminToken(token: string) {

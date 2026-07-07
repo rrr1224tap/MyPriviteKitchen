@@ -95,10 +95,10 @@ const currentMerchantId = computed(() => {
 })
 const pageDescription = computed(() => {
   if (isMerchantAdmin.value) {
-    return `当前小厨房：${currentMerchantId.value || '未识别'}。点菜单列表、详情和出餐进度都跟随登录身份。`
+    return `当前食堂房：${currentMerchantId.value || '未识别'}。点菜单列表、详情和出餐进度都跟随登录身份。`
   }
 
-  return `当前小厨：${currentMerchantId.value}。点菜单列表、详情和出餐进度已接入真实云函数。`
+  return `当前食堂：${currentMerchantId.value}。点菜单列表、详情和出餐进度已接入真实云函数。`
 })
 const pageTitle = computed(() => '今天的点菜单')
 const pendingCount = computed(() => orders.value.filter((item) => item.status === 'pending').length)
@@ -130,7 +130,7 @@ function getStoredMerchantId() {
 function ensureMerchantContext() {
   if (isMerchantAdmin.value && !currentMerchantId.value) {
     errorCode.value = 'SESSION_INVALID'
-    errorMessage.value = '小厨登录状态异常，请重新登录'
+    errorMessage.value = '食堂登录状态异常，请重新登录'
     clearDetail()
     clearSession()
     router.push('/login')
@@ -412,11 +412,11 @@ onMounted(() => {
         </ActionButton>
       </div>
 
-      <EmptyState v-else-if="isLoading" title="正在读取点菜单" description="请稍候，正在从云函数获取当前小厨房的点菜单。" />
+      <EmptyState v-else-if="isLoading" title="正在读取点菜单" description="请稍候，正在从云函数获取当前食堂房的点菜单。" />
       <EmptyState
         v-else-if="orders.length === 0"
         title="暂无点菜单"
-        description="当前小厨房在该筛选条件下还没有点菜单。"
+        description="当前食堂房在该筛选条件下还没有点菜单。"
       />
 
       <div v-else class="mock-table orders-table">

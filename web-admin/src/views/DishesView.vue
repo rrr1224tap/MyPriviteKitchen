@@ -118,10 +118,10 @@ const currentMerchantId = computed(() => {
 })
 const pageDescription = computed(() => {
   if (isMerchantAdmin.value) {
-    return `当前小厨房：${currentMerchantId.value || '未识别'}。今日菜品、加一道菜、改一下、开始卖、先不卖了和移除都跟随登录身份。`
+    return `当前食堂房：${currentMerchantId.value || '未识别'}。今日菜品、加一道菜、改一下、开始卖、先不卖了和移除都跟随登录身份。`
   }
 
-  return `当前小厨：${currentMerchantId.value}。今日菜品、加一道菜、改一下、做法参考和食材配置已接入真实云函数；规格加料仍为后续接入。`
+  return `当前食堂：${currentMerchantId.value}。今日菜品、加一道菜、改一下、做法参考和食材配置已接入真实云函数；规格加料仍为后续接入。`
 })
 const pageTitle = computed(() => '今日菜品')
 
@@ -545,7 +545,7 @@ async function submitCreateDish() {
   try {
     await createDish(requestMerchantId.value, validation.payload)
     await loadDishes()
-    createSuccessMessage.value = '小厨记住啦，列表已刷新'
+    createSuccessMessage.value = '已经帮你记下，列表已刷新'
     isCreateFormOpen.value = false
     resetCreateForm()
   } catch (error) {
@@ -662,7 +662,7 @@ async function toggleDishStatus(item: DishListItem) {
     await updateDishStatus(requestMerchantId.value, item.dish_id, nextStatus)
     await loadDishes()
     statusSuccessMessage.value = nextStatus === 'on_sale'
-      ? '小厨记住啦，列表已刷新'
+      ? '已经帮你记下，列表已刷新'
       : '已经帮你改好啦，列表已刷新'
   } catch (error) {
     const adminError = error as Partial<AdminApiError>
@@ -788,7 +788,7 @@ watch(merchantId, loadPageData)
     <GlassCard v-if="createSuccessMessage">
       <div class="section-heading compact-section-heading">
         <div>
-          <h2>小厨记住啦</h2>
+          <h2>已经帮你记下</h2>
           <p>{{ createSuccessMessage }}</p>
         </div>
       </div>
@@ -806,7 +806,7 @@ watch(merchantId, loadPageData)
     <GlassCard v-if="statusSuccessMessage">
       <div class="section-heading compact-section-heading">
         <div>
-          <h2>小厨记住啦</h2>
+          <h2>已经帮你记下</h2>
           <p>{{ statusSuccessMessage }}</p>
         </div>
       </div>
@@ -1165,7 +1165,7 @@ watch(merchantId, loadPageData)
         <EmptyState
           v-else-if="dishes.length === 0"
           title="暂无菜品"
-          description="当前小厨房还没有菜品。可以点击加一道菜，先把第一道招牌菜记下来。"
+          description="当前食堂房还没有菜品。可以点击加一道菜，先把第一道招牌菜记下来。"
         />
 
         <div v-else class="mock-table dish-table">

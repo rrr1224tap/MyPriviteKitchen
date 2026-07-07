@@ -35,7 +35,7 @@ const functions = [
           <div><strong>Web Admin 版本</strong><span>v0.5-A2</span></div>
           <div><strong>小程序稳定 tag</strong><span>private-kitchen-v0.4</span></div>
           <div><strong>SUPER_ADMIN_OPENIDS</strong><span>仅在云函数环境变量配置，不在前端显示真实值</span></div>
-          <div><strong>小厨房来源</strong><span>小厨登录后使用登录身份里的小厨房信息</span></div>
+          <div><strong>厨房来源</strong><span>食堂登录后使用登录身份里的厨房信息</span></div>
         </div>
       </GlassCard>
 

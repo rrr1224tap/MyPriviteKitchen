@@ -18,7 +18,7 @@
 
     <view class="custom-nav" style="padding-top: {{statusBarHeight}}px; height: {{navigationHeight}}px;">
       <view class="back-button" bindtap="goBack"><image class="nav-icon-image" src="/images/icons/icon-back.svg" mode="aspectFit"></image></view>
-      <view class="nav-title">小厨推荐</view>
+      <view class="nav-title">今日推荐</view>
       <view class="nav-placeholder"></view>
     </view>
 
@@ -41,7 +41,7 @@
     <view wx:if="{{pageStatus !== 'error'}}" class="dish-panel glass-panel">
       <view class="dish-head">
         <view class="dish-title-wrap">
-          <view class="dish-name">{{pageStatus === 'loading' ? '小厨推荐加载中' : dish.name}}</view>
+          <view class="dish-name">{{pageStatus === 'loading' ? '今日推荐加载中' : dish.name}}</view>
           <view class="dish-subtitle">SAN YE SIGNATURE</view>
         </view>
         <view class="dish-price">{{pageStatus === 'loading' ? '¥--' : unitPriceText}}</view>

@@ -146,7 +146,7 @@
         <view class="total-panel glass-panel">
           <view>
             <view class="total-label">点菜单合计</view>
-            <view class="total-note">金额由小厨按下单时价格计算</view>
+            <view class="total-note">金额由食堂按下单时价格计算</view>
           </view>
           <view class="total-price">{{order.total_amount_text}}</view>
         </view>

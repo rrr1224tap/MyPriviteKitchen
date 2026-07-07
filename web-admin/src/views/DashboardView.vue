@@ -18,7 +18,7 @@ const modules = [
   { title: '商户管理', description: '维护商户基础信息与启用状态', tag: '后台', path: '/merchants', icon: '商' },
   { title: '成员邀请', description: '生成邀请码并管理成员身份', tag: '权限', path: '/merchants/xiaochu/staff', icon: '员' },
   { title: '餐品管理', description: '维护菜品、规格、加料与食材', tag: '菜单', path: '/dishes', icon: '餐' },
-  { title: '今日备料', description: '按今日订单汇总采购清单', tag: '私厨', path: '/prep-summary', icon: '备' },
+  { title: '今日备料', description: '按今日订单汇总采购清单', tag: '食堂', path: '/prep-summary', icon: '备' },
   { title: '数据检查', description: '检查关键数据完整性与轻量修复', tag: '安全', path: '/data-health', icon: '检' }
 ]
 
@@ -125,8 +125,8 @@ onMounted(() => {
   <section class="dashboard-view">
     <div class="dashboard-hero glass-card">
       <div>
-        <div class="dashboard-hero__kicker">Private Kitchen Web Admin v0.5-B5</div>
-        <h1>欢迎回来，小厨管理员</h1>
+        <div class="dashboard-hero__kicker">FRIENDS' CANTEEN</div>
+        <h1>欢迎回来，食堂管理员</h1>
         <p>当前总览数据已接入真实云函数，其它模块仍为静态原型</p>
       </div>
       <StatusBadge :label="isLoading ? '加载中' : '真实总览'" tone="orange" />

@@ -5,18 +5,18 @@ const BACKGROUND_IMAGE = '/images/mock/home-glass-display.jpg'
 
 const ORDER_STATUS_META = {
   pending: {
-    text: '待小厨接单',
-    desc: '等待小厨接单',
+    text: '待食堂接单',
+    desc: '等待食堂接单',
     className: 'pending'
   },
   accepted: {
-    text: '小厨已接单',
-    desc: '小厨已接单，等待制作',
+    text: '食堂已接单',
+    desc: '食堂已接单，等待制作',
     className: 'accepted'
   },
   cooking: {
     text: '制作中',
-    desc: '小厨正在制作，请稍候',
+    desc: '食堂正在制作，请稍候',
     className: 'cooking'
   },
   finished: {
@@ -176,7 +176,7 @@ function buildProgress(order) {
     return [
       {
         key: 'pending',
-        title: '小厨已收到',
+        title: '食堂已收到',
         time: order.created_time,
         done: true,
         active: false
@@ -215,14 +215,14 @@ function buildProgress(order) {
   return [
     {
       key: 'pending',
-      title: '小厨已收到',
+      title: '食堂已收到',
       time: order.created_time,
       done: activeIndex >= 0,
       active: activeIndex === 0
     },
     {
       key: 'accepted',
-      title: '小厨已接单',
+      title: '食堂已接单',
       time: order.accepted_time || '等待更新',
       done: activeIndex >= 1,
       active: activeIndex === 1

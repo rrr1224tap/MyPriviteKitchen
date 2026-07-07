@@ -20,7 +20,7 @@
           <view class="hero-kicker">ORDER TRACK</view>
           <view class="hero-title">我的点菜单</view>
           <view class="hero-desc">
-            <block wx:if="{{orders.length}}">共 {{orders.length}} 份点菜单，按告诉小厨的时间展示</block>
+            <block wx:if="{{orders.length}}">共 {{orders.length}} 份点菜单，按告诉食堂的时间展示</block>
             <block wx:else>查看你的点餐进度和历史点菜单</block>
           </view>
           <view wx:if="{{isRefreshing || refreshMessage || lastUpdatedText}}" class="refresh-note {{refreshMessage ? 'is-error' : ''}}">
@@ -48,7 +48,7 @@
       <view wx:elif="{{pageStatus === 'empty'}}" class="state-card glass-panel">
         <view class="state-mark"><image class="state-icon-image" src="/images/icons/icon-order.svg" mode="aspectFit"></image></view>
         <view class="state-title">还没有点菜单</view>
-        <view class="state-desc">先去挑一份热乎的拌饭，跟小厨说一声后会显示在这里</view>
+        <view class="state-desc">先去挑一份热乎的拌饭，跟食堂说一声后会显示在这里</view>
         <button class="state-button" bindtap="goToMenu">去今日菜单</button>
       </view>
 

@@ -126,7 +126,7 @@
 
       <view class="form-field">
         <view class="field-label">商户名称</view>
-        <input class="field-input" value="{{formData.name}}" placeholder="例如 小厨食堂" data-field="name" bindinput="handleInput" />
+        <input class="field-input" value="{{formData.name}}" placeholder="例如 朋友们的食堂" data-field="name" bindinput="handleInput" />
       </view>
 
       <view class="form-field">

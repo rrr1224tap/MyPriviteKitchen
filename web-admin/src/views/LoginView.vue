@@ -58,7 +58,7 @@ async function handleMerchantAdminLogin() {
   errorMessage.value = ''
 
   if (!inputMerchantSlug) {
-    errorMessage.value = '请输入小厨房标识'
+    errorMessage.value = '请输入厨房标识'
     return
   }
 
@@ -81,7 +81,7 @@ async function handleMerchantAdminLogin() {
   isLoading.value = false
 
   if (!result.success || !result.data) {
-    errorMessage.value = result.error?.message || '小厨登录失败，请检查小厨房标识、登录名或密码'
+    errorMessage.value = result.error?.message || '食堂登录失败，请检查厨房标识、登录名或密码'
     return
   }
 
@@ -108,15 +108,15 @@ function handleLogin() {
   <main class="login-page">
     <section class="login-hero">
       <div class="login-hero__badge">LOCAL PREVIEW</div>
-      <h1>小厨食堂</h1>
-      <p class="login-hero__subtitle">私厨工作台</p>
+      <h1>朋友们的食堂</h1>
+      <p class="login-hero__subtitle">食堂工作台</p>
       <p class="login-hero__desc">
-        总控小厨继续维护全局配置；小厨登录后进入自己的工作台，处理菜单分类、今日菜品、点菜单和备菜清单。
+        总控台继续维护全局配置；食堂登录后进入自己的工作台，处理菜单分类、今日菜品、点菜单和备菜清单。
       </p>
     </section>
 
     <form class="login-card glass-card" aria-label="登录卡片" @submit.prevent="handleLogin">
-      <div class="login-card__kicker">KITCHEN PASS</div>
+      <div class="login-card__kicker">CANTEEN PASS</div>
       <h2>工作台入口</h2>
 
       <div class="login-mode-tabs" role="tablist" aria-label="登录身份">
@@ -127,7 +127,7 @@ function handleLogin() {
           :disabled="isLoading"
           @click="switchMode('super_admin')"
         >
-          总控小厨
+          总控台
         </button>
         <button
           class="login-mode-tabs__button"
@@ -136,7 +136,7 @@ function handleLogin() {
           :disabled="isLoading"
           @click="switchMode('merchant_admin')"
         >
-          小厨登录
+          食堂登录
         </button>
       </div>
 
@@ -155,7 +155,7 @@ function handleLogin() {
 
       <div v-else class="login-form-stack">
         <label class="form-field">
-          <span>小厨房标识</span>
+          <span>厨房标识</span>
           <input
             v-model="merchantSlug"
             type="text"
@@ -179,7 +179,7 @@ function handleLogin() {
           <input
             v-model="merchantPassword"
             type="password"
-            placeholder="请输入小厨房密码"
+            placeholder="请输入厨房密码"
             autocomplete="current-password"
             :disabled="isLoading"
           />
@@ -191,7 +191,7 @@ function handleLogin() {
         {{ isLoading ? '登录中...' : '登录' }}
       </button>
       <p class="hint-text">
-        小厨登录只进入自己的工作台，不会看到其它小厨房内容。
+        食堂登录只进入自己的工作台，不会看到其它厨房内容。
       </p>
     </form>
   </main>

@@ -5,7 +5,7 @@ const { formatMoney } = require('../../../utils/format')
 const HOME_REFERENCE = '/images/mock/home-glass-display.jpg'
 const FOOD_PLACEHOLDER_IMAGE = '/images/placeholders/food-placeholder.svg'
 const CART_STORAGE_KEY = STORAGE_KEYS.CART_ITEMS || 'cart_items'
-const BRAND_NAME = '小厨食堂'
+const BRAND_NAME = '朋友们的食堂'
 
 const FALLBACK_IMAGE_STYLES = [
   'width: 750rpx; left: -192rpx; top: -676rpx;',
@@ -327,7 +327,7 @@ function buildMenuState(menuData) {
     dishes: categoryDishesMap[activeCategory] || [],
     pageStatus: categories.length && allDishes.length ? 'success' : 'empty',
     emptyTitle: categories.length ? '今天暂时没有可点的菜' : '今日菜单还没有准备好',
-    emptyDesc: categories.length ? '晚点再来看看小厨上新了没' : '小厨还在准备菜单'
+    emptyDesc: categories.length ? '晚点再来看看食堂上新了没' : '食堂还在准备菜单'
   }
 }
 
@@ -346,7 +346,7 @@ Page({
     dishes: [],
     allDishes: [],
     emptyTitle: '今日菜单加载中',
-    emptyDesc: '正在看看小厨今天准备了什么',
+    emptyDesc: '正在看看食堂今天准备了什么',
     fallbackNoticeTitle: '',
     fallbackNoticeDesc: '',
     cartCount: 0,
@@ -385,7 +385,7 @@ Page({
       fallbackNoticeTitle: '',
       fallbackNoticeDesc: '',
       emptyTitle: '今日菜单加载中',
-      emptyDesc: '正在看看小厨今天准备了什么'
+      emptyDesc: '正在看看食堂今天准备了什么'
     })
 
     try {

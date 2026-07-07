@@ -1,8 +1,8 @@
 const { DEFAULT_MERCHANT_ID } = require('../../../utils/constants')
 
 const BACKGROUND_IMAGE = '/images/mock/home-glass-display.jpg'
-const MERCHANT_PERMISSION_TITLE = '需要注册小厨身份'
-const MERCHANT_PERMISSION_MESSAGE = '当前账号暂未开通小厨商家身份，请联系管理员注册 / 开通后再进入商家工作台。'
+const MERCHANT_PERMISSION_TITLE = '需要注册食堂身份'
+const MERCHANT_PERMISSION_MESSAGE = '当前账号暂未开通食堂身份，请联系管理员注册 / 开通后再进入商家工作台。'
 
 function getNavigationMetrics() {
   const windowInfo = wx.getWindowInfo

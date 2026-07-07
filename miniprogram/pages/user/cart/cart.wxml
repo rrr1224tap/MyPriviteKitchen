@@ -24,7 +24,7 @@
       <view>
         <view class="overview-kicker">YOUR ORDER</view>
         <view class="overview-title">小篮子里的好味</view>
-        <view class="overview-desc">共 {{totalCount}} 份 · 跟小厨说一声后现做</view>
+        <view class="overview-desc">共 {{totalCount}} 份 · 跟食堂说一声后现做</view>
       </view>
       <view class="overview-actions">
         <view class="overview-count">{{totalCount}}</view>
@@ -147,7 +147,7 @@
       loading="{{submitting}}"
       disabled="{{submitting}}"
     >
-      {{submitting ? '正在告诉小厨...' : '跟小厨说一声'}}<text>→</text>
+      {{submitting ? '正在告诉食堂...' : '跟食堂说一声'}}<text>→</text>
     </button>
   </view>
 </view>

@@ -27,7 +27,7 @@ const ORDER_RESELECT_CODES = [
 ]
 const ORDER_RESELECT_MESSAGE = '菜品状态或规格已变化，请返回今日菜单重新选择。'
 const ORDER_NETWORK_ERROR_TEXT = '网络不太稳定，请稍后重试'
-const ORDER_UNKNOWN_ERROR_TEXT = '没能告诉小厨，请稍后重试'
+const ORDER_UNKNOWN_ERROR_TEXT = '没能告诉食堂，请稍后重试'
 
 function getFallbackImageStyle(index) {
   return FALLBACK_IMAGE_STYLE
@@ -499,7 +499,7 @@ Page({
 
     if (shouldGuideToMenu(code)) {
       wx.showModal({
-        title: '没能告诉小厨',
+        title: '没能告诉食堂',
         content: ORDER_RESELECT_MESSAGE,
         cancelText: '我知道了',
         confirmText: '去今日菜单',
@@ -545,7 +545,7 @@ Page({
       this.refreshCart()
 
       wx.showModal({
-        title: '小厨收到啦',
+        title: '食堂收到啦',
         content: `点菜单号：${order.order_no || order.order_id || ''}`,
         cancelText: '继续点菜',
         confirmText: '看点菜单',

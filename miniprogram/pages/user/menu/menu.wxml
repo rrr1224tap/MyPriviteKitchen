@@ -65,7 +65,7 @@
     <scroll-view class="dish-list" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
       <view class="dish-section-head">
         <view>
-          <view class="dish-section-title">小厨推荐</view>
+          <view class="dish-section-title">今日推荐</view>
           <view class="dish-section-subtitle">今天想给你吃这个</view>
         </view>
         <view class="dish-section-count">{{dishes.length}} 款 ›</view>
@@ -74,7 +74,7 @@
       <view wx:if="{{pageStatus === 'loading'}}" class="empty-dishes">
         <view class="empty-emblem"><image class="empty-icon-image" src="/images/icons/icon-empty-dish.svg" mode="aspectFit"></image></view>
         <view class="empty-title">今日菜单加载中</view>
-        <view class="empty-desc">正在看看小厨今天准备了什么</view>
+        <view class="empty-desc">正在看看食堂今天准备了什么</view>
       </view>
 
       <view wx:elif="{{pageStatus === 'error'}}" class="empty-dishes">

@@ -36,10 +36,10 @@ const currentMerchantId = computed(() => {
 })
 const pageDescription = computed(() => {
   if (isMerchantAdmin.value) {
-    return `当前小厨房：${currentMerchantId.value || '未识别'}。按日期汇总未取消的点菜单，生成今天要准备的食材清单。`
+    return `当前食堂房：${currentMerchantId.value || '未识别'}。按日期汇总未取消的点菜单，生成今天要准备的食材清单。`
   }
 
-  return `当前小厨：${currentMerchantId.value}。内容来自 getPrepSummary，仅做真实读取，不执行采购、库存或打印写入。`
+  return `当前食堂：${currentMerchantId.value}。内容来自 getPrepSummary，仅做真实读取，不执行采购、库存或打印写入。`
 })
 const pageTitle = computed(() => '今日备菜清单')
 const allItems = computed(() => summary.value?.groups.flatMap((group) => group.items) || [])
@@ -74,7 +74,7 @@ function getStoredMerchantId() {
 function ensureMerchantContext() {
   if (isMerchantAdmin.value && !currentMerchantId.value) {
     errorCode.value = 'SESSION_INVALID'
-    errorMessage.value = '小厨登录状态异常，请重新登录'
+    errorMessage.value = '食堂登录状态异常，请重新登录'
     summary.value = null
     clearSession()
     router.push('/login')
