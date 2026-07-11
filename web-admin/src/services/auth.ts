@@ -37,6 +37,11 @@ function getAdminApiBaseUrl() {
   return String(import.meta.env.VITE_WEB_ADMIN_API_BASE_URL || '').trim().replace(/\/+$/, '')
 }
 
+function getWebAdminAuthEndpoint() {
+  const baseUrl = getAdminApiBaseUrl()
+  return baseUrl ? `${baseUrl}/webAdminAuth` : WEB_ADMIN_AUTH_ENDPOINT
+}
+
 function endpointNotConfigured<T>(message: string): ApiResponse<T> {
   return {
     success: false,
@@ -74,7 +79,7 @@ function normalizeApiResponse<T>(value: unknown): ApiResponse<T> {
 
 async function postAuth<T>(payload: Record<string, string>): Promise<ApiResponse<T>> {
   try {
-    const response = await fetch(WEB_ADMIN_AUTH_ENDPOINT, {
+    const response = await fetch(getWebAdminAuthEndpoint(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
