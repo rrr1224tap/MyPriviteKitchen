@@ -5,6 +5,7 @@ const { formatMoney } = require('../../../utils/format')
 const FALLBACK_IMAGE = '/images/placeholders/food-placeholder.svg'
 const FALLBACK_IMAGE_STYLE = 'width: 100%; height: 100%; left: 0; top: 0;'
 const FALLBACK_INGREDIENTS = ['肥牛', '米饭', '时令蔬菜', '拌饭酱', '鸡蛋']
+const SHARE_IMAGE_URL = '/images/home/home-hero-bibimbap.jpg'
 const CART_STORAGE_KEY = STORAGE_KEYS.CART_ITEMS || 'cart_items'
 const DETAIL_ERROR_TEXT = {
   title: '今日推荐加载失败',
@@ -467,6 +468,10 @@ Page({
       dishId
     })
 
+    wx.showShareMenu({
+      menus: ['shareAppMessage', 'shareTimeline']
+    })
+
     if (!dishId) {
       this.showErrorState({
         message: DETAIL_ERROR_TEXT.missingId,
@@ -476,6 +481,35 @@ Page({
     }
 
     this.loadDishDetail(dishId)
+  },
+
+  onShareAppMessage() {
+    const dish = this.data.dish
+    const dishId = this.data.dishId || (dish && getDishId(dish))
+    const title = dish && dish.name
+      ? `朋友们的食堂｜${dish.name}`
+      : '朋友们的食堂｜今日推荐'
+
+    return {
+      title,
+      path: dishId
+        ? `/pages/user/dish-detail/dish-detail?dish_id=${encodeURIComponent(dishId)}`
+        : '/pages/user/menu/menu',
+      imageUrl: SHARE_IMAGE_URL
+    }
+  },
+
+  onShareTimeline() {
+    const dish = this.data.dish
+    const dishId = this.data.dishId || (dish && getDishId(dish))
+
+    return {
+      title: dish && dish.name
+        ? `朋友们的食堂｜${dish.name}`
+        : '朋友们的食堂｜今日推荐',
+      query: dishId ? `dish_id=${encodeURIComponent(dishId)}` : '',
+      imageUrl: SHARE_IMAGE_URL
+    }
   },
 
   async loadDishDetail(dishId = this.data.dishId) {

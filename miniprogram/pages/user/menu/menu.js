@@ -6,6 +6,8 @@ const HOME_REFERENCE = '/images/mock/home-glass-display.jpg'
 const FOOD_PLACEHOLDER_IMAGE = '/images/placeholders/food-placeholder.svg'
 const CART_STORAGE_KEY = STORAGE_KEYS.CART_ITEMS || 'cart_items'
 const BRAND_NAME = '朋友们的食堂'
+const SHARE_TITLE = '朋友们的食堂｜今日菜单'
+const SHARE_IMAGE_URL = '/images/home/home-hero-bibimbap.jpg'
 
 const FALLBACK_IMAGE_STYLES = [
   'width: 750rpx; left: -192rpx; top: -676rpx;',
@@ -365,7 +367,27 @@ Page({
       navigationHeight
     })
 
+    wx.showShareMenu({
+      menus: ['shareAppMessage', 'shareTimeline']
+    })
+
     this.loadMenu()
+  },
+
+  onShareAppMessage() {
+    return {
+      title: SHARE_TITLE,
+      path: '/pages/user/menu/menu',
+      imageUrl: SHARE_IMAGE_URL
+    }
+  },
+
+  onShareTimeline() {
+    return {
+      title: SHARE_TITLE,
+      query: '',
+      imageUrl: SHARE_IMAGE_URL
+    }
   },
 
   onShow() {

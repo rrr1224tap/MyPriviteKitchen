@@ -1,5 +1,8 @@
 const { login, isMerchantStaff } = require('../../../utils/auth')
 
+const SHARE_TITLE = '朋友们的食堂｜看看今天吃什么'
+const SHARE_IMAGE_URL = '/images/home/home-hero-bibimbap.jpg'
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -19,6 +22,26 @@ Page({
       statusBarHeight,
       navigationHeight
     })
+
+    wx.showShareMenu({
+      menus: ['shareAppMessage', 'shareTimeline']
+    })
+  },
+
+  onShareAppMessage() {
+    return {
+      title: SHARE_TITLE,
+      path: '/pages/common/launch/launch',
+      imageUrl: SHARE_IMAGE_URL
+    }
+  },
+
+  onShareTimeline() {
+    return {
+      title: SHARE_TITLE,
+      query: '',
+      imageUrl: SHARE_IMAGE_URL
+    }
   },
 
   onShow() {
