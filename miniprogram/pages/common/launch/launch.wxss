@@ -354,33 +354,35 @@
 .recommend-image {
   display: block;
   position: absolute;
-  width: 360rpx;
-  height: auto;
-  max-width: none;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   filter: brightness(1.02) saturate(1.04);
 }
 
-.recommend-image-one {
-  top: -4rpx;
-  left: -130rpx;
-}
-
-.recommend-image-two {
-  top: -6rpx;
-  left: -126rpx;
-}
-
-.recommend-image-three {
-  top: -8rpx;
-  left: -122rpx;
-}
-
 .recommend-image-placeholder {
-  display: block;
-  width: 90rpx;
-  height: 90rpx;
-  margin: 36rpx auto 0;
+  box-sizing: border-box;
+  padding: 36rpx;
   opacity: 0.68;
+}
+
+.recommend-state {
+  padding: 34rpx 28rpx;
+  border-radius: 28rpx;
+  text-align: center;
+}
+
+.recommend-state-title {
+  color: #2a1f18;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+
+.recommend-state-desc {
+  margin-top: 10rpx;
+  color: #806d61;
+  font-size: 21rpx;
 }
 
 .recommend-badge {

@@ -82,55 +82,54 @@
         <view class="recommend-more" bindtap="goToMenu">查看更多</view>
       </view>
 
-      <view class="recommend-row">
-        <view class="recommend-card glass-light" bindtap="goToMenu">
-          <view class="recommend-image-wrap">
-            <image wx:if="{{homeImageAvailable}}" class="recommend-image recommend-image-one" src="{{homeReference}}" mode="widthFix"></image>
-            <image wx:else class="recommend-image-placeholder" src="/images/placeholders/food-placeholder.svg" mode="aspectFit"></image>
-            <view class="recommend-badge recommend-badge-red">招牌</view>
-          </view>
-          <view class="recommend-name">招牌肥牛石锅拌饭</view>
-          <view class="recommend-desc">肥牛鲜嫩 · 锅气十足</view>
-          <view class="recommend-bottom">
-            <text class="recommend-price">¥29.90</text>
-            <view class="recommend-add">+</view>
-          </view>
-        </view>
-
-        <view class="recommend-card glass-light" bindtap="goToMenu">
-          <view class="recommend-image-wrap">
-            <image wx:if="{{homeImageAvailable}}" class="recommend-image recommend-image-two" src="{{homeReference}}" mode="widthFix"></image>
-            <image wx:else class="recommend-image-placeholder" src="/images/placeholders/food-placeholder.svg" mode="aspectFit"></image>
-            <view class="recommend-badge recommend-badge-orange">人气</view>
-          </view>
-          <view class="recommend-name">黑椒牛肉饭</view>
-          <view class="recommend-desc">黑椒浓郁 · 香气扑鼻</view>
-          <view class="recommend-bottom">
-            <text class="recommend-price">¥26.90</text>
-            <view class="recommend-add">+</view>
-          </view>
-        </view>
-
-        <view class="recommend-card glass-light" bindtap="goToMenu">
-          <view class="recommend-image-wrap">
-            <image wx:if="{{homeImageAvailable}}" class="recommend-image recommend-image-three" src="{{homeReference}}" mode="widthFix"></image>
-            <image wx:else class="recommend-image-placeholder" src="/images/placeholders/food-placeholder.svg" mode="aspectFit"></image>
-            <view class="recommend-badge recommend-badge-green">新品</view>
-          </view>
-          <view class="recommend-name">宫保鸡丁饭</view>
-          <view class="recommend-desc">酸甜微辣 · 下饭必点</view>
-          <view class="recommend-bottom">
-            <text class="recommend-price">¥24.90</text>
-            <view class="recommend-add">+</view>
-          </view>
-        </view>
+      <view wx:if="{{recommendStatus === 'loading'}}" class="recommend-state glass-light">
+        <view class="recommend-state-title">正在读取今日餐品</view>
+        <view class="recommend-state-desc">看看食堂今天准备了什么</view>
       </view>
 
-      <view class="recommend-dots">
-        <view class="recommend-dot is-active"></view>
-        <view class="recommend-dot"></view>
-        <view class="recommend-dot"></view>
+      <view wx:elif="{{recommendStatus === 'error'}}" class="recommend-state glass-light" bindtap="loadRecommendations">
+        <view class="recommend-state-title">今日推荐加载失败</view>
+        <view class="recommend-state-desc">点击这里重新读取</view>
       </view>
+
+      <view wx:elif="{{recommendStatus === 'empty'}}" class="recommend-state glass-light">
+        <view class="recommend-state-title">今天暂时没有可推荐的餐品</view>
+        <view class="recommend-state-desc">晚点再来看看食堂上新了没</view>
+      </view>
+
+      <block wx:else>
+        <view class="recommend-row">
+          <view
+            wx:for="{{recommendedDishes}}"
+            wx:key="dish_id"
+            class="recommend-card glass-light"
+            data-id="{{item.dish_id}}"
+            bindtap="openRecommendedDish"
+          >
+            <view class="recommend-image-wrap">
+              <image
+                class="recommend-image {{item.is_placeholder_image ? 'recommend-image-placeholder' : ''}}"
+                src="{{item.display_image}}"
+                mode="{{item.image_mode}}"
+                lazy-load="{{true}}"
+                data-id="{{item.dish_id}}"
+                binderror="handleRecommendImageError"
+              ></image>
+              <view class="recommend-badge {{item.badge_class}}">{{item.badge_text}}</view>
+            </view>
+            <view class="recommend-name">{{item.name}}</view>
+            <view class="recommend-desc">{{item.description}}</view>
+            <view class="recommend-bottom">
+              <text class="recommend-price">{{item.price_text}}</text>
+              <view class="recommend-add" data-id="{{item.dish_id}}" catchtap="addRecommendedDish">{{item.has_options ? '选' : '+'}}</view>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{recommendedDishes.length > 1}}" class="recommend-dots">
+          <view wx:for="{{recommendedDishes}}" wx:key="dish_id" class="recommend-dot {{index === 0 ? 'is-active' : ''}}"></view>
+        </view>
+      </block>
     </view>
 
     <view class="service-strip glass-light">
